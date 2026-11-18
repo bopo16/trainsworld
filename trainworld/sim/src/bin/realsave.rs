@@ -292,7 +292,8 @@ fn main() {
                 pis = seq.into_iter().map(|(_, p)| p).collect();
             }
             let e = net.alloc_edge();
-            if net.set_edge(e, Some(EdgeData { a, b, tracks: 2, pis, built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::from_hsr(edge_hsr), sep: true, day: 0, oneway: 0, join: [0; 2] })).is_err() {
+            if let Err(issue) = net.set_edge(e, Some(EdgeData { a, b, tracks: 2, pis, built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::from_hsr(edge_hsr), sep: true, day: 0, oneway: 0, join: [0; 2] })) {
+                eprintln!("edge {ei} ({a} to {b}) refused: {issue:?}");
                 refused += 1;
             }
             edge_ids.push(e);
@@ -315,9 +316,9 @@ fn main() {
             let trains: Option<[u32; 3]> = l["trains"].as_array().map(|a| [0, 1, 2].map(|i| a[i].as_u64().unwrap() as u32));
             let id = net.alloc_line();
             let name = format!("{} {}", l["feed"].as_str().unwrap(), l["name"].as_str().unwrap());
-            let name = names::tidy_line(&name, "").unwrap_or(name);
+            let name = if l["symbol"].as_str().is_some_and(|s| !s.is_empty()) { l["name"].as_str().unwrap().to_string() } else { names::tidy_line(&name, "").unwrap_or(name) };
             let colour = l["colour"].as_str().and_then(|s| u32::from_str_radix(s.trim_start_matches('#'), 16).ok()).unwrap_or(PALETTE[li % PALETTE.len()]);
-            let r = net.set_line(id, Some(LineData { symbol: String::new(), trains, auto: None, name, colour, stops, path, tph: [tph[0], tph[1], tph[2]], dwell_s: 30.0, turnaround_s: 180.0, cars, fast: false, bus: None, ferry: None, group: 0, group_name: String::new(), group_look: Default::default(), day: 0, hand: false, one_way: false, limit: 0, twin: Default::default() }));
+            let r = net.set_line(id, Some(LineData { symbol: l["symbol"].as_str().unwrap_or("").to_string(), trains, auto: None, name, colour, stops, path, tph: [tph[0], tph[1], tph[2]], dwell_s: 30.0, turnaround_s: 180.0, cars, fast: false, bus: None, ferry: None, group: 0, group_name: String::new(), group_look: Default::default(), day: 0, hand: false, one_way: false, limit: 0, twin: Default::default() }));
             if r.is_ok() {
                 n_lines_ok += 1;
             }

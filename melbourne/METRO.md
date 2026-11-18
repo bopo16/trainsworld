@@ -1,0 +1,41 @@
+# Melbourne metropolitan network
+
+`melbourne-metro.save` is a first full metropolitan network built from the November 2026 timetable. It includes 17 metropolitan line groups (including Stony Point and Flemington events), City Loop stations and through-running Cranbourne–Sunbury and Pakenham–Sunbury services via the Metro Tunnel. It does not include V/Line or tram services; track used by both metropolitan and regional trains may be represented as part of a metropolitan corridor, but separate V/Line-only infrastructure is not systematically modelled.
+
+**Import:** download `melbourne-metro.save`, open Trainsworld and use its **Load a file** flow. The earlier corridor prototype was confirmed to load by its user. This larger save passed the native game decoder and simulation checks below, but has not been visually tested in a browser: the available cloud browser did not support WebGL2.
+
+## Sources and approach
+
+* [Transport Victoria GTFS Schedule](https://opendata.transport.vic.gov.au/dataset/gtfs-schedule), Department of Transport and Planning, CC BY 4.0. The input was the 12 November 2026 release, outer zip SHA-256 `424be6c94c328b22ca25b5ce90273acd945dcfd3dec562bb13dfd2ade2b40990`; weekday 18 November for normal services. The event-only Flemington line uses Saturday 21 November, since it has no service on that weekday. GTFS is a rolling dataset, not a permanent snapshot; retain the archive for reproduction. Date-specific disruptions and service patterns are present in this input.
+* Published game data version 2026-11-13: [Melbourne pack](https://data.anita.garden/trainworld/2026-11-13/mel.json), SHA-256 `7bf3622945cc3e381bf077c9a806df14637204669757243dc6e9b7104d9089c2`, and [Australian OSM-derived rail graph](https://data.anita.garden/trainworld/2026-11-13/realgraph/au.rgr), SHA-256 `a6110b317b28a198d9deda78eec83f7ab4fbd31bcf00743b3a7b82f922aee28a`. © OpenStreetMap contributors, [ODbL](https://www.openstreetmap.org/copyright). The graph's precise underlying OSM extract date has not been independently verified.
+* The selected event timetable reaches Showgrounds, not Flemington Racecourse. The generator adds **unserved** Showgrounds–Flemington Racecourse infrastructure by routing to [OSM stop position 8784348527](https://www.openstreetmap.org/node/8784348527); the pinned input is `sources/flemington-osm-node.json`. The official [event information](https://transport.vic.gov.au/news-and-resources/events-and-public-transport/public-transport-for-the-cox-plate) confirms that some events run through to Flemington Racecourse, but its service times are not inserted into this save. The event line is explicitly named “Flemington Racecourse (Showgrounds events)”.
+* The game uses 20 m cars. The Victorian Government's [Metro Tunnel business case](https://metrotunnel.vic.gov.au/__data/assets/pdf_file/0004/40477/MT-Business-Case-Feb-2016-APPENDIX-01.PDF) states approximately 143 m for existing fleets and 160 m for high-capacity trains. The generator uses **7 game cars / 140 m** for the conventional metro fleet, **8 / 160 m** for Metro Tunnel trains, and **3 / 60 m** for Stony Point as an approximation to two Sprinter railcars. [V/Line's network service plan](https://corporate.vline.com.au/getattachment/16cd1a7a-2973-4631-80fc-b6218b9ef990/Addenda) lists a Sprinter at 25.9 m; the number of railcars can vary. Game cars do not correspond one-for-one to real carriages. [Transport Victoria](https://transport.vic.gov.au/news-and-resources/projects-hub/greater-melbourne/xtrapolis-trains) describes X'Trapolis 2.0 as six-car trains.
+* Platform length is estimated from the longest modelled train using upstream rules, rather than individually surveyed. As a point of comparison, Victoria's Big Build describes [160 m of covered platform at Mordialloc](https://bigbuild.vic.gov.au/__data/assets/pdf_file/0014/930011/Meet-your-new-Mordialloc-Station-April-2025.pdf). Actual platform lengths and stopping positions need a station-by-station audit.
+
+The generator extracts the metropolitan train portion of the feed, removes replacement-bus routes and trips with replacement stops, applies service calendars and exceptions, and uses the upstream `realnet.py`, `realcorridors.py` and `realsave --shared --left` pipeline. It sets real GTFS line colours and short, **project-defined** letter symbols (not official route numbers). A single route can have several game lines for distinct stopping patterns; names indicate City Loop/direct and short-turn destinations where possible. The GTFS route halves of the Metro Tunnel were joined at Town Hall by merging two generated representations of the same platform, originally 103 m apart, with straightened platform approaches. Both resulting game lines continue through the tunnel.
+
+## Validation and known limitations
+
+The final save SHA-256 is `2e8881543aacc6176dffbf8c835c9f71ccbd69a6704e93e32d444e916a91f20b`. `validate_metro.py` checks the game container and header, then reloads the payload with the game's Rust decoder and `TrackWorld`. It checks left-hand running, 17 named line groups, the City Loop, both through Tunnel routes, station presence, built and connected paths, every line running and sufficient cars. Results: **38 running service patterns, 227 distinct station names, 517 edges, and 1,377 fleet cars**. Six Python tests pass. The game model's geometry validator reports **23 platform/junction clearance and 2 platform/station clearance warnings**; the latter are at Carrum. They did not stop any service in the native model, but should be inspected and resolved in-game.
+
+This is an approximation, not a precise signalling, platform or timetable reconstruction:
+
+* The game's generated two-way services can traverse the City Loop in both directions, even where real trains use different directional patterns. Short turns, stopping patterns and frequencies are aggregated; the model does not reproduce exact departure times, rolling stock rosters, platform assignments or service disruptions. Game train allocation changes the requested frequencies. The game-model sum of one-way journey times is around 10% shorter than the selected GTFS patterns.
+* Upstream chose GTFS shapes for **13 off-graph pieces** when it could not accept an OSM-graph route near the relevant shape. It infers shared pairs, track levels, platforms and junction geometry. Some stations are offset to fit the graph; junction and crossing layout is not surveyed. The model has no independently verified V/Line tracks or capacity reservations.
+* Train lengths above are approximations. Stony Point uses a normal game train rather than a specifically modelled diesel railcar; the game generator models double track even where the real railway is single. Flemington Racecourse station and its 925 m extension are built, but no service reaches it in this save. A route ending at Showgrounds represents the selected event day, not a daily timetable.
+* New builds depend on a feed containing both selected dates and the listed route names. The generator refuses to overwrite an existing save or different staged pack/graph and fails if expected tunnel endpoints, event services or the OSM extension cannot be found. It validates the output before returning success.
+
+## Rebuild
+
+Use Python 3.10+, `numpy`, `pandas`, `scipy`, `shapely` 2+, `matplotlib`, and Rust/Cargo. No worldwide dataset or WASM build is required. Download the official GTFS outer zip and the two pinned game data files above, then from the repository root:
+
+```sh
+python -m pip install numpy pandas scipy 'shapely>=2' matplotlib
+python melbourne/metro_network.py --gtfs /path/to/gtfs.zip --date 2026-11-18 \
+  --event-date 2026-11-21 --pack /path/to/mel.json --graph /path/to/au.rgr \
+  --out /path/to/new-build-directory
+python -m unittest discover -s melbourne -v
+python melbourne/validate_metro.py /path/to/new-build-directory/mel_real.save
+```
+
+The input zip is about 296 MB, though only its metropolitan train feed is extracted; the graph is about 743 KB. Generated files and logs in the build directory show the inferred network and graph-routing statistics. The graph and pack are also staged under git-ignored `trainworld/data/packs/`; different existing inputs are not overwritten.
