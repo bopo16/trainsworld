@@ -126,6 +126,7 @@ fn route(net: &mut Network, name: &str, old: &[u32], new: &[u32], stop: Option<(
     if let Some((from, to)) = stop {
         let at = line.stops.iter().position(|&id| id == from).expect(name);
         line.stops[at] = to;
+        line.stops.dedup();
     }
     net.set_line(id, Some(line)).unwrap();
 }
@@ -176,10 +177,10 @@ fn river(net: &mut Network) {
             .collect::<Vec<_>>()
     };
     for (id, sx, fss, incoming, outgoing, offset) in [
-        (369, 353, 349, 373, 303, 60.0),
-        (370, 393, 389, 374, 320, 89.0),
-        (371, 443, 420, 338, 326, 118.0),
-        (372, 456, 452, 375, 354, 147.0),
+        (369, 353, 349, 373, 303, 78.0),
+        (370, 393, 389, 374, 320, 104.0),
+        (371, 443, 420, 338, 326, 130.0),
+        (372, 456, 452, 375, 354, 0.0),
     ] {
         let p = lane(net, offset);
         station_end(net, sx, p[0], incoming, west);
@@ -203,7 +204,7 @@ fn river(net: &mut Network) {
         &[256 * 2, 257 * 2],
         Some((43, 316)),
     );
-    let p = lane(net, 0.0);
+    let p = lane(net, 26.0);
     station_end(net, 316, p[0], 257, west);
     station_end(net, 315, p[8], 201, east);
     place(net, 40, p[1]);
@@ -216,7 +217,7 @@ fn river(net: &mut Network) {
     let event = "Flemington Racecourse (Showgrounds events)";
     route(net, event, &[384 * 2, 377 * 2 + 1], &[384 * 2], None);
     route(net, event, &[376 * 2 + 1, 385 * 2], &[385 * 2], None);
-    let p = lane(net, 30.0);
+    let p = lane(net, 52.0);
     let old = point(net, 488);
     place(net, 488, p[0]);
     place(net, 485, p[8]);
@@ -236,6 +237,187 @@ fn river(net: &mut Network) {
         &[29, 31, 1, 0, 274, 32, 197, 377, 376],
         &[43, 44, 45, 47, 48, 489, 490],
     );
+}
+
+fn northern_loop(net: &mut Network) {
+    // Surveyed centre corridor approximated from OSM rail chains 218, 2586,
+    // 2427 and 12115 in the 18 November Australian graph. Offset the same
+    // vertices so all four tunnels keep their order and station tangents.
+    let guide = [
+        [-475.0, 462.0],
+        [165.0, 695.0],
+        [700.0, 890.0],
+        [840.0, 884.0],
+        [964.0, 806.0],
+        [1018.0, 695.0],
+        [1062.0, 568.0],
+    ];
+    for (flag, central, parliament, west, north, east, south, offset) in [
+        (360, 365, 368, 373, 362, 361, 291, -6.0),
+        (400, 405, 408, 374, 364, 363, 313, -18.0),
+        (433, 428, 425, 331, 366, 365, 330, 18.0),
+        (463, 468, 471, 375, 368, 367, 346, 6.0),
+    ] {
+        let p: Vec<_> = parallel(&guide, offset)
+            .into_iter()
+            .map(|q| plane(net, q))
+            .collect();
+        let old = point(net, flag);
+        place(net, flag, p[0]);
+        let westward = tangent(p[1], p[0]);
+        if west == 331 {
+            let scale = net.frame().scale_at(ORIGIN[1]).0;
+            place(net, 434, plus(p[0], westward, 100.0 * scale));
+            replace_shape(net, 331, &[], 0);
+            place(net, 435, plane(net, [-676.0, 421.0]));
+            place(net, 436, plane(net, [-838.0, 456.0]));
+            let lead = plus(point(net, 434), westward, 40.0 * scale);
+            replace_shape(net, 332, &[lead], 1);
+            let q = plane(net, [-766.0, 434.0]);
+            replace_shape(net, 333, &[q], 1);
+            let q = [plane(net, [-1265.0, 654.0]), plane(net, [-989.0, 499.0])];
+            replace_shape(net, 334, &q, 2);
+        } else {
+            retangent(net, west, flag, old, westward, 85.0);
+        }
+        place(net, central, p[1]);
+        replace_shape(net, north, &[], 0);
+        station_end(net, parliament, p[6], south, tangent(p[5], p[6]));
+        replace_shape(net, east, &[p[5], p[4], p[3], p[2]], 2);
+    }
+}
+
+fn flinders_east(net: &mut Network) {
+    // Keep the river order for the first platform lead. The cross-city and
+    // Frankston tracks then curve south; the Northern Loop turns north.
+    let axis = unit([222.0, 61.0]);
+    let scale = net.frame().scale_at(ORIGIN[1]).0;
+    for (station, joint, first, second, x, points) in [
+        (
+            452,
+            479,
+            354,
+            355,
+            918.0,
+            &[[1040.0, -151.0], [1220.0, -244.0], [1490.0, -394.0]][..],
+        ),
+        (
+            315,
+            262,
+            201,
+            202,
+            920.0,
+            &[
+                [1030.0, -125.0],
+                [1210.0, -150.0],
+                [1390.0, -261.0],
+                [1570.0, -365.0],
+            ][..],
+        ),
+        (
+            349,
+            380,
+            303,
+            304,
+            835.0,
+            &[
+                [955.0, -74.0],
+                [1080.0, -58.0],
+                [1220.0, -69.0],
+                [1440.0, -172.0],
+            ][..],
+        ),
+        (
+            389,
+            415,
+            320,
+            321,
+            819.0,
+            &[[920.0, -47.0], [975.0, -46.0]][..],
+        ),
+        (
+            420,
+            421,
+            326,
+            327,
+            850.0,
+            &[[940.0, 5.0], [1015.0, 41.0]][..],
+        ),
+    ] {
+        let start = point(net, station);
+        let target = plane(net, [x, 0.0]);
+        let end = plus(start, axis, (target[0] - start[0]) / axis[0]);
+        place(net, joint, end);
+        replace_shape(net, first, &[], 0);
+        let mut guides = vec![plus(end, axis, 45.0 * scale)];
+        guides.extend(points.iter().map(|&p| plane(net, p)));
+        if net.edge_data(second).unwrap().a != joint {
+            guides.reverse();
+        }
+        let split = guides.len() / 2;
+        replace_shape(net, second, &guides, split);
+    }
+}
+
+fn southern_cross_north(net: &mut Network) {
+    // Spread the compact Flagstaff tubes into the same order as the river
+    // bundle before they reach the platforms. End tangents follow the
+    // adjoining tunnel and river alignments, respectively.
+    let guide = [
+        [-572.0, 445.0],
+        [-747.0, 379.0],
+        [-890.0, 303.0],
+        [-948.0, 167.0],
+        [-936.0, 55.0],
+        [-829.0, -91.0],
+        [-795.0, -211.0],
+        [-767.0, -315.0],
+    ];
+    let scale = net.frame().scale_at(ORIGIN[1]).0;
+    let southward = unit([30.0, -111.0]);
+    for (edge, flag, central, platform, offset) in [
+        (375, 463, 468, 456, 0.0),
+        (373, 360, 365, 353, 78.0),
+        (374, 400, 405, 393, 104.0),
+    ] {
+        let start = point(net, flag);
+        let end = point(net, platform);
+        // The first two guide positions ease the expansion from 12 m
+        // tunnel spacing without swapping the order of the lanes.
+        let inner = parallel(&guide, offset);
+        let mut points = vec![plus(
+            start,
+            tangent(point(net, central), start),
+            85.0 * scale,
+        )];
+        points.extend((1..=5).map(|k| {
+            let ease = [0.0, 0.45, 0.78, 1.0, 1.0, 1.0][k];
+            plane(net, plus(guide[k], sub(inner[k], guide[k]), ease))
+        }));
+        points.push(plus(end, southward, -98.0 * scale));
+        replace_shape(net, edge, &points, points.len());
+        if edge == 375 {
+            let mut data = net.edge_data(edge).unwrap();
+            // Keep the crossing with the western surface pairs outside
+            // the platform leads, in the underground approach.
+            for pi in &mut data.pis[2..5] {
+                pi.level = -2;
+            }
+            net.set_edge(edge, Some(data)).unwrap();
+        }
+    }
+    // The Northern Group reaches Southern Cross from North Melbourne.
+    // Keep it east of the new bundle through the immediate station throat.
+    let station = point(net, 443);
+    place(net, 445, plus(station, southward, -183.0 * scale));
+    place(net, 446, plane(net, [-743.0, -11.0]));
+    place(net, 447, plane(net, [-781.0, 142.0]));
+    replace_shape(net, 338, &[], 0);
+    let lead = plus(point(net, 445), southward, -45.0 * scale);
+    replace_shape(net, 339, &[lead], 1);
+    replace_shape(net, 340, &[], 0);
+    let node = point(net, 447);
+    retangent(net, 341, 447, node, tangent(point(net, 446), node), 45.0);
 }
 
 fn move_bundle(net: &mut Network, nodes: &[u32], offset: Point) {
@@ -443,6 +625,140 @@ fn tidy_headings(net: &mut Network) {
     }
 }
 
+fn tram_junctions(net: &mut Network) {
+    // Route 64 had consecutive stops only 34 m apart on the Hawthorn Road
+    // curve. Keep the named interchange beyond the turn and fit one curve.
+    route(
+        net,
+        "Tram 64",
+        &[965 * 2, 966 * 2],
+        &[965 * 2],
+        Some((1069, 1070)),
+    );
+    let mut tram = net.edge_data(965).unwrap();
+    tram.b = 1070;
+    place(net, 1070, plane(net, [5654.0, -5483.0]));
+    let first = tram.pis[0];
+    let [x, y] = plane(net, [5703.0, -5511.0]);
+    tram.pis = vec![first, Pi::new(x, y, 26.0, 0)];
+    net.set_edge(965, Some(tram)).unwrap();
+    let points = [plane(net, [5636.5, -5473.0]), plane(net, [5523.2, -5417.5])];
+    replace_shape(net, 967, &points, 2);
+    retire(net, &[966], &[1069]);
+
+    // Leave the Nicholson turnout on its existing tangent, then stay
+    // near the road centre before the straight Barrow Street platform lead.
+    let a = point(net, 811);
+    let mut edge = net.edge_data(1033).unwrap();
+    let first = edge.pis[0];
+    let last = *edge.pis.last().unwrap();
+    let u = unit(sub([first.x, first.y], a));
+    let scale = net.frame().scale_at(ORIGIN[1]).0;
+    let mut corner = pi(plus(a, u, 31.0 * scale), 0);
+    corner.radius = 24.0;
+    edge.pis = vec![corner, pi(plane(net, [1080.0, 6657.0]), 0), last];
+    net.set_edge(1033, Some(edge)).unwrap();
+}
+
+fn swanston_trams(net: &mut Network) {
+    // The previous save intentionally doubled these tracks for capacity.
+    // Route the services onto the shared street pair, retaining the branch
+    // junctions used by routes 58, 72, and 1.
+    let stops = [
+        (707, 706),
+        (710, 709),
+        (712, 711),
+        (715, 713),
+        (718, 716),
+        (720, 719),
+        (722, 721),
+        (725, 723),
+        (727, 726),
+        (729, 728),
+        (731, 730),
+        (733, 732),
+        (735, 734),
+        (737, 736),
+        (739, 738),
+        (741, 740),
+    ];
+    let paths: &[(u32, &[u32])] = &[
+        (622, &[623 * 2, 420 * 2 + 1]),
+        (625, &[624 * 2]),
+        (627, &[626 * 2]),
+        (629, &[628 * 2, 421 * 2 + 1]),
+        (631, &[630 * 2]),
+        (633, &[422 * 2 + 1, 632 * 2]),
+        (635, &[634 * 2]),
+        (637, &[636 * 2, 423 * 2 + 1]),
+        (639, &[638 * 2]),
+        (641, &[640 * 2]),
+        (643, &[642 * 2]),
+        (645, &[644 * 2]),
+        (647, &[646 * 2]),
+        (649, &[648 * 2]),
+        (651, &[650 * 2]),
+        (653, &[652 * 2]),
+    ];
+    let mut lead = net.edge_data(420).unwrap();
+    lead.a = 706;
+    net.set_edge(420, Some(lead)).unwrap();
+
+    let mut centres = Vec::new();
+    for (duplicate, keep) in stops {
+        let orig = point(net, keep);
+        let shift = sub(point(net, duplicate), orig);
+        centres.push((keep, plus(orig, shift, 0.5)));
+    }
+    for &(node, xy) in &centres {
+        place(net, node, xy);
+    }
+    // Swanston Street is straight through these stops. Use one axis in
+    // place of the small side steps inherited from independent platforms.
+    let south = point(net, 726);
+    let axis = tangent(south, point(net, 740));
+    for node in [728, 730, 732, 734, 736, 738] {
+        let offset = sub(point(net, node), south);
+        place(
+            net,
+            node,
+            plus(south, axis, offset[0] * axis[0] + offset[1] * axis[1]),
+        );
+    }
+    for edge in [640, 642, 644, 646, 648, 650, 652] {
+        replace_shape(net, edge, &[], 0);
+    }
+    for id in 0..net.line_count() as u32 {
+        let mut line = net.line_data(id).unwrap();
+        let mut changed = false;
+        let mut new_path = Vec::with_capacity(line.path.len());
+        for &code in &line.path {
+            if let Some((_, replacement)) = paths.iter().find(|(e, _)| *e == code >> 1) {
+                if code & 1 == 0 {
+                    new_path.extend(replacement.iter().copied());
+                } else {
+                    new_path.extend(replacement.iter().rev().map(|p| p ^ 1));
+                }
+                changed = true;
+            } else {
+                new_path.push(code);
+            }
+        }
+        if changed {
+            line.path = new_path;
+            for stop in &mut line.stops {
+                if let Some((_, keep)) = stops.iter().find(|(drop, _)| *drop == *stop) {
+                    *stop = *keep;
+                }
+            }
+            net.set_line(id, Some(line)).unwrap();
+        }
+    }
+    let edges: Vec<_> = paths.iter().map(|(edge, _)| *edge).collect();
+    let nodes: Vec<_> = stops.iter().map(|(drop, _)| *drop).collect();
+    retire(net, &edges, &nodes);
+}
+
 fn edge_samples(net: &Network, id: u32) -> Vec<Point> {
     let pieces = net.edge_pieces(id);
     let n = (net.edge_len[id as usize] / 5.0).ceil() as usize;
@@ -515,12 +831,17 @@ fn main() {
     let mut net = save::decode(&input).expect("decode Melbourne save");
     assert_eq!((net.line_count(), net.edge_count()), (40, 1307));
     river(&mut net);
+    northern_loop(&mut net);
+    flinders_east(&mut net);
+    southern_cross_north(&mut net);
     approaches(&mut net);
     plaza(&mut net);
     street_stops(&mut net);
+    swanston_trams(&mut net);
+    tram_junctions(&mut net);
     net.touch_all();
     derive(&mut net);
-    for edge in [462, 509, 726, 966, 1033, 1040, 1200, 1281] {
+    for edge in [462, 509, 726, 965, 1033, 1040, 1200, 1281] {
         tidy_tram_curve(&mut net, edge);
     }
     tidy_headings(&mut net);
@@ -532,6 +853,9 @@ fn main() {
             "invalid route: {}",
             line.name
         );
+        if line.name == "Tram 64" {
+            assert!(world.net.path_reversals(&line.path).is_empty());
+        }
         assert!(
             world.svc.lines[id as usize].running,
             "inactive service: {}",
