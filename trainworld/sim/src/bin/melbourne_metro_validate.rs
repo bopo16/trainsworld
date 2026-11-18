@@ -20,8 +20,17 @@ fn main() {
     let mut names = BTreeSet::new();
     let mut needed = 0u64;
     let mut city_loop = false;
+    let grouped = n.line_group.iter().any(|&g| g != 0);
+    let mut groups = std::collections::BTreeMap::new();
     for i in 0..n.line_count() as u32 {
         let l = n.line_data(i).expect("missing line");
+        if grouped {
+            assert!(l.group > 0 && !l.group_name.is_empty() && !l.group_look.symbol.is_empty(), "{} missing line group metadata", l.name);
+            if let Some(previous) = groups.insert(l.group, l.group_name.clone()) { assert_eq!(previous, l.group_name, "inconsistent group name"); }
+            if l.name == "Stony Point" {
+                for &edge in &l.path { assert_eq!(n.edge_data(edge >> 1).unwrap().tracks, 1, "Stony Point is not single-track"); }
+            }
+        }
         let stop_names: Vec<String> = l.stops.iter().map(|&id| n.station_data(id).expect("line stop is not a station").name).collect();
         if ["Flinders Street", "Southern Cross", "Flagstaff", "Melbourne Central", "Parliament"].iter().all(|s| stop_names.iter().any(|x| x == s)) { city_loop = true; }
         if l.name == "Cranbourne – Sunbury" || l.name == "Pakenham – Sunbury" {
@@ -47,6 +56,12 @@ fn main() {
     }
     for expected in ["Alamein", "Belgrave", "Cranbourne", "Craigieburn", "Flemington Racecourse", "Frankston", "Glen Waverley", "Hurstbridge", "Lilydale", "Mernda", "Pakenham", "Sandringham", "Stony Point", "Sunbury", "Upfield", "Werribee", "Williamstown"] {
         assert!(names.iter().any(|name| name.contains(expected)), "missing line {expected}");
+    }
+    if grouped {
+        assert_eq!(groups.len(), 7, "expected seven line groups");
+        for name in ["Blue · Burnley", "Red · Clifton Hill", "Yellow · Northern", "Green · Frankston", "Pink · Cross-city", "Light blue · Metro Tunnel", "Special events"] {
+            assert!(groups.values().any(|x| x == name), "missing group {name}");
+        }
     }
     assert!(city_loop, "no route serves all City Loop stations");
     assert!(names.contains("Cranbourne – Sunbury") && names.contains("Pakenham – Sunbury"), "Metro Tunnel through services missing");

@@ -25,6 +25,113 @@ SYMBOLS = {'Alamein':'ALM', 'Belgrave':'BEG', 'Cranbourne':'CBE', 'Craigieburn':
            'Mernda':'MDD', 'Pakenham':'PKM', 'Flemington Racecourse':'RCE', 'Sandringham':'SHM',
            'Stony Point':'STY', 'Sunbury':'SUY', 'Upfield':'UFD', 'Werribee':'WER', 'Williamstown':'WIL'}
 
+# Groups follow the route colours in the Victorian GTFS feed. IDs are stable.
+GROUPS = {
+    **{x: (1, 'Blue · Burnley', 'BLU') for x in ('Alamein','Belgrave','Glen Waverley','Lilydale')},
+    **{x: (2, 'Red · Clifton Hill', 'RED') for x in ('Hurstbridge','Mernda')},
+    **{x: (3, 'Yellow · Northern', 'YEL') for x in ('Craigieburn','Upfield')},
+    **{x: (4, 'Green · Frankston', 'GRN') for x in ('Frankston','Stony Point')},
+    **{x: (5, 'Pink · Cross-city', 'PNK') for x in ('Sandringham','Werribee','Williamstown')},
+    **{x: (6, 'Light blue · Metro Tunnel', 'TUN') for x in ('Cranbourne','Pakenham','Sunbury')},
+    'Flemington Racecourse': (7, 'Special events', 'EVT'),
+}
+TERMINALS = {name: ('East Pakenham' if name == 'Pakenham' else 'Showgrounds' if name == 'Flemington Racecourse' else name) for name in SYMBOLS}
+
+def simplify_services(net):
+    """Choose a main pattern per route, add only variants needed for stop coverage.
+
+    Frequencies of removed patterns are assigned to the kept pattern that shares
+    the greatest fraction of stops, favouring its matching terminal. This is a
+    deliberate approximation; it is not a recreation of express stopping.
+    """
+    from copy import deepcopy
+    original = net['lines']; stations = net['stations']
+    routes = defaultdict(list)
+    for i, line in enumerate(original): routes[line['route']].append(i)
+    def full_direct_stops(primary, ids):
+        # Keep direct approaches legible, but restore observed intermediate stops
+        # from a longer compatible pattern. Never invent an unobserved hop time.
+        if primary['name'] not in {'Alamein', 'Glen Waverley', 'Mernda', 'Lilydale', 'Frankston'}:
+            return None
+        city = {'Southern Cross', 'Flagstaff', 'Melbourne Central', 'Parliament'}
+        candidates = []
+        for i in ids:
+            route = [s for s in original[i]['stops'] if stations[s]['name'] not in city]
+            at = iter(route)
+            if all(any(s == v for s in at) for v in primary['stops']): candidates.append(route)
+        if not candidates: return None
+        target = max(candidates, key=len)
+        if len(target) <= len(primary['stops']): return None
+        from statistics import median
+        samples = defaultdict(list)
+        for i in ids:
+            line = original[i]
+            for k, (a, b) in enumerate(zip(line['stops'], line['stops'][1:])):
+                for lv in range(3):
+                    for pair, value in (((a,b), line['t0'][lv][k]), ((b,a), line['t1'][lv][k+1])):
+                        if value > 0: samples[(pair, lv)].append(value)
+        t0 = [[0.0]*len(target) for _ in range(3)]; t1 = [[0.0]*len(target) for _ in range(3)]
+        for k,(a,b) in enumerate(zip(target,target[1:])):
+            for lv in range(3):
+                f = samples.get(((a,b),lv)) or samples.get(((b,a),lv))
+                r = samples.get(((b,a),lv)) or f
+                if not f or not r: return None
+                t0[lv][k] = float(median(f)); t1[lv][k+1] = float(median(r))
+        return target, t0, t1
+    expanded = {i: full_direct_stops(line, routes[line['route']]) for i, line in enumerate(original)}
+    def selected_stops(i):
+        return expanded[i][0] if expanded[i] is not None else original[i]['stops']
+    chosen = []
+    for route, ids in routes.items():
+        name = original[ids[0]]['name']; target = TERMINALS[name]
+        eligible = [i for i in ids if any(stations[s]['name'] == target for s in original[i]['stops'])]
+        eligible = eligible or ids
+        # Keep a few direct city approaches to avoid piling every line onto the
+        # same loop; the remaining patterns still represent the City Loop.
+        direct_preferred = {'Alamein', 'Glen Waverley', 'Mernda', 'Lilydale', 'Frankston', 'Upfield'}
+        if name in direct_preferred:
+            direct = [i for i in eligible if not any(stations[x]['name'] in ('Parliament', 'Melbourne Central', 'Flagstaff') for x in original[i]['stops'])]
+            if direct: eligible = direct
+        best = max(eligible, key=lambda i: (len(set(original[i]['stops'])), sum(original[i]['tph']), -i))
+        chosen.append(best)
+    all_stops = {s for line in original for s in line['stops']}
+    served = {s for i in chosen for s in selected_stops(i)}
+    while missing := all_stops - served:
+        options = [i for i in range(len(original)) if i not in chosen and set(selected_stops(i)) & missing]
+        if not options: raise ValueError('Cannot preserve all GTFS stations while consolidating')
+        best = max(options, key=lambda i: (len(set(selected_stops(i)) & missing), sum(original[i]['tph']), -i))
+        chosen.append(best); served.update(selected_stops(best))
+    chosen.sort()
+    assigned = {i: [] for i in chosen}
+    for i, line in enumerate(original):
+        options = [j for j in chosen if original[j]['route'] == line['route']]
+        def similarity(j):
+            common = len(set(line['stops']) & set(selected_stops(j)))
+            # A short turn and a full-length pattern stay with the same branch when possible.
+            return (common / len(set(line['stops'])), line['stops'][-1] == original[j]['stops'][-1], common, -j)
+        assigned[i if i in assigned else max(options, key=similarity)].append(i)
+    result = []
+    for j in chosen:
+        line = deepcopy(original[j]); sources = assigned[j]
+        full = expanded[j]
+        if full is not None:
+            line['stops'], line['t0'], line['t1'] = full
+        line['tph'] = [round(sum(original[i]['tph'][lv] for i in sources), 2) for lv in range(3)]
+        line['trips_day'] = sum(original[i].get('trips_day', 0) for i in sources)
+        line['merged_patterns'] = len(sources)
+        result.append(line)
+    net['lines'] = result
+    # Keep the upstream demand snapshot consistent with the selected network.
+    d = {'st_xy':[v for st in stations for v in (st['x'],st['y'])], 'line_n':[], 'stops':[], 'times':[], 'tph':[], 'cars':[]}
+    for line in result:
+        d['line_n'].append(len(line['stops'])); d['stops'] += line['stops']
+        for direction in (line['t0'], line['t1']):
+            for level in direction: d['times'] += level
+        d['tph'] += line['tph']; d['cars'].append(line['cars'])
+    net['demand'] = d
+    print(f'Consolidated {len(original)} patterns into {len(result)}, retaining {len(all_stops)} distinct GTFS station keys', flush=True)
+    return net
+
 def service_ids(calendar, dates, date):
     day = date.strftime('%Y%m%d')
     ids = set()
@@ -37,6 +144,89 @@ def service_ids(calendar, dates, date):
         ids |= set(rows.loc[rows.exception_type == '1', 'service_id'])
         ids -= set(rows.loc[rows.exception_type == '2', 'service_id'])
     return ids
+
+def single_track_stony_point(out):
+    """Use single track only for edges exclusively used by Stony Point."""
+    net = json.loads((out / 'mel_real.json').read_text())
+    path = out / 'mel_real_corridors.json'; doc = json.loads(path.read_text()); model = doc['model']
+    uses = defaultdict(set)
+    for line, service in zip(net['lines'], model['lines']):
+        if service:
+            for code in service['path']: uses[code >> 1].add(line['name'])
+    stony = [service for line, service in zip(net['lines'], model['lines']) if line['name'] == 'Stony Point' and service]
+    if len(stony) != 1: raise ValueError('Expected one Stony Point service')
+    selected = {code >> 1 for code in stony[0]['path']}
+    if any(uses[e] != {'Stony Point'} for e in selected):
+        raise ValueError('Stony Point shares an edge with another line; cannot safely make it single')
+    for e in selected: model['edges'][e]['tracks'] = 1
+    path.write_text(json.dumps(doc))
+    print(f'Set {len(selected)} Stony Point edges to single track', flush=True)
+
+def ordered_shape(stations, candidates):
+    """Best nearby shape visiting stations once in order, in either direction."""
+    import numpy as np
+    best = None
+    for shape_id, shape in candidates:
+        if shape is None or len(shape) < 2: continue
+        distances = np.hypot(*(shape[:,None,:] - stations[None,:,:]).transpose(2,0,1))
+        indexes = np.argmin(distances, axis=0)
+        nearest = distances[indexes, np.arange(len(stations))]
+        diff = np.diff(indexes)
+        if max(nearest) > 400 or not (np.all(diff > 0) or np.all(diff < 0)): continue
+        cum = np.r_[0, np.cumsum(np.hypot(*np.diff(shape,axis=0).T))]
+        hops = np.abs(np.diff(cum[indexes])); direct = np.hypot(*np.diff(stations,axis=0).T)
+        if np.any(hops > 1.8 * direct + 800): continue
+        score = float(sum(nearest) + sum(np.maximum(0, hops - direct)))
+        if best is None or score < best[0]: best = (score, shape, indexes)
+    return best
+
+def fit_ordered_shapes(out, feed, realnet):
+    """Select GTFS shapes in stop order to avoid looped/doubled-back hops."""
+    import numpy as np
+    net = json.loads((out / 'mel_real.json').read_text())
+    path = out / 'mel_real_geom.json'; geo = json.loads(path.read_text())
+    shapes = pd.read_csv(feed / 'shapes.txt', dtype=str, keep_default_na=False)
+    trips = pd.read_csv(feed / 'trips.txt', dtype=str, keep_default_na=False)
+    shapes['seq'] = shapes.shape_pt_sequence.astype(float)
+    shapes = shapes.sort_values(['shape_id', 'seq'])
+    x, y = realnet.to_xy(shapes.shape_pt_lon.astype(float).to_numpy(), shapes.shape_pt_lat.astype(float).to_numpy(), realnet.origin('mel'))
+    shapes['x'], shapes['y'] = x, y
+    points = {sid: group[['x','y']].to_numpy() for sid, group in shapes.groupby('shape_id', sort=False)}
+    route_shapes = {route: list(group.shape_id.unique()) for route, group in trips.groupby('route_id', sort=False)}
+    chosen, fallback = 0, []
+    for li, line in enumerate(net['lines']):
+        st = np.array([[net['stations'][k]['x'], net['stations'][k]['y']] for k in line['stops']])
+        best = ordered_shape(st, ((sid, points.get(sid)) for sid in route_shapes.get(line['route'], [])))
+        if best is None:
+            fallback.append(line['name']); continue
+        _, shape, indexes = best
+        hops = []
+        for i, j in zip(indexes[:-1], indexes[1:]):
+            piece = shape[min(i,j):max(i,j)+1]
+            if j < i: piece = piece[::-1]
+            piece = realnet.simplify(piece, 15.0)
+            hops.append(piece[1:-1].round(1).tolist())
+        geo['lines'][li] = {'nodes': shape[indexes].tolist(), 'hops': hops}
+        chosen += 1
+    # The two tunnel branches share precisely the same stops through Dandenong.
+    # Feed shapes sometimes snap them to different platform ends, producing
+    # unnecessary separate tracks and an artificial split at Town Hall.
+    indexes = {line['name']: i for i, line in enumerate(net['lines'])}
+    if 'Cranbourne' in indexes and 'Pakenham' in indexes:
+        c, p = indexes['Cranbourne'], indexes['Pakenham']
+        cs, ps = net['lines'][c]['stops'], net['lines'][p]['stops']
+        common = 0
+        for a, b in zip(cs, ps):
+            if a != b: break
+            common += 1
+        if common < 2: raise ValueError('Metro Tunnel branches do not share expected stops')
+        for k in range(common): geo['lines'][p]['nodes'][k] = geo['lines'][c]['nodes'][k]
+        for k in range(common - 1): geo['lines'][p]['hops'][k] = geo['lines'][c]['hops'][k]
+        print(f'Aligned tunnel branches over {common} shared stations', flush=True)
+    levels, pairs, left = realnet.assign_levels(geo['lines'])
+    for line, lv in zip(geo['lines'], levels): line['level'] = lv
+    path.write_text(json.dumps(geo))
+    print(f'Fit {chosen} ordered GTFS shapes, fallback for {fallback}; crossing pairs {pairs}, unresolved {left}', flush=True)
 
 def add_flemington_infrastructure(out, realnet):
     """Extend Showgrounds to the OSM racecourse stop; no invented through service."""
@@ -139,6 +329,7 @@ def join_tunnel(out):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--simplified', action='store_true', help='merge similar stopping patterns and add colour-based line groups')
     p.add_argument('--gtfs', required=True, type=Path)
     p.add_argument('--date', required=True, help='2026 service date, YYYY-MM-DD')
     p.add_argument('--event-date', default='2026-11-21', help='date for occasional Flemington Racecourse service')
@@ -182,6 +373,13 @@ def main():
     os.environ['REALNET_OUT'] = str(out)
     import realnet
     import realcorridors
+    if a.simplified:
+        # Prefer shared corridors and use adjacent pairs only on the busiest sections.
+        import realshared
+        realcorridors.PACK_LOAD_RAIL = 1.0
+        realcorridors.WANT_LOAD = 1.0
+        realcorridors.APART_LOAD = 1.8
+        realshared.PLAT_LOAD = 1.2
     packs = TW / 'data' / 'packs'; (packs / 'realgraph').mkdir(parents=True, exist_ok=True)
     for source, dest in ((a.pack, packs / 'mel.json'), (a.graph, packs / 'realgraph' / 'au.rgr')):
         if source.resolve() != dest.resolve():
@@ -201,10 +399,14 @@ def main():
     realnet.ADAPTERS['gtfs'] = load
     realnet.cmd_net('mel')
     net_path = out / 'mel_real.json'; net = json.loads(net_path.read_text())
+    if a.simplified: simplify_services(net)
     counts = Counter(line['name'] for line in net['lines'])
     labels = defaultdict(int)
     for line in net['lines']:
         name = line['name']; line['symbol'] = SYMBOLS.get(name, '')
+        if a.simplified:
+            group_id, group_name, group_symbol = GROUPS[name]
+            line.update(group=group_id, group_name=group_name, group_symbol=group_symbol, group_colour=line.get('colour', ''))
         if name == 'Flemington Racecourse':
             line['name'] = 'Flemington Racecourse (Showgrounds events)'
         if counts[name] > 1:
@@ -215,11 +417,15 @@ def main():
             label = f'{name}{target} ({where})'
             labels[label] += 1
             line['name'] = label if labels[label] == 1 else f'{label} {labels[label]}'
+        if a.simplified and name == 'Werribee' and any(net['stations'][i]['name'] == 'Altona' for i in line['stops']):
+            line['name'] = 'Werribee via Altona (Laverton)'
     net_path.write_text(json.dumps(net))
     print('Generated', len(net['stations']), 'stations,', len(net['lines']), 'service patterns', flush=True)
     sys.argv = ['realnet.py', 'geom', 'mel']; realnet.cmd_geom()
+    if a.simplified: fit_ordered_shapes(out, feed, realnet)
     realcorridors.build('mel', str(out))
     join_tunnel(out)
+    if a.simplified: single_track_stony_point(out)
     add_flemington_infrastructure(out, realnet)
     subprocess.run(['cargo','run','--release','--features','demand','--bin','realsave','--','--city','mel','--out',str(out),'--shared','--left'], cwd=TW/'sim', check=True)
     sys.argv = ['realnet.py','gamesave','mel']; realnet.cmd_gamesave()

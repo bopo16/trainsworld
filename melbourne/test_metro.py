@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 import pandas as pd
-from metro_network import join_tunnel, service_ids
+from metro_network import join_tunnel, service_ids, simplify_services, ordered_shape, single_track_stony_point
 
 class MetroTests(unittest.TestCase):
     def test_calendar_additions_and_removals(self):
@@ -14,6 +14,42 @@ class MetroTests(unittest.TestCase):
         exceptions = pd.DataFrame([{'service_id':'a','date':'20261118','exception_type':'2'},
                                    {'service_id':'c','date':'20261118','exception_type':'1'}])
         self.assertEqual(service_ids(cal, exceptions, dt.date(2026,11,18)), {'b','c'})
+
+    def test_shape_selection_rejects_wrong_station_order(self):
+        import numpy as np
+        stations = np.array([[0.,0.],[1000.,0.],[2000.,0.]])
+        bad = np.array([[0.,0.],[2000.,0.],[1000.,0.]])
+        good = np.array([[0.,1.],[1000.,1.],[2000.,1.]])
+        result = ordered_shape(stations, [('bad',bad),('good',good)])
+        self.assertTrue(np.array_equal(result[1], good))
+        self.assertIsNone(ordered_shape(stations, [('bad',bad)]))
+
+    def test_consolidation_preserves_stations_and_frequency(self):
+        names = ['Flinders Street','Newport','Laverton','Altona','Werribee']
+        stations = [{'name':n,'x':i,'y':0} for i,n in enumerate(names)]
+        def pattern(stops, rate):
+            length = len(stops)
+            return {'name':'Werribee','route':'wer','stops':stops,'tph':[rate,rate,rate], 'cars':7,
+                    't0':[[1]*(length-1)+[0] for _ in range(3)],
+                    't1':[[0]+[1]*(length-1) for _ in range(3)]}
+        original = [pattern([0,1,2,4],2), pattern([0,1,3,2],3), pattern([0,1,2,4],1)]
+        net = simplify_services({'stations':stations,'lines':original})
+        self.assertEqual(len(net['lines']),2)
+        self.assertEqual({s for l in net['lines'] for s in l['stops']}, set(range(5)))
+        self.assertEqual(sum(l['tph'][0] for l in net['lines']),6)
+        self.assertTrue(all(sum(l['tph']) > 0 for l in net['lines']))
+
+    def test_single_track_only_for_exclusive_edges(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d=Path(tmp); (d/'mel_real.json').write_text(json.dumps({'lines':[{'name':'Stony Point'},{'name':'Other'}]}))
+            model={'edges':[{},{}], 'lines':[{'path':[0,2]},{'path':[]} ]}
+            (d/'mel_real_corridors.json').write_text(json.dumps({'model':model}))
+            single_track_stony_point(d)
+            got=json.loads((d/'mel_real_corridors.json').read_text())['model']
+            self.assertEqual([e['tracks'] for e in got['edges']],[1,1])
+            model['lines'][1]['path']=[2]
+            (d/'mel_real_corridors.json').write_text(json.dumps({'model':model}))
+            with self.assertRaises(ValueError): single_track_stony_point(d)
 
     def test_tunnel_join_connects_both_routes_and_keeps_one_platform(self):
         def station(name): return {'name':name,'platform':160,'key':'town' if name == 'Town Hall' else name}

@@ -31,7 +31,7 @@
 use serde_json::{json, Value};
 use trainworld_sim::track::geom::Pi;
 use trainworld_sim::track::names;
-use trainworld_sim::track::net::{EdgeData, LineData, Network, NodeData, StationData};
+use trainworld_sim::track::net::{EdgeData, GroupLook, LineData, Network, NodeData, StationData};
 use trainworld_sim::track::params::*;
 use trainworld_sim::track::frame::FrameKind;
 use trainworld_sim::track::save;
@@ -292,7 +292,7 @@ fn main() {
                 pis = seq.into_iter().map(|(_, p)| p).collect();
             }
             let e = net.alloc_edge();
-            if let Err(issue) = net.set_edge(e, Some(EdgeData { a, b, tracks: 2, pis, built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::from_hsr(edge_hsr), sep: true, day: 0, oneway: 0, join: [0; 2] })) {
+            if let Err(issue) = net.set_edge(e, Some(EdgeData { a, b, tracks: ed["tracks"].as_u64().unwrap_or(2) as u8, pis, built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::from_hsr(edge_hsr), sep: true, day: 0, oneway: 0, join: [0; 2] })) {
                 eprintln!("edge {ei} ({a} to {b}) refused: {issue:?}");
                 refused += 1;
             }
@@ -318,7 +318,10 @@ fn main() {
             let name = format!("{} {}", l["feed"].as_str().unwrap(), l["name"].as_str().unwrap());
             let name = if l["symbol"].as_str().is_some_and(|s| !s.is_empty()) { l["name"].as_str().unwrap().to_string() } else { names::tidy_line(&name, "").unwrap_or(name) };
             let colour = l["colour"].as_str().and_then(|s| u32::from_str_radix(s.trim_start_matches('#'), 16).ok()).unwrap_or(PALETTE[li % PALETTE.len()]);
-            let r = net.set_line(id, Some(LineData { symbol: l["symbol"].as_str().unwrap_or("").to_string(), trains, auto: None, name, colour, stops, path, tph: [tph[0], tph[1], tph[2]], dwell_s: 30.0, turnaround_s: 180.0, cars, fast: false, bus: None, ferry: None, group: 0, group_name: String::new(), group_look: Default::default(), day: 0, hand: false, one_way: false, limit: 0, twin: Default::default() }));
+            let group = l["group"].as_u64().unwrap_or(0) as u32;
+            let group_colour = l["group_colour"].as_str().and_then(|s| u32::from_str_radix(s.trim_start_matches('#'), 16).ok());
+            let look = GroupLook { symbol: l["group_symbol"].as_str().unwrap_or("").to_string(), colour: group_colour };
+            let r = net.set_line(id, Some(LineData { symbol: l["symbol"].as_str().unwrap_or("").to_string(), trains, auto: None, name, colour, stops, path, tph: [tph[0], tph[1], tph[2]], dwell_s: 30.0, turnaround_s: 180.0, cars, fast: false, bus: None, ferry: None, group, group_name: l["group_name"].as_str().unwrap_or("").to_string(), group_look: look, day: 0, hand: false, one_way: false, limit: 0, twin: Default::default() }));
             if r.is_ok() {
                 n_lines_ok += 1;
             }
