@@ -4,7 +4,7 @@ Three independent Trainsworld 0.4 saves, built for 18 November 2026. Import the 
 
 | Save | Network and deliberate simplifications |
 | --- | --- |
-| `perth.save` | Eight regular Transperth rail lines represented by six services: Yanchep–Mandurah and Fremantle–Midland run through the city. One representative stopping pattern per line; event-only and regional services omitted. |
+| `perth.save` | Eight regular Transperth rail lines represented by six services: Yanchep–Mandurah and Fremantle–Midland run through the city. One representative stopping pattern per line; event-only and regional services omitted. See the [Perth approach revision](PERTH_APPROACH.md). |
 | `canberra.save` | Route 1 light rail between Alinga Street and Gungahlin Place, all 14 stops. No planned extension. |
 | `sydney.save` | Metro M1 to Bankstown, Sydney Trains T1–T9, and light rail L1–L4. Representative branches and stopping patterns, rather than all service variants; no intercity, future Metro lines, buses or ferries. T2, T3 and T8 services use one-way City Circle loops, then return along their originating branch. This models connectivity, not actual train block workings. |
 
@@ -42,8 +42,8 @@ The validator decompresses the actual save, loads its track payload using the ga
 
 | Save | Native model result | Remaining geometry warnings | SHA-256 |
 | --- | --- | --- | --- |
-| Perth | 6 services running, 85 station names | 3 platform/junction | `02da21fc6f242c4d994a16724b64475037c121aaa857001c8e98a325238fdbce` |
+| Perth | 6 services running, 85 station names | 1 platform/junction outside the revised approach | `59fa645f007bf89217d65ab03d999ef9e2e544f705fe225460e8055a04401ff3` |
 | Canberra | 1 service running, 14 station names | none | `b1a483c2acec052d3beadb2627dcca0c4b046c05e463163a2fa01ef5d30b0e53` |
 | Sydney | 18 services running, 239 station/stop names | 1 platform joint, 1 platform/junction | `57151aabbb0ab3cbfc47e3b4c03b5518f33af7ea47a5caa5458da4beb0773e11` |
 
-These checks do not replace loading and inspecting the saves in the game's graphical interface. In particular, Canberra's custom origin and city selection/camera have not been visually verified. Inspect dense Sydney interchanges and the reported Perth/Sydney platform warnings in-game, then refine geometry or operations based on what is actually visible. A future NSW GTFS-backed build should replace the approximate frequencies and verify route patterns before adding intercity services.
+These checks do not replace loading and inspecting the saves in the game's graphical interface. In particular, Canberra's custom origin and city selection/camera have not been visually verified. Inspect dense Sydney interchanges and its reported platform warnings in-game. The Perth northeast approach was checked in Chromium as described in [the revision report](PERTH_APPROACH.md). A future NSW GTFS-backed build should replace the approximate frequencies and verify route patterns before adding intercity services.
