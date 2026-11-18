@@ -34,6 +34,24 @@ fn offset_edge(
     net.set_edge(target, Some(edge)).unwrap();
 }
 
+// Fit a single turn between the two existing tangents east of the platform.
+fn smooth_departure(net: &mut Network) {
+    let mut edge = net.edge_data(90).unwrap();
+    let a = net.node_data(edge.a).unwrap();
+    let b = net.node_data(edge.b).unwrap();
+    let (first, last) = (edge.pis.first().unwrap(), edge.pis.last().unwrap());
+    let u = [first.x - a.x, first.y - a.y];
+    let v = [last.x - b.x, last.y - b.y];
+    let cross = |p: [f64; 2], q: [f64; 2]| p[0] * q[1] - p[1] * q[0];
+    let distance = cross([b.x - a.x, b.y - a.y], v) / cross(u, v);
+    assert!(distance > 0.0);
+    let mut corner = *first;
+    corner.x = a.x + distance * u[0];
+    corner.y = a.y + distance * u[1];
+    edge.pis = vec![corner];
+    net.set_edge(90, Some(edge)).unwrap();
+}
+
 fn main() {
     let args: Vec<_> = env::args_os().skip(1).collect();
     assert_eq!(args.len(), 2, "perth_bayswater INPUT.twt2 OUTPUT.twt2");
@@ -62,6 +80,7 @@ fn main() {
         net.set_node(to, Some(data)).unwrap();
     }
 
+    smooth_departure(&mut net);
     let first = net.edge_count() as u32;
     offset_edge(&mut net, 88, first, [next, next + 1], offset, None);
     offset_edge(&mut net, 89, first + 1, [next + 1, next + 2], offset, None);

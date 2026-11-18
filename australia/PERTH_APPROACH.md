@@ -25,6 +25,7 @@ The revision script operates on the pinned original save, preserving its game he
 ## Bayswater Airport approach
 
 The Airport line now uses the southern Bayswater platform pair and stays south through the junctions where the Ellenbrook and Midland routes turn away. The two Bayswater platform pairs are linked. The Airport line rejoins the other services west of Bayswater and keeps its original stops and left-hand running. All six services run with the same fleet requirement, and the native validator still reports one unrelated platform/junction warning.
+The departure east of Bayswater follows a single curve fitted to the original two tangents, removing the short S-bend from both track pairs.
 
 To reproduce the current Perth save, apply the Bayswater revision to the approach save made above:
 
@@ -33,4 +34,4 @@ python australia/perth_geometry.py --bayswater /tmp/perth-revised.save /tmp/pert
 python australia/validate.py per /tmp/perth-bayswater.save
 ```
 
-The current save SHA-256 is `ea60bc5408a4ab16e62a7eca09819721f1aceb9c7991fa4bb939c76b4b3e40f0`.
+The current save SHA-256 is `d660a23d27bc6cd3e2345ee9e43c0d0e39b52e0d6db7884a57b21588913d3da1`.
