@@ -21,3 +21,16 @@ python australia/validate.py per /tmp/perth-revised.save
 ```
 
 The revision script operates on the pinned original save, preserving its game header. The full GTFS-based builder remains the workflow for regenerating the original network. The revised save SHA-256 is `59fa645f007bf89217d65ab03d999ef9e2e544f705fe225460e8055a04401ff3`.
+
+## Bayswater Airport approach
+
+The Airport line now uses the southern Bayswater platform pair and stays south through the junctions where the Ellenbrook and Midland routes turn away. The two Bayswater platform pairs are linked. The Airport line rejoins the other services west of Bayswater and keeps its original stops and left-hand running. All six services run with the same fleet requirement, and the native validator still reports one unrelated platform/junction warning.
+
+To reproduce the current Perth save, apply the Bayswater revision to the approach save made above:
+
+```sh
+python australia/perth_geometry.py --bayswater /tmp/perth-revised.save /tmp/perth-bayswater.save
+python australia/validate.py per /tmp/perth-bayswater.save
+```
+
+The current save SHA-256 is `ea60bc5408a4ab16e62a7eca09819721f1aceb9c7991fa4bb939c76b4b3e40f0`.

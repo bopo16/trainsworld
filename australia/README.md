@@ -42,7 +42,7 @@ The validator decompresses the actual save, loads its track payload using the ga
 
 | Save | Native model result | Remaining geometry warnings | SHA-256 |
 | --- | --- | --- | --- |
-| Perth | 6 services running, 85 station names | 1 platform/junction outside the revised approach | `59fa645f007bf89217d65ab03d999ef9e2e544f705fe225460e8055a04401ff3` |
+| Perth | 6 services running, 85 station names | 1 platform/junction outside the revised approach | `ea60bc5408a4ab16e62a7eca09819721f1aceb9c7991fa4bb939c76b4b3e40f0` |
 | Canberra | 1 service running, 14 station names | none | `b1a483c2acec052d3beadb2627dcca0c4b046c05e463163a2fa01ef5d30b0e53` |
 | Sydney | 18 services running, 239 station/stop names | 1 platform joint, 1 platform/junction | `57151aabbb0ab3cbfc47e3b4c03b5518f33af7ea47a5caa5458da4beb0773e11` |
 
