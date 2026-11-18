@@ -363,6 +363,7 @@ def join_tunnel(out):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--trams', action='store_true', help='append selected weekday tram routes')
     p.add_argument('--city-loops', action='store_true', help='prepare directional City Loop services')
     p.add_argument('--simplified', action='store_true', help='merge similar stopping patterns and add colour-based line groups')
     p.add_argument('--gtfs', required=True, type=Path)
@@ -373,6 +374,7 @@ def main():
     p.add_argument('--out', required=True, type=Path)
     a = p.parse_args(); date = dt.date.fromisoformat(a.date)
     if a.city_loops and not a.simplified: p.error('--city-loops requires --simplified')
+    if a.trams and not a.city_loops: p.error('--trams requires --city-loops')
     if date.year != 2026: p.error('choose a service day in 2026')
     out = a.out.resolve(); out.mkdir(parents=True, exist_ok=True)
     if (out / 'mel_real.save').exists(): raise FileExistsError('Use a fresh output directory')
@@ -470,8 +472,16 @@ def main():
         city_loop.build(out)
         import loop_geometry
         loop_geometry.align(out)
+    if a.trams:
+        import tram_network
+        tram_network.build(out, a.gtfs, date, realnet)
     subprocess.run(['cargo','run','--release','--features','demand','--bin','realsave','--','--city','mel','--out',str(out),'--shared','--left'], cwd=TW/'sim', check=True)
     sys.argv = ['realnet.py','gamesave','mel']; realnet.cmd_gamesave()
-    subprocess.run([sys.executable, str(ROOT / 'melbourne/validate_metro.py'), str(out / 'mel_real.save')] + (['--city-loops'] if a.city_loops else []), check=True)
+    if a.trams:
+        import gzip, struct
+        file = out / 'mel_real.save'; raw = gzip.decompress(file.read_bytes()); size = struct.unpack_from('<I', raw, 4)[0]
+        header = json.loads(raw[8:8+size]); header['fleetTram'] = json.loads((out/'mel_real_track.json').read_text())['fleetTram']
+        encoded = json.dumps(header).encode(); file.write_bytes(gzip.compress(b'TWG1' + struct.pack('<I',len(encoded)) + encoded + raw[8+size:], mtime=0))
+    subprocess.run([sys.executable, str(ROOT / 'melbourne/validate_metro.py'), str(out / 'mel_real.save')] + (['--city-loops'] if a.city_loops else []) + (['--trams'] if a.trams else []), check=True)
 
 if __name__ == '__main__': main()

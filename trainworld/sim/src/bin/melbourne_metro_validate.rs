@@ -5,7 +5,9 @@ fn main() {
     let mut args = std::env::args().skip(1);
     let file = args.next().expect("usage: melbourne_metro_validate TRACK FLEET");
     let fleet: u64 = args.next().expect("fleet required").parse().expect("invalid fleet");
-    let expect_city_loops = args.next().is_some_and(|x| x == "--city-loops");
+    let options: Vec<String> = args.collect();
+    let expect_city_loops = options.iter().any(|x| x == "--city-loops");
+    let tram_fleet: Option<u64> = options.iter().position(|x| x == "--trams").map(|i| options[i+1].parse().expect("invalid tram fleet"));
     let bytes = std::fs::read(file).expect("read track payload");
     let mut api = TrackApi::new(0.0, 0.0, false);
     assert!(api.load(&bytes), "game load routine rejected payload");
@@ -23,6 +25,12 @@ fn main() {
     assert!(stations.len() >= 220, "too few distinct stations: {}", stations.len());
     let mut names = BTreeSet::new();
     let mut needed = 0u64;
+    let mut tram_needed = 0u64;
+    let mut tram_count = 0;
+    let mut tram_symbols = BTreeSet::new();
+    let mut tram_edge_use = std::collections::BTreeMap::<u32, u32>::new();
+    let mut event_edges = BTreeSet::new();
+    let mut cross_city_edges = BTreeSet::new();
     let mut city_loop = false;
     let grouped = n.line_group.iter().any(|&g| g != 0);
     let mut groups = std::collections::BTreeMap::new();
@@ -47,6 +55,8 @@ fn main() {
             }
         }
         let svc = &world.svc.lines[i as usize];
+        if l.name.starts_with("Flemington Racecourse") { event_edges.extend(l.path.iter().map(|p| p >> 1)); }
+        if l.name.contains("Werribee") || l.name.contains("Williamstown") { cross_city_edges.extend(l.path.iter().map(|p| p >> 1)); }
         if has_loop_services && (l.name == "Werribee – Sandringham" || l.name == "Williamstown – Sandringham") {
             let fss: Vec<u32> = l.stops.iter().copied().filter(|&id| n.station_data(id).is_some_and(|st| st.name == "Flinders Street")).collect();
             assert_eq!(fss.len(), 1, "{} does not pass Flinders Street once", l.name);
@@ -92,14 +102,32 @@ fn main() {
             if let Some(previous) = last { assert_eq!(previous,from,"{} has a disconnected path",l.name); }
             last = Some(to);
         }
-        needed += u64::from(*svc.trains.iter().max().unwrap()) * u64::from(l.cars);
+        let cars_needed = u64::from(*svc.trains.iter().max().unwrap()) * u64::from(l.cars);
+        if n.line_tram(i) {
+            tram_count += 1;
+            tram_symbols.insert(l.symbol.clone());
+            tram_needed += cars_needed;
+            if l.name == "Tram 35" {
+                assert!(l.one_way && n.line_loop(i) != LoopKind::None, "City Circle is not a loop");
+            }
+            assert_eq!(l.group_name, "Yarra Trams");
+            assert_eq!(l.colour, 0x009b3a, "tram is not green");
+            assert!(l.cars <= 4, "tram exceeds four sections");
+            for &stop in &l.stops {
+                assert!(n.station_data(stop).unwrap().platform <= 80, "tram platform too long");
+            }
+            for &edge in &l.path {
+                assert!(n.edge_data(edge >> 1).unwrap().kind.spec().family == 1, "tram uses rail track");
+                *tram_edge_use.entry(edge >> 1).or_default() += 1;
+            }
+        } else { needed += cars_needed; }
         names.insert(l.name);
     }
     for expected in ["Alamein", "Belgrave", "Cranbourne", "Craigieburn", "Flemington Racecourse", "Frankston", "Glen Waverley", "Hurstbridge", "Lilydale", "Mernda", "Pakenham", "Sandringham", "Stony Point", "Sunbury", "Upfield", "Werribee", "Williamstown"] {
         assert!(names.iter().any(|name| name.contains(expected)), "missing line {expected}");
     }
     if grouped {
-        assert_eq!(groups.len(), 7, "expected seven line groups");
+        assert_eq!(groups.len(), if tram_fleet.is_some() { 8 } else { 7 }, "unexpected line groups");
         for name in ["Burnley Group", "Clifton Hill Group", "Northern Group", "Caulfield Group", "Cross-City Group", "Metro Tunnel", "Special Events"] {
             assert!(groups.values().any(|x| x == name), "missing group {name}");
         }
@@ -114,7 +142,15 @@ fn main() {
     assert!(city_loop, "no route serves all City Loop stations");
     assert!(names.contains("Cranbourne – Sunbury") && names.contains("Pakenham – Sunbury"), "Metro Tunnel through services missing");
     assert!(fleet >= needed, "header fleet {fleet} is less than {needed} cars needed");
+    if let Some(fleet) = tram_fleet {
+        assert_eq!(tram_count, 24, "expected all 24 tram routes");
+        let expected: BTreeSet<String> = ["1","3","5","6","11","12","16","19","30","35","48","57","58","59","64","67","70","72","75","78","82","86","96","109"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(tram_symbols, expected, "unexpected numbered tram routes");
+        assert!(tram_edge_use.values().any(|&users| users > 1), "tram routes do not share track");
+        assert!(event_edges.is_disjoint(&cross_city_edges), "event and cross-city services overlap on an edge");
+        assert!(fleet >= tram_needed, "header tram fleet {fleet} is less than {tram_needed} sections needed");
+    } else { assert_eq!(tram_count, 0, "tram validation flag missing"); }
     let issues = n.validate(&(0..n.edge_count() as u32).collect::<Vec<_>>(), &(0..n.node_count() as u32).collect::<Vec<_>>(), &[]);
     for issue in &issues { eprintln!("track validation: {issue:?}"); }
-    println!("Reloaded: {} lines running, {} distinct station names, {} edges, fleet {} cars (need {}); {} track geometry/placement warnings", n.line_count(), stations.len(), n.edge_count(), fleet, needed, issues.len());
+    println!("Reloaded: {} lines running ({} tram), {} distinct station names, {} edges, fleet {} cars (need {}), {} tram sections needed; {} track geometry/placement warnings", n.line_count(), tram_count, stations.len(), n.edge_count(), fleet, needed, tram_needed, issues.len());
 }

@@ -82,6 +82,38 @@ def remove_short_station_joints(model):
     print(f'Removed {len(removed)} short Southern Cross platform joints',flush=True)
 
 
+def separate_event_tracks(model, net):
+    """Space the event route away from the cross-city tracks in the diagram."""
+    nodes, edges, services = model['nodes'], model['edges'], model['lines']
+    index = next(i for i,l in enumerate(net['lines']) if l['name'].startswith('Flemington Racecourse'))
+    service = services[index]
+    old_edges = {c >> 1 for c in service['path']}
+    old_nodes = {v for i in old_edges for v in (edges[i]['a'],edges[i]['b'])}
+    shift = (40.0,40.0)
+    node_map = {}
+    for old in sorted(old_nodes):
+        node=copy.deepcopy(nodes[old]); node['xy']=[node['xy'][j]+shift[j] for j in (0,1)]
+        node_map[old]=len(nodes); nodes.append(node)
+    edge_map={}
+    for old in sorted(old_edges):
+        edge=copy.deepcopy(edges[old]); edge['a']=node_map[edge['a']];edge['b']=node_map[edge['b']]
+        for side in ('a','b'):
+            if edge['lead_'+side] is not None: edge['lead_'+side]=[edge['lead_'+side][j]+shift[j] for j in (0,1)]
+        edge['line']=[[p[j]+shift[j] for j in (0,1)] for p in edge['line']]
+        edge_map[old]=len(edges);edges.append(edge)
+    service['path']=[edge_map[c>>1]<<1 | c&1 for c in service['path']]
+    service['stops']=[node_map[v] for v in service['stops']]
+    # The unserved extension must still connect to the moved Showgrounds stop.
+    for edge in edges:
+        ends=(edge['a'],edge['b'])
+        if not any((nodes[v]['station'] or {}).get('name')=='Flemington Racecourse' for v in ends): continue
+        for side in ('a','b'):
+            if edge[side] in node_map:
+                edge[side]=node_map[edge[side]]
+                if edge['lead_'+side] is not None: edge['lead_'+side]=[edge['lead_'+side][j]+shift[j] for j in (0,1)]
+    print('Separated event route from cross-city track for readability',flush=True)
+
+
 def align(out):
     files = [out / 'mel_real.json', out / 'mel_real_corridors.json']
     net, doc = [json.loads(p.read_text()) for p in files]
@@ -148,8 +180,44 @@ def align(out):
             k=matches[0]; services[j]['path']=path[:k]+replacement+path[k+len(old):]
             services[j]['stops']=[x for x in services[j]['stops'] if x not in other_flags]
         print(f'Aligned {primary} Loop segment; removed {len(other_flags)} duplicate Flagstaff stops',flush=True)
+    # Give the four groups the same ordering on the Southern Cross–Flinders Street
+    # curve as on the underground section. Their stations may be moved to fit.
+    def river_section(i):
+        ids=walk(services[i]['path'])
+        a=next(k for k,x in enumerate(ids) if name(x)=='Southern Cross')
+        b=next(k for k,x in enumerate(ids) if name(x)=='Flinders Street')
+        return ids,a,b
+    ids,a,b=river_section(line('Belgrave'))
+    river=LineString([nodes[x]['xy'] for x in ids[a:b+1]]).simplify(12)
+    for primary,members,offset in [
+        ('Belgrave',['Belgrave','Alamein','Lilydale','Glen Waverley'],-45),
+        ('Hurstbridge',['Hurstbridge','Mernda'],-15),
+        ('Craigieburn',['Craigieburn','Upfield'],15),
+        ('Frankston',['Frankston'],45),
+    ]:
+        i=line(primary); ids,a,b=river_section(i); lo,hi=sorted((a,b)); old=services[i]['path'][lo:hi]
+        start,end=ids[a],ids[b]; curve=river.offset_curve(offset)
+        if curve.geom_type != 'LineString' or curve.length < river.length * .8: raise ValueError('Cannot offset river Loop curve')
+        for node,distance in ((start,0),(end,curve.length)):
+            xy=list(curve.interpolate(distance).coords[0]); delta=[xy[j]-nodes[node]['xy'][j] for j in (0,1)]
+            for e in edges:
+                for side in ('a','b'):
+                    if e[side]==node and e['lead_'+side] is not None:
+                        e['lead_'+side]=[e['lead_'+side][j]+delta[j] for j in (0,1)]
+            nodes[node]['xy']=xy
+        aligned_stations.extend((start,end))
+        lead=min(80,curve.length/4)
+        mid=substring(curve,lead,curve.length-lead)
+        e=copy.deepcopy(edges[old[0]>>1]); e.update(a=start,b=end,lead_a=list(curve.interpolate(lead).coords[0]),lead_b=list(curve.interpolate(curve.length-lead).coords[0]),line=list(mid.coords)[1:-1],tracks=1,oneway=1 if a<b else 2,levels=[])
+        new=len(edges)<<1;edges.append(e);replacement=[new if a<b else new^1]
+        for member in members:
+            path=services[line(member)]['path']; matches=[k for k in range(len(path)-len(old)+1) if path[k:k+len(old)]==old]
+            if len(matches)!=1: raise ValueError(f'{member}: river Loop segment not found')
+            k=matches[0];services[line(member)]['path']=path[:k]+replacement+path[k+len(old):]
+        print(f'Aligned {primary} Southern Cross–Flinders Street track',flush=True)
     merge_redundant_platforms(m)
     remove_short_station_joints(m)
+    separate_event_tracks(m,net)
     used={c>>1 for s in services if s for c in s['path']}
     # Preserve deliberately unserved Flemington infrastructure.
     used.update(i for i,e in enumerate(edges) if any(name(v)=='Flemington Racecourse' for v in (e['a'],e['b'])))

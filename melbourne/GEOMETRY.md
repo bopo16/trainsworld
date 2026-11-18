@@ -1,5 +1,7 @@
 # Melbourne metro: geometry cleanup
 
+This report describes the earlier geometry save. The generator has since gained the additional rail and tram changes described in [TRAMS.md](TRAMS.md), so the command below now produces newer geometry rather than the original file's hash.
+
 Import `melbourne-metro-geometry.save` using Trainsworld's **Load a file** flow. It is a separate revision of the save described in [CITY_LOOP.md](CITY_LOOP.md), which retains its original file.
 
 The four City Loop group tracks between Parliament and Flagstaff are now fitted to spaced offsets of one common curve, instead of independently fitted paths. Each service stops once at Flagstaff, rather than twice at closely spaced copies. Eight unnecessary short joints within the four cloned Southern Cross platforms were removed. The generator also merges redundant parallel station paths when they have the same station key and connect the same pair of junctions: this affects Burnley, Blackburn and North Richmond. These station merges deliberately trade some separate platform capacity for a simpler layout; they do not alter one-way tracks. These changes are approximations to improve readability, not surveyed platform geometry.

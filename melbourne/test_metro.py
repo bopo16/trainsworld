@@ -6,9 +6,21 @@ import unittest
 
 import pandas as pd
 from metro_network import join_tunnel, service_ids, simplify_services, ordered_shape, single_track_stony_point
-from loop_geometry import merge_redundant_platforms, remove_short_station_joints
+from loop_geometry import merge_redundant_platforms, remove_short_station_joints, separate_event_tracks
 
 class MetroTests(unittest.TestCase):
+    def test_event_track_separation_preserves_racecourse_extension(self):
+        def node(name, xy): return {'xy':xy, 'station':{'name':name} if name else None}
+        def edge(a,b): return {'a':a,'b':b,'lead_a':None,'lead_b':None,'line':[]}
+        model={'nodes':[node('Flinders Street',[0,0]),node('Showgrounds',[100,0]),node('Flemington Racecourse',[200,0])],
+               'edges':[edge(0,1),edge(1,2)],
+               'lines':[{'path':[0], 'stops':[0,1]},{'path':[0], 'stops':[0,1]}]}
+        separate_event_tracks(model, {'lines':[{'name':'Flemington Racecourse events'},{'name':'Other'}]})
+        event,other=model['lines']
+        self.assertNotEqual(event['path'][0]>>1,other['path'][0]>>1)
+        self.assertEqual(model['edges'][1]['a'],event['stops'][-1])
+        self.assertEqual(model['edges'][other['path'][0]>>1]['b'],1)
+
     def test_short_station_joint_preserves_service_path(self):
         nodes = [{'xy':[0,0], 'level':0, 'station':{'name':'Southern Cross'}},
                  {'xy':[40,0], 'level':0, 'station':None},

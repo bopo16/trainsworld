@@ -129,6 +129,7 @@ fn main() {
         let mut refused = 0;
         for (ei, ed) in m["edges"].as_array().unwrap().iter().enumerate() {
             let edge_hsr = on_hsr[ei] && !on_other[ei];
+            let tram = ed["kind"].as_str() == Some("tram");
             let design = if edge_hsr { design_radius(320.0) } else { R_CAP };
             let (a, b) = (ed["a"].as_u64().unwrap() as u32, ed["b"].as_u64().unwrap() as u32);
             let mut pis = vec![];
@@ -167,7 +168,7 @@ fn main() {
                 line.extend(inner.iter().copied());
                 line.push(lb);
                 let t = std::time::Instant::now();
-                let r = if inner.is_empty() { None } else { trace::trace(&line, false, TRACE_TOL_M, TRACE_MIN_RADIUS, design, lv_a) };
+                let r = if inner.is_empty() { None } else { trace::trace(&line, false, TRACE_TOL_M, if tram { TRAM_MIN_RADIUS } else { TRACE_MIN_RADIUS }, design, lv_a) };
                 trace_s += t.elapsed().as_secs_f64();
                 let mid: Vec<Pi> = match r {
                     Some(t) => {
@@ -292,7 +293,7 @@ fn main() {
                 pis = seq.into_iter().map(|(_, p)| p).collect();
             }
             let e = net.alloc_edge();
-            if let Err(issue) = net.set_edge(e, Some(EdgeData { a, b, tracks: ed["tracks"].as_u64().unwrap_or(2) as u8, pis, built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::from_hsr(edge_hsr), sep: true, day: 0, oneway: ed["oneway"].as_u64().unwrap_or(0) as u8, join: [0; 2] })) {
+            if let Err(issue) = net.set_edge(e, Some(EdgeData { a, b, tracks: ed["tracks"].as_u64().unwrap_or(2) as u8, pis, built: true, off: false, thru: vec![], crossover: false, kind: if tram { TrackKind::Tram } else { TrackKind::from_hsr(edge_hsr) }, sep: true, day: 0, oneway: ed["oneway"].as_u64().unwrap_or(0) as u8, join: [0; 2] })) {
                 eprintln!("edge {ei} ({a} to {b}) refused: {issue:?}");
                 refused += 1;
             }
@@ -631,6 +632,7 @@ fn main() {
     let (mut gtfs_s, mut track_s) = (0.0, 0.0);
     let mut not_running = 0;
     let mut fleet = 0u64;
+    let mut fleet_tram = 0u64;
     for &(li, id) in &line_ids {
         let svc = &w.svc.lines[id as usize];
         if !svc.running {
@@ -665,7 +667,7 @@ fn main() {
         let d = w.net.line_data(id).unwrap();
         tph.extend(d.tph);
         cars.push(d.cars as f32);
-        fleet += *svc.trains.iter().max().unwrap() as u64 * d.cars as u64;
+        if w.net.line_tram(id) { fleet_tram += *svc.trains.iter().max().unwrap() as u64 * d.cars as u64; } else { fleet += *svc.trains.iter().max().unwrap() as u64 * d.cars as u64; }
         lines_out.push(json!({"feed": l["feed"], "name": l["name"], "route": l["route"], "gtfs_min": g0 / 60.0, "track_min": t0s / 60.0}));
     }
     eprintln!("{} lines running ({} not); one-way run times, sum over lines: GTFS {:.0} min, track model {:.0} min ({:+.0}%)", lines_out.len(), not_running, gtfs_s / 60.0, track_s / 60.0, 100.0 * (track_s / gtfs_s - 1.0));
@@ -674,6 +676,7 @@ fn main() {
         "stations": st_out,
         "lines": lines_out,
         "fleet": fleet,
+        "fleetTram": fleet_tram,
         "demand": {"st_xy": st_xy, "line_n": line_n, "stops": stops, "times": times, "tph": tph, "cars": cars},
     });
     std::fs::write(format!("{out_dir}/{city}_real_track.json"), serde_json::to_string(&out).unwrap()).unwrap();
