@@ -3,7 +3,7 @@
 // Its hover says more. T-2693: a thin bar in every case (see `share` below); no ring since T-2728.
 
 import { computed, effect, signal } from "@preact/signals";
-import { demandBehindFrom, demandScope, demandStep, demandSolving, demandWork, workShare, demandUpdating, demandView, focusZones, intercityDemand, refiningZone, viewRecomputing } from "../game/demand";
+import { demandBehindFrom, demandHeld, demandScope, demandStep, demandSolving, demandWork, workShare, demandUpdating, demandView, focusZones, intercityDemand, refiningZone, viewRecomputing } from "../game/demand";
 import { linesPending } from "../game/lineFigures";
 import { count } from "../game/format";
 import { clock, DEMAND_CAP } from "../game/clock";
@@ -16,6 +16,7 @@ import { tripView } from "../game/trip";
 import { LoadBar, loadingCardShown } from "./LoadingScreen";
 import { bubblesWaiting, farWaiting } from "../map/commuterView";
 import { groundNet, shadeDownloads } from "../game/terrain";
+import { retryGround } from "../workers/clockClient";
 import { basemapSlow } from "../map/basemap";
 import { t } from "../i18n";
 import { tPlace } from "../i18n/places";
@@ -74,15 +75,25 @@ function waitTip(zone: CityId): string {
 const TERRAIN_SLOW_MS = 1500;
 const terrainSlow = signal(false);
 let slowTimer = 0;
+/** T-3479: until this time a retry click keeps the tag on "Downloading terrain…" whatever the downloads do */
+let retryHoldUntil = 0;
 /** T-2693: the most downloads waiting at once since the last time none were, so the bar is the share finished */
 let terrainPeak = 0;
 effect(() => {
   const waiting = groundNet.value.pending + shadeDownloads.value;
   const on = waiting > 0;
   terrainPeak = on ? Math.max(terrainPeak, waiting) : 0;
-  if (!on) { clearTimeout(slowTimer); slowTimer = 0; terrainSlow.value = false; }
+  if (!on) { clearTimeout(slowTimer); slowTimer = 0; if (Date.now() >= retryHoldUntil) terrainSlow.value = false; }
   else if (!slowTimer && !terrainSlow.peek()) slowTimer = window.setTimeout(() => { slowTimer = 0; terrainSlow.value = true; }, TERRAIN_SLOW_MS);
 });
+/** T-3479: the failed tag clicked: the downloads go again now, and the tag says so at once, for a second at
+ * least, so a try that fails as fast still shows it was made */
+function retryTerrain() {
+  retryGround();
+  terrainSlow.value = true;
+  retryHoldUntil = Date.now() + 1000;
+  window.setTimeout(() => { if (!groundNet.peek().pending && !shadeDownloads.peek()) terrainSlow.value = false; }, 1000);
+}
 function terrainText(): string | null {
   return terrainSlow.value ? t("statusTag.terrainDownloading") : groundNet.value.failed ? t("statusTag.terrainFailed") : null;
 }
@@ -186,6 +197,8 @@ export function StatusTag() {
     : !demandView.value ? (demandIdle.value ? null : t("statusTag.loadingDataDots")) // T-318: nothing to load over dead space
     // T-1493: the zone in view has figures but its bubbles are still on their way
     : bubblesWaiting.value ? t("statusTag.loadingDataDots")
+    // T-3427: edits made while paused, held for the game to run ("Recalculate trips while paused" off)
+    : demandHeld.value ? t("statusTag.heldPaused")
     // T-2523: a click whose answer waits says what the game is working on
     : clickWait.value ? waitText(clickWait.value)
     : behindDays.value >= 1 ? t("statusTag.behind", { count: behindDays.value })
@@ -196,6 +209,11 @@ export function StatusTag() {
     // T-2622: the clock capped for an edit whose figures elsewhere are not in, the zone in view final
     : clock.capped.value ? t("statusTag.calculatingAfterChange") : null;
   if (!busy) { trackWait(null); stopWaitTimer(); tickSlow(false); return null; }
+  // T-3427: edits held while paused: nothing is working, so a hover and no bar
+  if (demandHeld.value && busy === t("statusTag.heldPaused")) {
+    trackWait(null); stopWaitTimer(); tickSlow(false);
+    return <div class="status-tag" role="status" data-tip={t("statusTag.heldPausedTip")}><span class="demand-busy">{busy}</span></div>;
+  }
   const onTerrain = busy === terrain, terrainFailed = onTerrain && !terrainSlow.value;
   const onMap = !onTerrain && busy === mapWait;
   const base = onMap ? "" : onTerrain ? (terrainFailed ? t("statusTag.terrainFailTip") : "")
@@ -226,6 +244,10 @@ export function StatusTag() {
   slowTick.value;
   const slow = failed ? null : slowLine(kind);
   const tipAll = [tip, slow].filter(Boolean).join("\n") || undefined;
+  // T-3479: terrain that failed is tried again on a click
+  if (terrainFailed) return <button type="button" class="status-tag" aria-live="polite" data-tip={tipAll} onClick={retryTerrain}>
+    <span class="demand-busy">{busy}</span>
+  </button>;
   return <div class="status-tag" role="status" data-tip={tipAll}>
     <span class="demand-busy">{busy}</span>
     {!failed && <LoadBar fraction={share!} step={busy} thin quiet={kind !== "load"} />}

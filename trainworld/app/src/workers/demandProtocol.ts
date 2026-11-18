@@ -4,7 +4,7 @@ import type { FrameSpec } from "../game/frame";
 import { PERIODS } from "../game/periods";
 
 /** `DemandApi.trip`'s answer layout (sim/src/demand/trip.rs `HEAD`, `PAIR_LEN`, `LEG_LEN`). */
-export const TRIP_LAYOUT = { HEAD: 48, PAIR_LEN: 20, LEG_LEN: 13 } as const;
+export const TRIP_LAYOUT = { HEAD: 48, PAIR_LEN: 20, LEG_LEN: 14 } as const;
 /** `IntercityApi::market_trip`'s answer: `MT_HEAD` and `MT_PAIR_LEN` in market_trip.rs. */
 export const MARKET_TRIP_LAYOUT = { HEAD: 25, PAIR_LEN: 7 } as const;
 // Messages between the main thread and the demand workers (T-026, T-021; notes/T-026.md).
@@ -37,6 +37,9 @@ export interface DemandNetwork {
   lineN: Uint32Array;
   /** station index of every stop, line after line */
   stops: Uint32Array;
+  /** T-3348 (`DemandApi.set_back_stops`): parallel to `stops`, the station run 1 stops at there (the
+   * stop's own where it is the same); absent where every line stops alike both ways */
+  back?: Uint32Array;
   /**
    * Riding seconds, 6 per stop: for each line, per run (0 = stops in order, 1 = reversed) and
    * demand level (high, medium, low), `n` values indexed by stop k in the line's own order.
@@ -48,11 +51,14 @@ export interface DemandNetwork {
   tph: Float32Array;
   /** cars per train, per line */
   cars: Float32Array;
-  fare: { base: number; perKm: number; nodes?: [number, number][]; scales?: Record<string, number>; hsr?: number; ferry?: number; bus?: number; transfer?: number };
+  fare: { base: number; perKm: number; nodes?: [number, number][]; scales?: Record<string, number>; hsr?: number; ferry?: number; bus?: number; transfer?: number; lines?: Record<string, number> };
   /** km per route node: each line's forward stops then reverse stops, 0 at each end */
   hopKm: Float32Array;
   /** T-1626 (`DemandApi.set_fare_mul`): each route node's fare multiplier, as `hopKm`; absent: all 1 */
   fareW?: Float32Array;
+  /** T-3578 (`DemandApi.set_base_mul`): each route node's line's own fare multiplier, which the base takes
+   * too, as `hopKm`; absent: all 1 */
+  baseW?: Float32Array;
   /** T-842 (`DemandApi.set_span`): per period and route node (`q * route nodes + r`, route nodes
    * as `hopKm`), the share of riders with a train due within their tolerance; empty or absent:
    * 1 everywhere */
@@ -98,11 +104,16 @@ export function arriveOf(come: Float32Array, rounds: Float32Array, board: Float3
  */
 export type Loads = { kind: "loads"; version: number; cluster: number; period: number; round: number; side: "cities" | "market"; loads: Float32Array };
 
+/** T-336: a selection as the regional market's squares: their centres (market metres) and the share
+ * of each selected; T-3500: `air`, the zone's airport terminals' squares, four numbers each (x, y,
+ * the terminals' weight, of it selected; `IntercityApi.selection`) */
+export interface SelSquares { xy: Float32Array; share: Float32Array; air?: Float32Array }
+
 /** Bit q set for every period q: a question answered for the whole day */
 export const ALL_PERIODS = (1 << PERIODS.length) - 1;
 
 /** The questions for the demand views, `ToDemand`'s and `FromDemand`'s kinds alike */
-const QUERY_KIND_LIST = ["cells", "subSums", "cellModes", "station", "flowRail", "flows", "purposes", "icSel", "icStation", "purposeModes", "transfers", "trip", "icTrip", "bare", "bareFlows", "bareSquares", "tripLengths"] as const;
+const QUERY_KIND_LIST = ["cells", "subSums", "cellModes", "station", "flowRail", "flows", "purposes", "icSel", "icStation", "purposeModes", "transfers", "trip", "icTrip", "bare", "bareFlows", "bareSquares", "tripLengths", "airLegs", "zoneSquares", "regLegs"] as const;
 export type QueryKind = (typeof QUERY_KIND_LIST)[number];
 const QUERY_KINDS: ReadonlySet<string> = new Set(QUERY_KIND_LIST);
 export const isQuery = <T extends { kind: string }>(m: T): m is Extract<T, { kind: QueryKind }> => QUERY_KINDS.has(m.kind);
@@ -180,6 +191,15 @@ export type ToDemand =
       freshParts?: boolean;
       /** T-1862 `?perfOff=noise`: a cluster keeps its result only on exactly the network it solved */
       exactKeep?: boolean;
+      /** T-3512 `?perfOff=localKeep`: an edit's local solve solves every period of the touched
+       * populations, the unchanged ones too, and the whole solve after it solves them again */
+      localAll?: boolean;
+      /** T-3512 `?perfOff=localSkip`: an edit's touched populations are solved locally first however
+       * much of the cluster's work they are */
+      alwaysLocal?: boolean;
+      /** T-3512, dev `?localShare=a,b`: solving worker i's own `LOCAL_SHARE_MAX`, so two workers can be
+       * made to disagree (one solving locally, one going straight to the whole solve) */
+      localShare?: number[];
       /** T-1733: the network's line ids (`lineN` order) and station ids (`stXY` order), so a worker
        * can carry what it holds solved over to the next network's route nodes */
       ids?: { lines: string[]; stations: string[] } }
@@ -235,7 +255,7 @@ export type ToDemand =
   | { kind: "icSel"; id: number; city: CityId; version: number; round: number; end: number; cells: Uint32Array;
       /** T-336: the selection's squares, from the aux worker's `bareSquares`, for a zone open bare
        * there (this worker does not hold it); `cells` and `end` are then unread */
-      sq?: { xy: Float32Array; share: Float32Array } }
+      sq?: SelSquares }
   /** a station's longer-trip rail riders over this worker's periods (`IntercityApi.station_flows`) */
   | { kind: "icStation"; id: number; city: CityId; version: number; round: number; station: number }
   /** one everyday purpose's local trip legs per cell by mode over this worker's periods
@@ -265,6 +285,17 @@ export type ToDemand =
   /** T-336, the aux worker: a bare zone's selection as the regional market's squares, for the
    * solving workers' `icSel` */
   | { kind: "bareSquares"; id: number; city: CityId; version: number; round: number; end: number; cells: Uint32Array }
+  /** T-3500: the airport trips across zone lines over this worker's periods at points of the zone
+   * (market metres, `IntercityApi.airport_legs_day`): `xy0`, `w0` its homes with airport trips and
+   * their weight, `xy1`, `w1` its terminals */
+  | { kind: "airLegs"; id: number; city: CityId; version: number; round: number; xy0: Float32Array; w0: Float32Array; xy1: Float32Array; w1: Float32Array }
+  /** T-3503: the zone's 600 m squares and each cell's square and share of it at each end, from a
+   * worker holding the zone (the aux worker's copy for a zone open bare) */
+  | { kind: "zoneSquares"; id: number; city: CityId; version: number; round: number }
+  /** T-3503: the regional layer's legs with other places at the zone's squares (market metres) over
+   * this worker's periods (`IntercityApi.zone_legs_day`); `kinds`: bit 0 longer trips, bit 1
+   * commutes, bit 2 + k everyday kind k */
+  | { kind: "regLegs"; id: number; city: CityId; version: number; round: number; xy: Float32Array; kinds: number }
   /** T-2365: the zone's trips by length over this worker's periods (`DemandApi.trip_lengths_day`,
    * `EverydayApi.trip_lengths_day`); `bare`: the aux worker's for a zone open bare, every period */
   | { kind: "tripLengths"; id: number; city: CityId; version: number; round: number; bare?: boolean };
@@ -339,6 +370,9 @@ export type FromDemand =
       corridorRail?: Float64Array;
       /** T-378: per place, its longer trips in the period with places that have no zone, each way */
       elsewhere?: number[];
+      /** T-3503: the everyday outings across a zone line with another place in the period, four
+       * numbers a place with any: place, legs with an end there, rail legs, walking legs */
+      everydayPlaces?: number[];
       /** per route node (line by line, run 0 stops then run 1 stops): riders in the period */
       seg: Float32Array;
       board: Float32Array;
@@ -352,6 +386,10 @@ export type FromDemand =
       /** per route node, US$ in the period: the fare curve's extra on the trips first boarding there
        * (T-1143, the sims' `fare_extra`; all 0 for a straight line) */
       fareX?: Float32Array;
+      /** T-3578: per route node, US$ in the period: what the lines' own multiples add past one base (below 0
+       * under 1), on the km ridden (the sims' `base_extra`); all 0 while no line has one. Income adds it to the base
+       * fares it shares out (game/money.ts `baseTrips`), not to any line */
+      baseX?: Float32Array;
       /** riders boarding at each route node after changing lines in the period, every purpose
        * (T-1530, the sims' `transfers_in`), one block of route nodes per kind of day
        * (`DEMAND_DAYS` order), each population's scaled as its `transfers_day` scales its pairs:
@@ -447,7 +485,16 @@ export type FromDemand =
   | { kind: "bareFlows"; id: number; city: CityId; packed: Float32Array | null; masks: number[]; work: Float32Array[]; everyday: Float32Array[]; names: string[] }
   /** T-336: the squares' centres in the market frame and the share of each selected; null: not
    * open bare here, or outside the regional market */
-  | { kind: "bareSquares"; id: number; city: CityId; xy: Float32Array | null; share: Float32Array | null }
+  | { kind: "bareSquares"; id: number; city: CityId; xy: Float32Array | null; share: Float32Array | null; air?: Float32Array }
+  /** T-3500: per point of each end, legs, rail legs and walking legs (`airport_legs_day`, the
+   * market's all-mode legs and its parts' rail added); null: no market, or not `version` and `round` */
+  | { kind: "airLegs"; id: number; city: CityId; version: number; mask: number; legs0: Float64Array | null; legs1: Float64Array | null }
+  /** T-3503: `xy` the squares' centres, `sq` each cell's square, `share` each cell's share of it
+   * (home end, then destination end); null: the zone is not held here */
+  | { kind: "zoneSquares"; id: number; city: CityId; xy: Float32Array | null; sq: Uint32Array | null; share: Float32Array | null }
+  /** T-3503: per square, legs, rail legs and walking legs at the home end, then at the destination
+   * end; null: no market, or not `version` and `round` */
+  | { kind: "regLegs"; id: number; city: CityId; version: number; mask: number; legs: Float64Array | null }
   /** T-2365: eight blocks of `trip_length_edges` bins each (trips, rail, walking, no way, then their
    * km); null: not `version` and `round` (or not held here); `everyday` null for a zone without the layer */
-  | { kind: "tripLengths"; id: number; city: CityId; version: number; mask: number; edges: Float32Array; commute: Float64Array | null; everyday: Float64Array | null };
+  | { kind: "tripLengths"; id: number; city: CityId; version: number; mask: number; edges: Float32Array; commute: Float64Array | null; everyday: Float64Array | null; kinds: Float64Array | null };

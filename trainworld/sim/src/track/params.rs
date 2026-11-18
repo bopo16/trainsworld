@@ -15,6 +15,8 @@ pub const TRACE_MIN_RADIUS: f64 = 100.0;
 pub const V_TOP: f64 = 160.0 / 3.6;
 /// Top speed of a high-speed train and the cap on high-speed track, m/s (T-817).
 pub const V_HSR: f64 = 320.0 / 3.6;
+/// The lowest speed limit the player can put on a piece of track, km/h (T-3405), as on a line (T-2987).
+pub const EDGE_LIMIT_MIN: u16 = 40;
 /// Auto radius cap: the smallest whole-metre radius that already allows V_TOP
 /// (ceil(44.44² / 1.1) = 1,796 m; T-008 rounds it to 1,800).
 pub const R_CAP: f64 = 1796.0;
@@ -116,6 +118,10 @@ pub const FLYOVER_KM: f64 = 0.6;
 pub const FLAT_CROSSING_KM: f64 = 0.1;
 /// Water mask sampling step along track, m: half the pack mask's 25 m pixel (notes/T-004.md).
 pub const WATER_STEP: f64 = 12.5;
+/// A pack mask reads as water where the 0/1 values of the four cells around a point, weighted by closeness,
+/// add to this or more (T-3553): the cells reach up to ~15 m past the drawn coast, so ground track near a shore
+/// stays on land, and a 50 m channel still leaves a band (about 35 m) the sampling catches.
+pub const WATER_READ: f64 = 0.8;
 /// What each terrain class adds to the level's multiplier (T-1890, Anita 2026-10-31): flat, low
 /// hills, high hills, mountains. Added, so at grade in mountains is 0.5 + 3 = 3.5x.
 pub const TERRAIN_SURCHARGE: [f64; 4] = [0.0, 0.5, 1.2, 3.0];
@@ -455,6 +461,22 @@ pub const LEVELS: usize = 3;
 /// demand solves each period on its own level's trains.
 pub const PERIOD_HOURS: [(f64, f64); 5] = [(6.0, 10.0), (10.0, 16.0), (16.0, 20.0), (20.0, 24.0), (0.0, 6.0)];
 pub const PERIOD_LEVEL: [usize; 5] = [HIGH, HIGH, HIGH, MEDIUM, LOW];
+/// The kinds of day a line sets its trains for (`LineData::weekend`): weekdays (a superholiday's
+/// days too) and weekends (Saturday and Sunday or the country's own weekend, and public holidays).
+pub const WEEKDAYS: usize = 0;
+pub const WEEKEND: usize = 1;
+pub const DAY_ROWS: usize = 2;
+/// T-3521: the percents a line's weekends may run at (`LineData::weekend`).
+pub const WEEKEND_SHARE_MIN: u32 = 10;
+pub const WEEKEND_SHARE_MAX: u32 = 200;
+/// A local game day's kind of day by the week alone: a weekend day (`day_kind_at` 1 or 2) or a
+/// weekday. A line's own calendar (holidays, its country's weekend) overrides it (`service::Cal`).
+pub fn row_of_day(day: i64) -> usize {
+    match (day - 1).rem_euclid(7) {
+        5 | 6 => WEEKEND,
+        _ => WEEKDAYS,
+    }
+}
 /// Each period's busiest hour against its mean hour (T-087): how riders arrive over it (the
 /// boarding account's shape, demand's crowding).
 pub const PEAK_HOUR_FACTOR: [f32; 5] = [1.4, 1.15, 1.4, 1.3, 1.5];
@@ -543,7 +565,7 @@ mod kind_tests {
         }
         for (k, kind) in kinds.into_iter().enumerate() {
             let e = net.alloc_edge();
-            net.set_edge(e, Some(EdgeData { a: k as u32, b: k as u32 + 1, tracks: 2, pis: vec![], built: false, off: false, thru: vec![], crossover: false, kind, sep: false, day: 0, oneway: 0, join: [0; 2] })).unwrap();
+            net.set_edge(e, Some(EdgeData { a: k as u32, b: k as u32 + 1, tracks: 2, pis: vec![], built: false, off: false, thru: vec![], crossover: false, kind, sep: false, day: 0, oneway: 0, join: [0; 2], limit: 0 })).unwrap();
         }
         net
     }

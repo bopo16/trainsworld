@@ -6,6 +6,7 @@
 // String()).
 
 import { t } from "../i18n";
+import { shareOf } from "./corridorShares";
 import { computed, signal } from "@preact/signals";
 import { activeCity, CITIES, REGISTRY, viewedZone, type CityId } from "./cities";
 import { carryLoads, type StopKey } from "./carryLoads";
@@ -36,9 +37,12 @@ export interface LineDemand {
    * it would ride if the trains had room, and a full platform turns them away */
   arrive?: Float32Array[];
   /** per period, US$: what the fare curve adds beyond its first stretch's base and rate on the
-   * trips that first board this line (T-1143, the sim's `fare_extra`); absent or 0 while the
-   * curve is a straight line */
+   * trips that ride this line, by km (T-1143, T-1516, the sim's `fare_extra`); absent or 0 while the curve is a
+   * straight line */
   fareX?: number[];
+  /** T-3578: per period, US$: what the lines' own multiples add past one base on the trips riding this line, by
+   * km (the sim's `base_extra`); income adds the network's to the base fares `baseTrips` shares out */
+  baseX?: number[];
   /** T-324: from the free-flow estimate of a solve still running. A line new or changed since the
    * shown final result gets these first figures early, and the final round replaces them. */
   estimate?: boolean;
@@ -130,7 +134,10 @@ const carried = new WeakMap<Float32Array[], { now: string; out: Float32Array[] |
  * corridor's trips and rail are both parts together, `commutes` and `commuteRail` the commute legs;
  * T-378: `air` and `car` the rest by plane and by car, `elsewhere` each place's longer trips with
  * places that have no zone, each way. */
-export interface IntercityDemand { version: number; round: number; tripsPerDay: number; railTripsPerDay: number; commuteTripsPerDay?: number; commuteRailPerDay?: number; corridors: Corridors; elsewhere?: number[] }
+export interface IntercityDemand { version: number; round: number; tripsPerDay: number; railTripsPerDay: number; commuteTripsPerDay?: number; commuteRailPerDay?: number; corridors: Corridors; elsewhere?: number[];
+  /** T-3503: each place's everyday outings across a zone line with other places, four numbers a
+   * place with any (place, legs with an end there, rail legs, walking legs) */
+  everyday?: number[] }
 /**
  * The market's corridors with trips (T-789: hundreds of thousands of place pairs), the part no
  * network or period changes, one column an array: each pair's two places, its longer trips and
@@ -138,11 +145,14 @@ export interface IntercityDemand { version: number; round: number; tripsPerDay: 
  * that fly and that drive (T-378). One table serves every result of a market (T-1008).
  */
 export interface CorridorTable {
-  key: string; n: number; from: PlaceIds; to: PlaceIds; longer: Float64Array;
+  key: string; n: number; from: PlaceIds; to: PlaceIds;
+  /** 32-bit (T-3493: 31 MB less on a one-city game; the world's total moves by 2e-10 of itself) */
+  longer: Float32Array;
   /** the rows with commute legs, ascending, and their legs; every other row has none (T-2485: 24k of
    * New York's 5.9M rows have any, so a full column was 47 MB of zeros) */
   commuteAt: Uint32Array; commuteLegs: Float64Array;
-  air: Float32Array; car: Float32Array;
+  /** in steps of 1 / SHARE_ONE (`shareOf`, game/corridorShares.ts) */
+  air: Uint16Array; car: Uint16Array;
 }
 /** A market's place numbers: 16 bits while it has fewer than 65,536 places (T-2485) */
 export type PlaceIds = Uint16Array | Uint32Array;
@@ -152,7 +162,7 @@ export type PlaceIds = Uint16Array | Uint32Array;
 export interface Corridors { table: CorridorTable; longerScale: number; commuteScale: number; railAt: Uint32Array; longerRail: Float64Array; commuteRail: Float64Array }
 
 export const NO_CORRIDORS: Corridors = {
-  table: { key: "", n: 0, from: new Uint16Array(0), to: new Uint16Array(0), longer: new Float64Array(0), commuteAt: new Uint32Array(0), commuteLegs: new Float64Array(0), air: new Float32Array(0), car: new Float32Array(0) },
+  table: { key: "", n: 0, from: new Uint16Array(0), to: new Uint16Array(0), longer: new Float32Array(0), commuteAt: new Uint32Array(0), commuteLegs: new Float64Array(0), air: new Uint16Array(0), car: new Uint16Array(0) },
   longerScale: 0, commuteScale: 0, railAt: new Uint32Array(0), longerRail: new Float64Array(0), commuteRail: new Float64Array(0),
 };
 
@@ -165,7 +175,7 @@ export interface CorridorFigures { trips: number; rail: number; air: number; car
 export function corridorAt(c: Corridors, j: number, k = railIndex(c, j), m = sortedIndex(c.table.commuteAt, j)): CorridorFigures {
   const t = c.table, tl = t.longer[j] * c.longerScale, cm = (m >= 0 ? t.commuteLegs[m] : 0) * c.commuteScale;
   const lr = k >= 0 ? c.longerRail[k] : 0, cr = k >= 0 ? c.commuteRail[k] : 0, rest = tl - lr;
-  return { trips: tl + cm, rail: lr + cr, air: rest * t.air[j], car: rest * t.car[j] + cm - cr, commutes: cm, commuteRail: cr };
+  return { trips: tl + cm, rail: lr + cr, air: rest * shareOf(t.air[j]), car: rest * shareOf(t.car[j]) + cm - cr, commutes: cm, commuteRail: cr };
 }
 
 /** Corridor `j`'s place in `railAt`, -1 when it has no rail. */
@@ -257,6 +267,9 @@ export const refiningZone = signal<CityId | null>(null);
 /** T-2180: the player's edits are being solved for the edit note (game/editNote.ts); zones keep their
  * levels of detail meanwhile, so the note compares like with like */
 export const editsSettling = signal(false);
+/** T-3427: a network from the player's edits waits for the game to run before it is solved ("Recalculate
+ * trips while paused" off), so the figures shown are from before those edits */
+export const demandHeld = signal(false);
 /** T-2045: the zones shown from their own solve during a game load (the focus pool), true once it
  * has its last round: settled, which counts as final until the load's whole solve replaces it */
 export const focusZones = signal<ReadonlyMap<CityId, boolean>>(new Map());

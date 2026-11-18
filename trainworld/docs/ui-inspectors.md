@@ -26,7 +26,7 @@ title, rows: **Train share** (the
 zone's, as the top bar gives it; hover the top bar's split hover, [ui-panels.md](ui-panels.md#the-top-bar)), and for a zone with a built station
 **Stations** (built ones, the Cities tab's count), **Lines** (lines with a stop in the zone) and
 **Train trips** ("12.3M/day", the Cities tab's Trips figure for the day shown, hover the whole figure
-"per weekday" and so on) [T-1892], then **Points** (the past 24 game hours, hover as the Cities tab's), **Profit** ("$389M a day", the Cities
+"per weekday" and so on) [T-1892], then **Points** (the forecast weekday's, hover as the Cities tab's), **Profit** ("$389M a day", the Cities
 tab's figure and hover, losses red) and **Goals reached** (each goal reached, the star's as a small
 star before "10%", then "20%" and on; hover when it was reached; "None" before the first)
 [T-1437]. Then what a bubble click showed before ([ui-demand-views.md](ui-demand-views.md)): **Trips
@@ -46,7 +46,11 @@ the labels, no y axis. Under the plot a 10 px strip of each length's mode shares
 (the plot or the strip): the length band under the pointer shaded, and its trips ("Trips of 10-15 km per day",
 then each mode's share and count, No route and Plane only where the band has some, "All", and "To other places"
 where some are), the bands breaking at 0.5, 1, 2, 3, 5, 7, 10, 15, 20, 30, 50, 70, 100, 150, 200, 300, 500 and
-1,000 km ("Trips under 0.5 km per day", "Trips over 1,000 km per day"). Then the top three destinations. While the
+1,000 km ("Trips under 0.5 km per day", "Trips over 1,000 km per day"). A switch in the heading, **Mode** or
+**Purpose** [T-2790], stacks the same trips by purpose instead, in the purpose colours and the filter's order (Work at
+the bottom, Inter-city trips, being the trips to other places, on top; University with School); its hover lists each
+purpose that shows as 0.1% or more, then "All". The choice stays from one zone to the next until the game closes.
+Then the top three destinations. While the
 zone still loads (its bar on the map, T-421), To other places and the destinations wait, "Calculating demand" in
 their place; its Trips within and its graph show as soon as it has figures of its own (a round of its cluster
 during a load, T-2453), "Calculating demand" alone before that [T-2500]. Then, for
@@ -87,8 +91,7 @@ that the Lines tab's Money cell is blank, the line panel's Profit row reads "cal
 absent when it has none, and the line is left out of the group and Lines totals, so the upkeep alone is never
 shown as the line's loss. Deleting a rail or bus line with no stops asks nothing; one with stops asks "Delete <name>? Track
 and stations stay." [T-2535]. The line panel's block has no heading, only the rule above it. The points (Cities
-tab, top bar, leaderboard) say "in past 24h" too: they are a sum of the last 24 whole game
-hours, moving once an hour. They are counted by the clock worker from the boarding
+tab, top bar, leaderboard) are not these: they are the forecast weekday's (T-3465, "on a weekday"). The past 24 hours are counted by the clock worker from the boarding
 account's departures (`TrackApi.past_day`: the rest of yesterday from the time of day now, on
 yesterday's kind of day, then today so far on today's; a stop's boardings in a stretch are the
 riders arrived by its last departure in it less those still waiting, less the same at the
@@ -110,7 +113,7 @@ purpose filter the purpose drawn is ringed in the bar.
 
 ### The Lines tab
 
-- **The Lines tab** has New line above its list (actions go above lists of any length). The list
+- **The Lines tab** has New line above its list (actions go above lists of any length; new bus and ferry lines are started from the Build tab or U and O, T-3420). The list
   sorts by clicking a column header [T-310]: Name, City (below), Riders (today), Money (the line's expected profit today, fares less running cost and its share of upkeep, in the money format with negatives red; its hover gives "Expected profit today", the fares, the running cost, the upkeep and, on a weekend or holiday, a line saying so) [T-735, T-1893], Trains and Near. A click sorts by that
   column (names A to Z, figures biggest first, Near nearest first), a second reverses it, the sorted
   column has a small arrow, and each header's hover says what it sorts by. Names sort naturally, ties
@@ -151,9 +154,9 @@ purpose filter the purpose drawn is ringed in the bar.
   ([ui-map.md](ui-map.md) "Edit note").
 - **Trains to add** [T-472, T-1677, T-2236]: a row's train count (the trains its level needs now, the bare
   number under the "Trains" header [T-532]) is coloured by the line's load in the period now on today's kind of
-  day, otherwise muted (a 0 is muted and has no hover): the stretch mean of the period's intervals, as the line
-  panel's dot grades a level (`periodLoad` in `game/today.ts`, from `linesPeriods` for each line's own kind of
-  day) [T-2279, T-2335]; before those numbers come, the busiest hour's mean load on the line's fullest stretch
+  day, otherwise muted (a 0 is muted and has no hover): the straight mean of the period's intervals' loads
+  (`periodLoad` in `game/today.ts`, from `linesPeriods` for each line's own kind of
+  day) [T-2279, T-2335, T-3476]; before those numbers come, the busiest hour's mean load on the line's fullest stretch
   (`period_peaks` in `sim/src/track/boarding.rs`, the last of `Boarding::window`'s numbers per line, `crowdLoad`).
   Grades (`CROWD_GRADES`, the colour scale's steps): past 100% from 100.5%, orange from 130%, red from 140%;
   orange and red colour the count (`crowdClass`). The hover is the line panel's dot hover for the same level on
@@ -211,6 +214,18 @@ purpose filter the purpose drawn is ringed in the bar.
   view (below), a double click fits the map to all its lines'
   stops. A group edit is one undo step and wakes no demand; the hand order is outside the undo
   history, as a sort is.
+- **Hiding lines** [T-3420, `game/lineVisibility.ts`, `map/visibility.ts`]: an eye button beside the scope toggle
+  turns hide mode on (hover "Hide lines", lit while on): a small checkbox (Settings' look, smaller) starts every row,
+  ticked while the line is drawn on the map; a group's is ticked while all its lines are, half lit while some are, and a
+  click on it hides them all or, with any hidden, shows them all. A hidden line's bullet and name are faded. The eye
+  again (hover "Show all lines") leaves hide mode and shows every line, so lines are hidden only while it is on.
+  Hiding is a view setting: a hidden line runs, earns and is counted as before, keeps its row, its panel and the
+  schematic; on the map its strokes, its trains and a bus or ferry line's route and stops are not drawn and picks pass
+  over them (the track under it stays), and a hidden line's twin (T-3333) goes with it. Where lines run side by side
+  its band's slot stays empty. The hidden lines are saved with the game (the header's `hidden`, outside the undo
+  history; none once hide mode is left), and a game opened with lines hidden opens in hide mode; a new line or a copy
+  is shown. Settings' Show levels and Buses and ferries hide by level and by mode ([ui-panels.md](ui-panels.md)
+  "Settings").
 - **A group's bullet** [T-1813, `ui/GroupPill.tsx`]: a pill with a see-through body, a 2 px
   outline and bold text in one colour, reading the group's name with a trailing " line" or " main
   line" taken off, any case ("Tokaido Main Line" reads "Tokaido"; "Line 1" stays), and likewise a
@@ -285,15 +300,8 @@ purpose filter the purpose drawn is ringed in the bar.
 - **Sections**, in order: Schedule (trains for each demand level, with the resulting headway;
   [track-and-service.md](track-and-service.md) 6.3; columns Demand, Trains and Headway, every
   cell one line, the Demand column cut with an ellipsis when short of room [T-692]; beside the
-  heading two small muted icon buttons, copy and paste [T-1293, `game/scheduleCopy.ts`]: copy keeps
-  the line's trains or headways per level, train length and kind of train in the browser
-  (`localStorage` "anitabuilder-schedule-copy", so it outlasts the game and the visit; hover: the
-  settings, "Headways 3 min, 5 min and 10 min, 6 cars, high speed"), and paste puts them on the line
-  shown as separate edits (kind, length, then the trains or headways; a refusal stops the rest), the
-  length cut to what its shortest platform fits (the paste hover and a notice say so), a loop's
-  counts rounded up to even; paste is off until something is copied, its hover naming the line
-  copied from; a third, on a running line, opens the **timetable chart** (below, hover "Show timetable chart" /
-  "Hide timetable chart", pressed while open); a fourth, on a running line, opens the **schedule panel** (hover "Detailed
+  heading small muted icon buttons [T-3543]: on a running rail line the **timetable chart** (below, hover "Show timetable chart" /
+  "Hide timetable chart", pressed while open) and, a size bigger (24 px), the **schedule panel** (hover "Detailed
   schedule", [ui-panels.md](ui-panels.md#schedule-panel), T-3346); each level's count or headway is set on its own, a new line's included (T-2123 took
   back T-2092's fill of every level; the tutorial asks for trains at each level instead); a Trains / Headway switch in the heading
   chooses what the player sets [T-625]: with Trains a click on the count types it (Enter or leaving applies, Escape cancels, a loop's rounded up to even) [T-3152]. A count is raised to at most one train (a loop's two) more than the whole trains the line's track lets run at that level (the round trip over its shortest headway, `limits`; a loop's even, one at least; `trainCap`) and 1000, so one train is held and the held messages, the issue and the red headway show: a plus or a typed number at or past that is refused with the shake and the refusal knock, a typed number above it sets the cap and shakes, and the plus's hover says what limits the line. Lowering is free. When a game loads, a count past the cap is lowered to it (`game/capLoad.ts`); a cap that falls later, from a track edit, leaves the count, red with the held-out alert, until it is lowered [T-3165]; with Headway the headway column holds a stepper (steps to
@@ -322,9 +330,11 @@ shows an earlier edit's figures [T-1276]; each button's hover names the train
   load past the rated load, as in Trains to add [T-2236]: each interval's load is the busiest hour's mean load
   of the trains on it (the fuller direction) over the level's periods (High is its three periods, 6-10, 10-16
   and 16-20) as a share of the rated load, 160 a car (`period_peaks` in `Boarding::line_periods`); the dot's
-  fill is 100% plus the power-3 mean over every interval of its load past 100% (`stretchLoad`,
-  notes/T-2279.md) and its 1 px ring 1 px outside it (a gap between) the fullest interval's load, so one
-  packed interval among many reads yellow inside a crimson ring [T-2279, T-2335]; its colour
+  fill is 70% the straight mean of the intervals' crowding colours (red, green and blue each; every interval
+  counts the same) and 30% the colour of T-2279's skewed load (100% plus the power-2 mean of each interval's
+  load past 100%, leaning to the fullest; `stretchColour`, `CROWD_SKEW`), and its 1 px ring 1 px outside it (a
+  gap between) the fullest interval's load, so one packed interval among many reads mostly green with a warm
+  tint inside a crimson ring [T-2279, T-2335, T-3476]; each colour
   running smoothly with that load: green to 70%, yellow-green at 80%, yellow at 100%, orange at 130%, red at
   140% and crimson at crush's 150% (`crowdColour` in `game/palette.ts`, fed by `crowdLevel` in `game/today.ts`;
   the Traffic view's crowding hover colours its load the same way, [ui-map.md](ui-map.md)) [T-477, T-515,
@@ -679,7 +689,7 @@ profit, average load (against 320 a boat at the rated load, so up to 150% at cru
 and Riders left at platform (a port keeps a waiting crowd, T-2919); then the round trip block. A boat's panel is a train's,
 named "boat", its On board against two cars (88 seats, 320 at the rated load, 480 at crush), "Typical
 boat this hour" (a bus's "Typical bus this hour"). A port's panel is a station's: "Port" under its
-name, no platform length or upgrades, its upkeep a port's (US$10k a game day), Construct port and
+name, no platform length and one upgrade, the Waiting room (T-3419; waits for a boat count 0.8, as at a station), its upkeep a port's (US$10k a game day), Construct port and
 Remove port. The Money tab shows boats owned, needed and spare once there are any, and a **Ferry**
 fare row under High speed once a ferry line exists (a stepper by 0.05, 1.00x by default, a button back
 to 1.00x once set, saved with the game; a change solves demand again, T-2195). The Build tab's quote
@@ -773,7 +783,7 @@ order, kept and dropped as the Lines tab's is [T-1813]. Riders follows the rider
   group diagram at 0.7 too), and its hover adds "Not running" (`game/lineRunning.ts`, one set read
   by `Chip` and `lineBullet`; `checks/t1792-idle-bullets.mjs`) [T-1792, T-1907]. The GPU map layers draw no symbol bullets.
 - **Line shapes** [T-3319, `game/lineShapeState.ts`, `bulletDraw` in `ui/bullet.ts`]: a bullet is a circle, a
-  square (rounded, corner 18% of its side) or a diamond, and the ferry's default a pill (at least 1.5 times as wide
+  square (rounded, corner 18% of its side), a diamond or an outline (T-3436: a circle drawn as a ring in the line colour with its letter in it, stroke as thick as the bold letter's stem, 1.6 px at 12 and 16 px and 2.4 px at 30 px, T-3594; a line group pill's border is 2 px), and the ferry's default a pill (at least 1.5 times as wide
   as tall; not pickable, T-3357: a saved "pill" reads as no choice, so the line takes its mode's); a longer
   symbol widens each the same way, a diamond into a hexagon with the diamond's slopes. So the shapes look one size
   side by side, a square's side is 0.94 of a circle's height and a diamond 1.14 times it, reaching past the bullet's
@@ -787,8 +797,10 @@ order, kept and dropped as the Lines tab's is [T-1813]. Riders follows the rider
   group, station, train and track panels, the Stations tab, search, the trouble list, the edit note, the map's
   hovers and the network diagram's) and the group view's hovers; the group pill and the track on the map keep
   their own look.
-- **A click on a station selects its whole complex** [T-249]: complex view, whatever was selected
-  before (there is no Station / Complex switch). A station on its own is a complex of one. Complex
+- **A click on a station selects its whole complex** [T-249]: complex view (there is no Station / Complex switch).
+  With that complex already selected, or one of its stations opened alone, a click on a station of it opens that
+  station alone, and a click on the station already alone goes back to the complex [T-3539]. A station on its own
+  is a complex of one. Complex
   rules: [ui-map.md](ui-map.md) "Station complexes".
 - **Complex view** [T-1812: only these sections; no subtitle, no Trip from here, no commuters and no
   inter-city trips]:
@@ -796,8 +808,8 @@ order, kept and dropped as the Lines tab's is [T-1813]. Riders follows the rider
     station of the complex (it replaced the row per line name), busiest by the forecast first so the order
     holds through the day: name (muted on a blueprint), riders waiting now at it (red when its platform is full or
     a last train left riders behind), boardings there in the past 24 hours, and the station view's terminal
-    button (same icon, hover, price and click: blueprint or build at once, take away again; a tram stop or a
-    port has none, TerminalButton in `ui/inspector/StationUpgrades.tsx`); under them the chips of the lines
+    button (same icon, hover, price and click: blueprint or build at once, take away again; a port
+    has none, TerminalButton in `ui/inspector/StationUpgrades.tsx`); under them the chips of the lines
     stopping there (a name once, branches and patterns summed, busiest first), each selecting its line. The
     figures have their hovers. A click on the row opens that station alone in station view (`openAlone`,
     `singleStation` in `game/complexView.ts`): its own inspector and outline, its
@@ -853,7 +865,7 @@ order, kept and dropped as the Lines tab's is [T-1813]. Riders follows the rider
   name"), its text selected; Enter or leaving the box keeps it, Escape drops it, an empty name is
   ignored. A station's title also has the locate button [T-569] (cross hairs, hover "Show on the map",
   beside the pencil: the same move as a double click on its row) and the cycle button (two arrows, hover "Next suggested name"):
-  each click renames it to the next of its suggestions, the cross street, the neighbourhood and the
+  each click renames it to the next of its suggestions, the real station it stands on, the cross street, the neighbourhood and the
   city or town, wrapping round, worked out then from where it stands (map/stationNames.ts,
   [track-and-service.md](track-and-service.md) "Placing stations"). The cross street needs the
   station on screen at zoom 13 or closer; with nothing else to offer it says "No other name is
@@ -888,7 +900,7 @@ order, kept and dropped as the Lines tab's is [T-1813]. Riders follows the rider
   on its trains there a day (each direction the busier of arriving and leaving loads, every period
   summed) and how many change to or from other lines with its three biggest partners (T-176,
   `complexTransfers(members)` asked at each published round, [demand-views.md](demand-views.md)
-  "Transfers"), then the riders waiting now and the room (T-246, `game/complexLive.ts`). Platforms on
+  "Transfers"), then the riders waiting now, one line per direction ("14 waiting toward <end station>", T-3406), and the room (T-246, `game/complexLive.ts`). Platforms on
   top of each other (parallel within 15 degrees, centre lines within 12 m) share one hover listing
   them all. A click opens that station alone. The player's links have a hover giving the distance.
 - When the complex has more than one name, each name (the part before a slash) has one label beside

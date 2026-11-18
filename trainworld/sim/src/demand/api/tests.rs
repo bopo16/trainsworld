@@ -528,6 +528,57 @@ fn a_fare_multiplier_on_one_line_loses_its_riders_and_scales_its_fares() {
     assert_eq!(api.summary(0)[2].to_bits(), plain.to_bits());
 }
 
+/// T-3578: a line's own multiplier on the base, through the setters, the solve and `fare_extra`, on a straight
+/// curve and a bent one: twice the base on the first line loses rail riders and charges more, the extra on the
+/// loads; none again is the same solve to the bit. A base of $40 with the line free (route costs below 0) solves
+/// to finite figures with more riders, and the loads carry the base taken off.
+#[test]
+fn a_lines_own_base_multiplier_reaches_the_solve_and_the_fares() {
+    for bent in [false, true] {
+        let (mut api, xy, n, stops, times, tph, cars) = small();
+        api.set_network(&xy, &n, &stops, &times, &tph, &cars).unwrap();
+        let mut km = vec![];
+        for &count in &n { for _ in 0..2 { for k in 0..count { km.push(if k + 1 == count { 0.0 } else { 1.0 }); } } }
+        api.set_fares(1.5, 0.1, &km).unwrap();
+        if bent {
+            api.set_fare_curve(&[0.0, 1.5, 3.0, 1.8, 100.0, 1.8 + 97.0]).unwrap();
+        }
+        api.solve(0);
+        let plain = api.summary(0)[2];
+        let x0 = api.fare_extra(0);
+        let first = 2 * n[0] as usize;
+        let mut mul = vec![1.0; km.len()];
+        api.set_base_mul(&mul).unwrap();
+        api.solve(0);
+        assert_eq!(api.summary(0)[2].to_bits(), plain.to_bits(), "bent {bent}: all 1 is none");
+        mul[..first].fill(2.0);
+        api.set_base_mul(&mul).unwrap();
+        assert_eq!(api.solved_mask(), 0);
+        api.solve(0);
+        let dear = api.summary(0)[2];
+        let x1: f32 = api.base_extra(0).iter().sum();
+        assert!(dear < plain, "bent {bent}: rail {dear} against {plain}");
+        assert!(x1 > 1.0, "bent {bent}: base extra {x1}");
+        assert!(bent || api.fare_extra(0).iter().all(|&v| v == 0.0), "the base's extra is not the curve's");
+        assert!(api.set_base_mul(&[2.0]).is_err());
+        api.set_base_mul(&[]).unwrap();
+        api.solve(0);
+        assert_eq!(api.summary(0)[2].to_bits(), plain.to_bits(), "bent {bent}: none again");
+        assert!(api.fare_extra(0).iter().zip(&x0).all(|(a, b)| a.to_bits() == b.to_bits()));
+
+        api.set_fares(40.0, 0.1, &km).unwrap();
+        api.solve(0);
+        let high = api.summary(0)[2];
+        mul[..first].fill(0.0);
+        api.set_base_mul(&mul).unwrap();
+        api.solve(0);
+        let free = api.summary(0)[2];
+        let xf: f32 = api.base_extra(0).iter().sum();
+        assert!(api.summary(0).iter().all(|v| v.is_finite()), "bent {bent}: {:?}", api.summary(0));
+        assert!(free > high && xf < 0.0 && xf.is_finite(), "bent {bent}: rail {free} against {high}, extra {xf}");
+    }
+}
+
 #[test]
 fn fare_distances_follow_each_runs_track_and_base_is_once() {
     let (mut api, xy, n, stops, times, tph, cars) = small();
@@ -930,7 +981,7 @@ fn northeast_profile() {
     crate::demand::alloc::reset_peak();
     let live0 = crate::demand::alloc::current();
     let tstart = now_ms();
-    let mut stage_ms = vec![[0.0f64; 3]; 4];
+    let mut stage_ms = [[0.0f64; 3]; 4];
     for round in 0..4 {
         let tr = now_ms();
         let mut per_period: Vec<f64> = vec![];
@@ -1627,4 +1678,34 @@ fn t2365_commute_lengths_of_real_packs() {
         println!("{id}: {} zones, {ms:.0} ms; trips {t:.0} vs gravity {:.0} ({:+.2e}); mean {:.2} km vs gravity {:.2}; walking {w:.0} vs {:.0}; shares under 1 km {:.3}, 1-2 {:.3}, 2-5 {:.3}, 5-10 {:.3}, 10-20 {:.3}, 20+ {:.3}",
             a.z.n, a.gr.total, t / a.gr.total - 1.0, km / t, a.gr.mean_km, a.walk_all, band(0.0, 1.0), band(1.0, 2.0), band(2.0, 5.0), band(5.0, 10.0), band(10.0, 20.0), band(20.0, 1e9));
     }
+}
+
+
+/// T-3348: the reverse runs' stops (`set_back_stops`) reach the kernel: line 0's reverse run stops at
+/// a platform of its own 150 m off its stop 10, and riders board it there; none given, the graph is
+/// as before.
+#[test]
+fn reverse_stops_reach_the_graph() {
+    let (mut api, mut xy, n, stops, times, tph, cars) = small();
+    let beside = (xy.len() / 2) as u32;
+    xy.extend([2000.0, 150.0]);
+    let mut back = stops.clone();
+    back[10] = beside;
+    api.set_back_stops(&back);
+    api.set_network(&xy, &n, &stops, &times, &tph, &cars).unwrap();
+    let svc = api.svc.as_ref().unwrap();
+    let b = svc.st_map[beside as usize];
+    let net = DemandApi::period_net(svc, 0);
+    assert_eq!((net.back_stops.len(), net.back_stop(10)), (stops.len(), b));
+    let g = kernel::build_graph(&net, &Params::default());
+    // line 0's 17 stops: its reverse run reaches stop 10 at route node 17 + 6
+    assert_eq!((g.rn_station[10], g.rn_station[17 + 6]), (svc.st_map[10], b));
+    assert!(api.solve(0));
+    let (board, rail) = (api.board(0), api.summary(0)[2]);
+    assert!(board[17 + 6] > 0.0 && board[10] > 0.0, "{} {}", board[10], board[17 + 6]);
+    api.set_back_stops(&[]);
+    api.set_network(&xy, &n, &stops, &times, &tph, &cars).unwrap();
+    assert!(DemandApi::period_net(api.svc.as_ref().unwrap(), 0).back_stops.is_empty());
+    assert!(api.solve(0));
+    println!("rail trips, period 0: {rail:.1} with the platform beside, {:.1} without", api.summary(0)[2]);
 }

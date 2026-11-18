@@ -19,7 +19,7 @@ fn common_test_net(lines: &[&[u32]], tph: &[f32], ride: &[f32]) -> Network {
         hop_min: vec![], hop_back: vec![], line_speed_kmh: vec![0.0; lines.len()],
         line_headway_min: tph.iter().map(|t| [if *t > 0.0 { 60.0 / t } else { f32::INFINITY }; network::PERIODS]).collect(),
         line_seats: vec![100.0; lines.len()], line_rated: vec![], line_crush: vec![200.0; lines.len()],
-        st_group: vec![], stop_x: vec![], stop_y: vec![], line_wrap: vec![], span: vec![], st_ups: vec![], st_passage: vec![], catches: vec![], st_bus: vec![], st_tram: vec![],
+        st_group: vec![], stop_x: vec![], stop_y: vec![], line_wrap: vec![], span: vec![], st_ups: vec![], st_passage: vec![], catches: vec![], st_bus: vec![], st_tram: vec![], back_stops: vec![],
     };
     for (l, stops) in lines.iter().enumerate() {
         net.line_stops.extend_from_slice(stops);
@@ -154,6 +154,85 @@ fn a_feeders_share_of_the_fare_curve_extra_goes_by_its_km() {
     }
 }
 
+/// T-3578: a line's own multiplier scales the base, a trip paying it times the largest of the lines
+/// it rides: the feeder 0-1 at 1.5 and the line 1-2-3 at 2, so 0 -> 3 pays 2 bases, 0 -> 1 one and a
+/// half and 1 -> 3 two. The route costs carry the base's part past one base (below it at 0), on a
+/// straight curve or a bent one; the assignment puts it on the km ridden, a line at 0 included, and
+/// it adds up to the trips times it. Parallel lines from one station average by their trains.
+#[test]
+fn a_lines_own_multiplier_scales_the_base_by_the_largest_on_the_trip() {
+    let p = common_test_params();
+    let net = common_test_net(&[&[0, 1], &[1, 2, 3]], &[12.0, 12.0], &[2.0, 6.0]);
+    let (base, rate) = (4.5f32, 0.3f32);
+    // route nodes: the feeder's 0, 1 and back 2, 3; the line's 4, 5, 6 and back 7, 8, 9
+    let km = [5.0, 0.0, 5.0, 0.0, 20.0, 20.0, 0.0, 20.0, 20.0, 0.0];
+    let graph = |mul: Option<[f32; 2]>, bent: bool| {
+        let mut g = build_graph(&net, &p);
+        g.rn_fare = km.iter().map(|k| k * rate).collect();
+        let ones = vec![1.0; g.rn_ride.len()];
+        set_crowding(&mut g, &ones);
+        if bent {
+            g.fare_curve = FareCurve { km: vec![0.0, 5.0, 200.0], min: vec![base, base + 5.0 * rate, base + 5.0 * rate], base, rate };
+            g.rn_km = km.to_vec();
+        }
+        if let Some(m) = mul {
+            g.rn_base_mul = g.rn_line.iter().map(|&l| m[l as usize]).collect();
+            g.base_min = base;
+            g.rn_km = km.to_vec();
+        }
+        g
+    };
+    let at = |r: &[f32], i: usize, j: usize| r[i * 4 + j];
+    for bent in [false, true] {
+        let plain_g = graph(None, bent);
+        let plain = skims(&plain_g, &p);
+        let ones = skims(&graph(Some([1.0, 1.0]), bent), &p);
+        assert!(plain.r.iter().zip(&ones.r).all(|(a, b)| a.to_bits() == b.to_bits()), "all 1 is no change");
+        let g = graph(Some([1.5, 2.0]), bent);
+        let sk = skims(&g, &p);
+        for (i, j, m) in [(0, 3, 2.0), (0, 1, 1.5), (1, 3, 2.0), (3, 0, 2.0), (1, 0, 1.5)] {
+            let d = at(&sk.r, i, j) - at(&plain.r, i, j);
+            assert!((d - base * (m - 1.0)).abs() < 1e-4, "bent {bent}: {i} -> {j} adds {d}, want {}", base * (m - 1.0));
+        }
+        // the largest, not the sum: the feeder at 3 and the line at 0.5 pays 3 bases
+        let sk3 = skims(&graph(Some([3.0, 0.5]), bent), &p);
+        assert!((at(&sk3.r, 0, 3) - at(&plain.r, 0, 3) - base * 2.0).abs() < 1e-4);
+        // a free feeder alone costs less than nothing past its wait and ride
+        let free = skims(&graph(Some([0.0, 1.0]), bent), &p);
+        assert!((at(&free.r, 0, 1) - at(&plain.r, 0, 1) + base).abs() < 1e-4);
+        assert!((at(&free.r, 0, 3) - at(&plain.r, 0, 3)).abs() < 1e-4, "the line at 1 sets the trip's");
+
+        let mut od = vec![0.0f32; 16];
+        od[3] = 10.0; // 0 -> 3
+        od[1] = 4.0; // 0 -> 1
+        let l0 = assign(&plain_g, &plain, &od);
+        let l = assign(&g, &sk, &od);
+        assert!(l0.rn_base_x.iter().all(|&v| v == 0.0) && l.rn_fare_x == l0.rn_fare_x, "bent {bent}: the curve's extra is its own");
+        let x = l.rn_base_x.clone();
+        let total: f32 = x.iter().sum();
+        let want = 10.0 * base * 1.0 + 4.0 * base * 0.5;
+        assert!((total - want).abs() < 1e-3, "bent {bent}: {total} against {want}: {x:?}");
+        // 0 -> 3's by km: 5 of 45 on the feeder; 0 -> 1's all on it
+        for (r, want) in [(0, 10.0 * base * 5.0 / 45.0 + 4.0 * base * 0.5), (4, 10.0 * base * 20.0 / 45.0), (5, 10.0 * base * 20.0 / 45.0)] {
+            assert!((x[r] - want).abs() < 1e-3, "bent {bent}: route node {r}: {x:?}");
+        }
+        let lf = assign(&graph(Some([0.0, 1.0]), bent), &free, &od);
+        let xf: f32 = lf.rn_base_x.iter().sum();
+        assert!((xf + 4.0 * base).abs() < 1e-3, "bent {bent}: only 0 -> 1 rides the free line alone: {xf}");
+    }
+    // two lines side by side from 0 to 2, 6 and 12 trains an hour: riders split a third and two
+    // thirds, and so does the base's multiplier
+    let net = common_test_net(&[&[0, 1, 2], &[0, 1, 2]], &[6.0, 12.0], &[2.0, 2.0]);
+    let mut g = build_graph(&net, &p);
+    let plain = skims(&g, &p);
+    g.rn_base_mul = g.rn_line.iter().map(|&l| if l == 0 { 3.0 } else { 1.5 }).collect();
+    g.base_min = base;
+    g.rn_km = vec![1.0; g.rn_line.len()];
+    let sk = skims(&g, &p);
+    let want = base * ((3.0 + 2.0 * 1.5) / 3.0 - 1.0);
+    assert!((at(&sk.r, 0, 2) - at(&plain.r, 0, 2) - want).abs() < 1e-4, "{} against {want}", at(&sk.r, 0, 2) - at(&plain.r, 0, 2));
+}
+
 /// T-798: a circle 0-1-2-3-4-5-0, 12 tph, 2 minutes a stop and half a minute standing at 0.
 /// Riders take the short way round through 0 without changing; a line that is not a circle
 /// sends them the long way.
@@ -170,7 +249,7 @@ fn a_circle_rides_the_short_way_through_its_first_stop() {
             line_name: vec![String::new()], line_off: vec![0, 7], line_stops: stops.to_vec(),
             hop_min: ride, hop_back: back, line_speed_kmh: vec![0.0],
             line_headway_min: vec![[5.0; network::PERIODS]], line_seats: vec![100.0], line_rated: vec![], line_crush: vec![200.0],
-            st_group: vec![], stop_x: vec![], stop_y: vec![], line_wrap: vec![wrap], span: vec![], st_ups: vec![], st_passage: vec![], catches: vec![], st_bus: vec![], st_tram: vec![],
+            st_group: vec![], stop_x: vec![], stop_y: vec![], line_wrap: vec![wrap], span: vec![], st_ups: vec![], st_passage: vec![], catches: vec![], st_bus: vec![], st_tram: vec![], back_stops: vec![],
         }
     };
     let g = build_graph(&ring(true), &p);
@@ -223,7 +302,7 @@ fn a_passed_stop_boards_and_alights_nobody() {
         line_name: vec![String::new()], line_off: vec![0, 3], line_stops: vec![0, 1, 2],
         hop_min: vec![2.0, 2.0, 0.0], hop_back: vec![0.0, 1.5, 1.5], line_speed_kmh: vec![0.0],
         line_headway_min: vec![[5.0; network::PERIODS]], line_seats: vec![100.0], line_rated: vec![], line_crush: vec![200.0],
-        st_group: vec![], stop_x: vec![], stop_y: vec![], line_wrap: vec![false], span: vec![], st_ups: vec![], st_passage: vec![], catches: vec![], st_bus: vec![], st_tram: vec![],
+        st_group: vec![], stop_x: vec![], stop_y: vec![], line_wrap: vec![false], span: vec![], st_ups: vec![], st_passage: vec![], catches: vec![], st_bus: vec![], st_tram: vec![], back_stops: vec![],
     };
     // route nodes: run 0 = 0..3 (stations 0, 1, 2), run 1 = 3..6 (2, 1, 0)
     net.span = (0..network::PERIODS).flat_map(|_| (0..6).map(|r| if r == 4 { -1.0 } else { 1.0 })).collect();
@@ -654,7 +733,7 @@ fn a_lollipop_line_changes_onto_itself_at_its_junction() {
             line_name: vec![String::new()], line_off: vec![0, n as u32], line_stops: stops,
             hop_min: (0..n).map(|k| if k + 1 < n { 2.0 } else { 0.0 }).collect(), hop_back: vec![], line_speed_kmh: vec![0.0],
             line_headway_min: vec![[5.0; network::PERIODS]], line_seats: vec![100.0], line_rated: vec![], line_crush: vec![200.0],
-            st_group: vec![], stop_x: vec![], stop_y: vec![], line_wrap: vec![false], span: vec![], st_ups: vec![], st_passage: vec![], catches: vec![], st_bus: vec![], st_tram: vec![],
+            st_group: vec![], stop_x: vec![], stop_y: vec![], line_wrap: vec![false], span: vec![], st_ups: vec![], st_passage: vec![], catches: vec![], st_bus: vec![], st_tram: vec![], back_stops: vec![],
         }
     };
     let g = build_graph(&lolly(true), &p);
@@ -710,7 +789,7 @@ fn bent_line(gap: f32) -> Network {
         line_name: vec![String::new()], line_off: vec![0, 7], line_stops: (0..7).collect(),
         hop_min: vec![3.0, 6.0, 6.0, 6.0, 6.0, 3.0, 0.0], hop_back: vec![], line_speed_kmh: vec![0.0],
         line_headway_min: vec![[5.0; network::PERIODS]], line_seats: vec![100.0], line_rated: vec![], line_crush: vec![200.0],
-        st_group: vec![], stop_x: vec![], stop_y: vec![], line_wrap: vec![false], span: vec![], st_ups: vec![], st_passage: vec![], catches: vec![], st_bus: vec![], st_tram: vec![],
+        st_group: vec![], stop_x: vec![], stop_y: vec![], line_wrap: vec![false], span: vec![], st_ups: vec![], st_passage: vec![], catches: vec![], st_bus: vec![], st_tram: vec![], back_stops: vec![],
     }
 }
 
@@ -1604,7 +1683,7 @@ fn leaf_stations_leave_every_strategy_as_it_was() {
             line_name: vec![String::new()], line_off: vec![0, 7], line_stops: vec![0, 1, 2, 3, 4, 5, 0],
             hop_min: (0..7).map(|k| if k < 6 { 2.0 } else if wrap { 0.5 } else { 0.0 }).collect(), hop_back: vec![], line_speed_kmh: vec![0.0],
             line_headway_min: vec![[5.0; network::PERIODS]], line_seats: vec![100.0], line_rated: vec![], line_crush: vec![200.0],
-            st_group: vec![], stop_x: vec![], stop_y: vec![], line_wrap: vec![wrap], span: vec![], st_ups: vec![], st_passage: vec![], catches: vec![], st_bus: vec![], st_tram: vec![],
+            st_group: vec![], stop_x: vec![], stop_y: vec![], line_wrap: vec![wrap], span: vec![], st_ups: vec![], st_passage: vec![], catches: vec![], st_bus: vec![], st_tram: vec![], back_stops: vec![],
         }
     };
     let nets = [network::synth_network(), ring(true), ring(false), common_test_net(&[&[0, 1, 2, 3], &[0, 1, 2]], &[6.0, 12.0], &[2.0, 3.0])];
@@ -1631,4 +1710,36 @@ fn leaf_stations_leave_every_strategy_as_it_was() {
         }
     }
     super::search::CHECK_PLAIN.with(|c| c.set(false));
+}
+
+
+/// T-3348: a line whose reverse run stops at a platform beside the listed stop (one-way track): the
+/// reverse run's route node is at that station, riders board and alight there going back, and
+/// the listed stop has no reverse-run service.
+#[test]
+fn a_reverse_run_boards_at_its_own_platform_beside_the_stop() {
+    let p = common_test_params();
+    let mut net = common_test_net(&[&[0, 1, 2]], &[6.0], &[2.0]);
+    // station 4: the westbound platform 150 m from station 1
+    net.st_x.push(2000.0);
+    net.st_y.push(150.0);
+    net.back_stops = vec![0, 4, 2];
+    assert_eq!(net.back_only(0).collect::<Vec<_>>(), vec![4]);
+    let g = build_graph(&net, &p);
+    assert_eq!(g.rn_station, vec![0, 1, 2, 2, 4, 0]);
+    let sk = skims(&g, &p);
+    let at = |i: usize, j: usize| sk.r[i * 5 + j];
+    assert!(at(4, 0).is_finite() && at(2, 4).is_finite() && at(0, 1).is_finite());
+    // from the listed stop west only by riding to the end and back, past the platform beside
+    assert!(at(1, 0) > at(4, 0) + 2.0 * 2.0, "{} {}", at(1, 0), at(4, 0));
+    let mut od = vec![0.0f32; 25];
+    od[4 * 5] = 10.0; // 4 -> 0
+    od[2 * 5 + 4] = 5.0; // 2 -> 4
+    od[1] = 3.0; // 0 -> 1
+    let l = assign(&g, &sk, &od);
+    let near = |a: f32, b: f32| (a - b).abs() < 1e-3;
+    assert!(near(l.rn_board[4], 10.0) && near(l.rn_alight[4], 5.0), "{:?} {:?}", l.rn_board, l.rn_alight);
+    assert!(near(l.board[4], 10.0) && near(l.alight[4], 5.0) && near(l.alight[1], 3.0) && near(l.board[1], 0.0));
+    // the station is one of the line's for access, as its listed stops are
+    assert_eq!(on_train(&net), vec![true, true, true, false, true]);
 }

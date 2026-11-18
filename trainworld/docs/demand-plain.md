@@ -68,8 +68,10 @@ station buildings and T-2278's parking by income). The full rules are in demand.
   Sunday is a weekend day. A public holiday, with the substitute days its country gives, runs as a
   Sunday, so Thanksgiving runs a New York line on Sunday demand and fares that day only; a few US
   holidays most people work through (Columbus Day, Veterans Day and the like) run as weekdays.
-  Every day runs the same trains: each line's high, medium and low trains in their own hours,
-  weekends and holidays too, and their crowding is the day's riders on those trains.
+  Each line's high, medium and low trains run in their own hours every day; on weekends and public
+  holidays a line runs a percent of its weekday trains (100% unless the player changes it) or
+  counts set by hand, and a day's crowding is its riders on that day's trains. Weekend riders don't
+  change with the weekend trains: fewer trains crowd them rather than lose them.
 - **Long holidays.** Spring Festival, Golden Week, Obon, Chuseok, Thanksgiving, Christmas, Eid and
   a few more make a run of days off around them a superholiday (3 days or more). While people are
   away, local outings are 0.7 of a Sunday's (many have gone home) and attractions 1.5 times a
@@ -159,7 +161,9 @@ counted in the totals, by no mode. Car ferries don't count as roads.
   player's own; older saves keep their fares), paid once a trip; choosing
   between routes sees only its first stretch. On high-speed lines the fare above the base is 1.25
   times as much (or the player's multiplier), by the share of the trip's km on them, so riders weigh
-  the dearer fare. A transfer fare the player sets ($0 to start) is paid at each change of line,
+  the dearer fare. Each line also has its own fare multiple (0 to 3, 1 to start) that works the same way
+  on its km and scales the base too: a trip pays the base times the highest multiple among the lines it
+  rides, so one at 1.5 and one at 2 pays twice the base. A transfer fare the player sets ($0 to start) is paid at each change of line,
   times the country's scale too; people weigh it when picking a route and the train, and the line
   they change onto takes it. Trips between regions change free. At the default scales a fare weighs the same
   everywhere; poorer countries just pay less per ride. A new game's curve is about what real trains
@@ -263,8 +267,8 @@ parking is paid, rail wins easily (Hempstead to Midtown). The trip explorer show
 The player's answer is a bus (since T-1464). Anyone within 300 m of a bus route walks to it (their
 distance to the route plus 100 m), waits and rides to a station at 90% of what a car does on the road there, never under 30 km/h while moving (a bus lane), losing 28 seconds at each stop: about 19 km/h with stops every 400 m in a dense centre like Manhattan. The change to the
 train is free: one fare for the whole trip on the same curve. Every time someone boards a bus,
-including changing from a train to one, it costs them 6 perceived minutes on top of the wait. A home
-1.5 km from a station walks 29 perceived minutes to it, or about 24 by bus. Trips by bus alone count
+including changing from a train to one, it costs them 4 perceived minutes on top of the wait. A home
+1.5 km from a station walks 29 perceived minutes to it, or about 22 by bus. Trips by bus alone count
 as rail. A bus is a third of a train car: riders mind its crowding from 45 aboard, it is at 100% with 53
 and takes 80 at the most (a train car: 112, 160 and 240).
 

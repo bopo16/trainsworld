@@ -122,7 +122,8 @@ impl TrackApi {
             let p = prof(&t);
             let n = ls.runs[t.run as usize].stop_idx.len();
             for k in 0..n.saturating_sub(1) {
-                if ls.stop_node(t.run as usize, k) != Some(node) {
+                // T-3565: nor where the run passes a one-way station on the other track
+                if ls.stop_node(t.run as usize, k) != Some(node) || ls.runs[t.run as usize].away.iter().any(|x| x.0 as usize == k) {
                     continue;
                 }
                 let at = t.draw + p.dep.get(k).copied().unwrap_or(0.0);
@@ -317,14 +318,25 @@ impl TrackApi {
     /// as u8), node or -1, x, y, trains an hour through it, the most it takes]`, all zero where the
     /// line's whole fleet runs. Then per level what limits the line (T-679): `[shortest headway s
     /// with every other line as it runs (infinite with no room left), kind, node or -1, x, y]`,
-    /// all zero where nothing does.
+    /// all zero where nothing does. Then per level the shortest headway a train count is capped by
+    /// (T-3526): the same, but with single track's margin counted for a lone train too; 0 where
+    /// nothing limits.
     pub fn line_held(&self, line: u32) -> Vec<f64> {
-        let mut out = vec![0.0; 12 * LEVELS];
+        let mut out = vec![0.0; 13 * LEVELS];
         let cap = &self.w.svc.cap;
         if line as usize >= self.w.net.line_count() {
             return out;
         }
         let most = cap.line_limits(&self.w.net)[line as usize];
+        // the lone case only differs for a line with one train or none
+        let lone = self.w.net.line_trains[line as usize].map_or(true, |t| t.iter().any(|&n| n <= 1));
+        let paired = if lone { cap.line_limits_lone(&self.w.net, false)[line as usize] } else { most };
+        for lev in 0..LEVELS {
+            let tph = paired[lev].0;
+            if paired[lev].1 != u32::MAX {
+                out[12 * LEVELS + lev] = if tph > 0.0 { 3600.0 / tph } else { f64::INFINITY };
+            }
+        }
         for lev in 0..LEVELS {
             let (tph, r) = most[lev];
             if r == u32::MAX {
@@ -407,6 +419,8 @@ impl TrackApi {
             (0..svc.lines.len()).filter(|&o| o != line as usize && svc.lines[o].ok && uses(&svc.lines[o].runs[0])).map(|o| o as f64).collect()
         };
         let mut marks: Vec<(f64, [f64; 5], Vec<f64>)> = vec![];
+        // a looped route passes a junction or crossing twice: drawn once, at its first pass
+        let mut seen_nodes = std::collections::HashSet::new();
         for k in 1..run.nodes.len().saturating_sub(1) {
             let n = run.nodes[k];
             let i = n as usize;
@@ -414,22 +428,26 @@ impl TrackApi {
                 continue;
             }
             let s = run.node_s[k];
-            if s <= stop_s[0] || s >= stop_s[stop_s.len() - 1] {
+            if s <= stop_s[0] || s >= stop_s[stop_s.len() - 1] || !seen_nodes.insert(n) {
                 continue;
             }
             let (g, f) = place(s);
             marks.push((s, [4.0, g as f64, f, net.node_x[i], net.node_y[i]], others(&|r| r.nodes.contains(&n))));
         }
         for c in net.crossings.iter().filter(|c| matches!(c.kind, CrossKind::Flat(_))) {
+            let mut best: Option<(f64, Vec<f64>)> = None;
             for (own, s_own, other) in [(c.e1, c.s1, c.e2), (c.e2, c.s2, c.e1)] {
                 let Some(j) = run.segs.iter().position(|&p| path_edge(p) == own) else { continue };
                 let len = net.edge_len[own as usize];
                 let s = run.seg_off[j] + if path_dir(run.segs[j]) == 0 { s_own } else { len - s_own };
-                if s <= stop_s[0] || s >= stop_s[stop_s.len() - 1] {
+                if s <= stop_s[0] || s >= stop_s[stop_s.len() - 1] || best.as_ref().is_some_and(|b| b.0 <= s) {
                     continue;
                 }
+                best = Some((s, others(&|r| r.segs.iter().any(|&p| path_edge(p) == other))));
+            }
+            if let Some((s, lines)) = best {
                 let (g, f) = place(s);
-                marks.push((s, [5.0, g as f64, f, c.x, c.y], others(&|r| r.segs.iter().any(|&p| path_edge(p) == other))));
+                marks.push((s, [5.0, g as f64, f, c.x, c.y], lines));
             }
         }
         marks.sort_by(|a, b| a.0.total_cmp(&b.0));

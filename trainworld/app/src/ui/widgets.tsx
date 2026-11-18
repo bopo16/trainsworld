@@ -6,7 +6,7 @@ import { levelLabel } from "../game/format";
 import { inkOn, LEVEL_COLOURS } from "../game/palette";
 import { IDLE_TIP, isIdleLine } from "../game/lineRunning";
 import { PLANE_PATH } from "../map/glyphs";
-import { bulletDraw, bulletEpoch, bulletTextSoon, type BulletDraw } from "./bullet";
+import { bulletDraw, bulletEpoch, bulletText, bulletTextSoon, type BulletDraw } from "./bullet";
 import { shapeOf } from "../game/lineShapeState";
 import { LINE_SHAPES, type LineShape, type PickShape } from "../game/lineShape";
 import { LEVELS, type Level, type LineInput } from "../game/types";
@@ -15,6 +15,9 @@ import { knock } from "../game/world";
 import type { Signal } from "@preact/signals";
 import { t, type MessageKey } from "../i18n";
 import { mobileDevice } from "../workers/deviceMemory";
+
+/** the snap switches' magnet, its two pole tips apart from its body (T-3069) */
+const SNAP_MAGNET = "M1.75 1.5v1.2M6.75 1.5v1.2M1.75 4.2v1.3a2.5 2.5 0 005 0V4.2";
 
 export const Icon = {
   minus: () => <svg viewBox="0 0 16 16"><path d="M4 8h8" /></svg>,
@@ -43,12 +46,15 @@ export const Icon = {
   bubble: () => <svg viewBox="0 0 16 16"><circle class="bubble" cx="8" cy="8" r="5.5" /></svg>,
   // a run of segments, each starting where the last ended
   keepPlacing: () => <svg viewBox="0 0 16 16"><path d="M2 12.5l4-6 3 3 5-6.5" /><circle class="solid" cx="6" cy="6.5" r="1.4" /><circle class="solid" cx="9" cy="9.5" r="1.4" /><circle class="solid" cx="14" cy="3" r="1.4" /></svg>,
-  // a magnet over a curving line
-  snapReal: () => <svg viewBox="0 0 16 16"><path d="M1.5 14.5c4-.5 9-3 13-8" /><path d="M5 2.5v3.5a3 3 0 006 0V2.5M5 4.5h2M9 4.5h2" /></svg>,
-  // a road with its centre line, a rail track curving along it (T-3129)
-  snapRoads: () => <svg viewBox="0 0 16 16"><path d="M1.5 12.5c4 0 8-2 13-9M4.5 15c4 0 8-2 11-6.5" /><path d="M2.5 9c3.5-.5 7-2 11-7" stroke-dasharray="1.5 1.5" /></svg>,
-  // two curving tracks side by side, the new one dashed
-  snapBeside: () => <svg viewBox="0 0 16 16"><path d="M1.5 11.5c4.5 0 8-3 10-9.5" /><path d="M4.5 14.5c4.5 0 8-3 10-9.5" stroke-dasharray="2 1.6" /></svg>,
+  // T-3069: the snaps are one family, the same magnet top left over what it snaps to, drawn on one sweep.
+  // The real network: one line
+  snapReal: () => <svg viewBox="0 0 16 16"><path d={SNAP_MAGNET} /><path d="M1.5 14.5c5 0 10-4 13-12" /></svg>,
+  // roads (T-3129): the sweep as a road, two edges and a centre line
+  snapRoads: () => <svg viewBox="0 0 16 16"><path d={SNAP_MAGNET} /><path d="M1.4 12.2L2.4 12.1L3.4 11.9L4.3 11.6L5.3 11.2L6.3 10.6L7.2 9.8L8.2 8.8L9.1 7.8L10 6.5L10.8 5.1L11.6 3.5L12.4 1.7M7.5 15.2L8.9 14.3L10.3 13.2L11.5 12L12.7 10.6L13.8 9L14.9 7.3" /><path d="M1.5 14.5c5 0 10-4 13-12" stroke-width="1" stroke-dasharray="1.6 1.4" /></svg>,
+  // streets for tram track (T-2927, T-3536): a straight street, two edges and a dashed centre line
+  snapStreets: () => <svg viewBox="0 0 16 16"><path d={SNAP_MAGNET} /><path d="M1.5 12L12 1.5M4.5 15L15 4.5" /><path d="M3 13.5L13.5 3" stroke-width="1" stroke-dasharray="1.6 1.4" /></svg>,
+  // beside track: two tracks along the sweep, the new one dashed
+  snapBeside: () => <svg viewBox="0 0 16 16"><path d={SNAP_MAGNET} /><path d="M1.4 12.9L2.5 12.8L3.6 12.6L4.6 12.3L5.7 11.8L6.7 11.1L7.7 10.3L8.7 9.3L9.6 8.2L10.6 6.9L11.4 5.4L12.2 3.8L13 1.9" /><path d="M6.5 14.9L7.9 14.2L9.2 13.2L10.4 12.1L11.6 10.8L12.7 9.4L13.8 7.8L14.7 6L15.2 5.1" stroke-dasharray="2 1.6" /></svg>,
   // two peaks, the track tag's terrain mark (T-1394)
   terrain: () => <svg viewBox="0 0 16 16"><path d="M1.5 13.5L6 6l2.4 3.4L10.6 6.5l3.9 7z" /></svg>,
   // track carried on at its own height: a raised piece, then an arrow along the same level (T-1161)
@@ -64,7 +70,11 @@ export const Icon = {
   anchor: () => <svg viewBox="0 0 16 16"><circle cx="8" cy="3.2" r="1.6" /><path d="M8 4.8v9.7M5.2 7.2h5.6M2.7 9.6c.4 2.9 2.6 4.9 5.3 4.9s4.9-2 5.3-4.9" /></svg>,
   redo: () => <svg viewBox="0 0 16 16"><path d="M10.5 4l3 3-3 3M13 7H6.5a3.5 3.5 0 000 7H9" /></svg>,
   cross: () => <svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>,
-  // the controls panel
+  // T-3420: the Lines tab's hide mode
+  eye: () => <svg viewBox="0 0 16 16"><path d="M1.5 8c1.6-2.9 3.8-4.4 6.5-4.4s4.9 1.5 6.5 4.4c-1.6 2.9-3.8 4.4-6.5 4.4S3.1 10.9 1.5 8z" /><circle cx="8" cy="8" r="2" /></svg>,
+  // T-3527: the help panel's button, a plain "?" (Anita)
+  question: () => <svg viewBox="0 0 16 16"><path d="M5.3 5.6a2.7 2.7 0 1 1 3.8 2.5c-.7.3-1.1.9-1.1 1.6v.8" /><circle class="solid" cx="8" cy="13" r=".7" /></svg>,
+  // an achievement's hint
   help: () => <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2" /><path d="M6.2 6.3a1.9 1.9 0 1 1 2.6 1.8c-.5.2-.8.6-.8 1.1v.6" /><circle class="solid" cx="8" cy="11.6" r=".5" /></svg>,
   // T-2855: Discord's logo (filled, so no outline), for Settings' link to the server
   discord: () => <svg viewBox="0 0 24 24"><path class="solid" style="stroke:none" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z" /></svg>,
@@ -104,7 +114,6 @@ export const Icon = {
   marey: () => <svg viewBox="0 0 16 16"><path d="M1.5 2.5h13M1.5 13.5h13M2 13.5l4-11M7.5 2.5l4 11M10 13.5l4-11" /></svg>,
   // T-3346: the schedule panel, a station timetable's hour column and rows
   timetable: () => <svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="1" /><path d="M2.5 5.5h11M5.5 5.5v8M7.5 8h4M7.5 10.5h3" /></svg>,
-  paste: () => <svg viewBox="0 0 16 16"><path d="M5.5 3h-2v11.5h9V3h-2" /><rect x="5.5" y="1.5" width="5" height="3" rx="0.5" /><path d="M6 8h4M6 10.5h4" /></svg>,
   // the Lines and Stations tabs' scope toggle (the viewed place, the whole world)
   calendar: () => <svg viewBox="0 0 16 16"><rect x="2.5" y="3.5" width="11" height="11.5" rx="1" /><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3" /></svg>,
   // a long holiday's going-out and coming-back days (T-1373), the sky's arrows: out to the right
@@ -145,6 +154,11 @@ export const Icon = {
   link: () => <svg viewBox="0 0 16 16"><path d="M6.4 9.6l3.2-3.2M7.2 4.8l1.3-1.3a2.6 2.6 0 013.7 3.7l-1.3 1.3M8.8 11.2l-1.3 1.3a2.6 2.6 0 01-3.7-3.7l1.3-1.3" /></svg>,
   heart: () => <svg viewBox="0 0 16 16"><path d="M8 13.8S2 10.3 2 6.1A3.1 3.1 0 018 5a3.1 3.1 0 016 1.1c0 4.2-6 7.7-6 7.7z" /></svg>,
   flag: () => <svg viewBox="0 0 16 16"><path d="M3.5 14.5v-12M3.5 2.5h9l-2 3 2 3h-9" /></svg>,
+  // T-3466: the changelog's areas without an icon of their own: a folded map (map and schematic), a bug (a fix that
+  // fits no area), a computer (performance)
+  foldMap: () => <svg viewBox="0 0 16 16"><path d="M1.5 4l4-1.5 5 2 4-1.5v9.5l-4 1.5-5-2-4 1.5zM5.5 2.5V12M10.5 4.5V14" /></svg>,
+  bug: () => <svg viewBox="0 0 16 16"><path d="M6.2 4.8a1.8 1.8 0 013.6 0" /><rect x="4.8" y="4.8" width="6.4" height="9.2" rx="3.2" /><path d="M8 7.6V14M4.8 8.6H2.4M4.8 11.6l-2.2 1.5M11.2 8.6h2.4M11.2 11.6l2.2 1.5M5.3 6.3L3.4 4.6M10.7 6.3l1.9-1.7" /></svg>,
+  computer: () => <svg viewBox="0 0 16 16"><rect class="screen" x="1.5" y="2.5" width="13" height="8.5" rx="1" /><path d="M8 11v2.5M5 13.8h6" /></svg>,
   gear: () => (
     <svg viewBox="0 0 16 16">
       <path d="M6.83 3.14L7.09 1.26L8.91 1.26L9.17 3.14L10.61 3.74L12.13 2.59L13.41 3.87L12.26 5.39L12.86 6.83L14.74 7.09L14.74 8.91L12.86 9.17L12.26 10.61L13.41 12.13L12.13 13.41L10.61 12.26L9.17 12.86L8.91 14.74L7.09 14.74L6.83 12.86L5.39 12.26L3.87 13.41L2.59 12.13L3.74 10.61L3.14 9.17L1.26 8.91L1.26 7.09L3.14 6.83L3.74 5.39L2.59 3.87L3.87 2.59L5.39 3.74z" />
@@ -168,7 +182,7 @@ export function Chip({ line, size = "", plain, pick, gone, tip }: { line: LineIn
   const b0 = bulletTextSoon(line.letter, size, zoom.value), b = b0 && bulletDraw(b0, shape);
   const idle = isIdleLine(line.id);
   return (
-    <span ref={zoom.ref} class={"chip " + size + (plain ? "" : " link") + (shape === "square" ? " square" : "") + (idle ? " idle" : "")} style={{ "--c": line.colour, "--ct": inkOn(line.colour), visibility: gone ? "hidden" : undefined }}
+    <span ref={zoom.ref} class={"chip " + size + (plain ? "" : " link") + (shape === "square" ? " square" : "") + (shape === "outline" ? " ring" : "") + (idle ? " idle" : "")} style={{ "--c": line.colour, "--ct": inkOn(line.colour), visibility: gone ? "hidden" : undefined }}
       data-tip={plain ? undefined : (tip ?? line.name) + (idle ? "\n" + IDLE_TIP : "")} onClick={click}>
       {b ? (
         <svg style={{ width: b.w + "px", height: b.h + "px" }}>
@@ -182,11 +196,12 @@ export function Chip({ line, size = "", plain, pick, gone, tip }: { line: LineIn
 
 /** T-3319: a shape alone, sized as a 12 px bullet of it would be. */
 export function ShapeIcon({ shape }: { shape: LineShape }) {
-  const b = bulletDraw({ w: 12, h: 12, x: 0, y: 0, top: 0, iw: 0, ih: 0 }, shape);
+  void bulletEpoch.value;
+  const b = bulletDraw({ w: 12, h: 12, x: 0, y: 0, top: 0, iw: 0, ih: 0, stem: bulletText("I", "")?.stem ?? 2 }, shape);
   return <svg class="shape-icon" style={{ width: b.w + "px", height: b.h + "px" }} aria-hidden="true"><BulletOutline b={b} /></svg>;
 }
 
-const SHAPE_NAME: Record<PickShape, MessageKey> = { circle: "widgets.circle", square: "widgets.square", diamond: "widgets.diamond" };
+const SHAPE_NAME: Record<PickShape, MessageKey> = { circle: "widgets.circle", square: "widgets.square", diamond: "widgets.diamond", outline: "widgets.outline" };
 
 /** T-3319: a row of the bullet shapes to pick from, drawn in `colour` (the text's when absent); `tips` for a hover on some. */
 export function ShapePicker({ value, onChange, colour, tips }: { value: LineShape; onChange: (s: PickShape) => void; colour?: string; tips?: (s: PickShape) => string | undefined }) {
@@ -203,7 +218,8 @@ export function ShapePicker({ value, onChange, colour, tips }: { value: LineShap
 
 /** T-3319: a bullet's outline in its shape (ui/bullet.ts `bulletDraw`). */
 const BulletOutline = ({ b }: { b: BulletDraw }) =>
-  b.path ? <path d={b.path.d} stroke-width={b.path.stroke} /> : <rect y={b.rect!.y} width={b.rect!.w} height={b.rect!.h} rx={b.rect!.r} />;
+  b.path ? <path d={b.path.d} stroke-width={b.path.stroke} /> : b.rect!.ring !== undefined ? <rect class="ring" x={b.rect!.x} y={b.rect!.y} width={b.rect!.w} height={b.rect!.h} rx={b.rect!.r} stroke-width={b.rect!.ring} />
+  : <rect y={b.rect!.y} width={b.rect!.w} height={b.rect!.h} rx={b.rect!.r} />;
 
 /** The CSS zoom an element is drawn at (the panels are zoomed by the UI scale, T-247): the UI scale
  * until it is in the page, then what the browser reports, so a bullet's baseline lands on a whole
@@ -382,13 +398,27 @@ export function SegBar({ parts, kind, label }: { parts: { share: number; cls?: s
   );
 }
 
-/** The elevation buttons in the level colours, `value` on; `tip` words each hover. */
-export function LevelButtons({ value, onPick, tip }: { value: Level | null; onPick: (l: Level) => void; tip: (l: Level) => string }) {
+/** The elevation buttons in the level colours, `value` on; `tip` words each hover; `levels`, only those. */
+export function LevelButtons({ value, onPick, tip, levels = LEVELS }: { value: Level | null; onPick: (l: Level) => void; tip: (l: Level) => string; levels?: readonly Level[] }) {
   return (
     <div class="group levels">
-      {LEVELS.map((l) => (
+      {levels.map((l) => (
         <button class={"btn lv" + (l === value ? " on" : "")} style={{ "--lc": LEVEL_COLOURS[l], "--lk": inkOn(LEVEL_COLOURS[l]) }}
           data-tip={tip(l)} aria-label={t("widgets.level", { level: levelLabel(l) })} aria-pressed={l === value} onClick={() => onPick(l)}>
+          {levelLabel(l)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** T-3420: the level buttons with every level shown lit; a click fades or restores that level (T-3560). */
+export function LevelToggles({ hidden, onToggle }: { hidden: ReadonlySet<Level>; onToggle: (l: Level) => void }) {
+  return (
+    <div class="group levels level-toggles">
+      {LEVELS.map((l) => (
+        <button class={"btn lv" + (hidden.has(l) ? "" : " on")} style={{ "--lc": LEVEL_COLOURS[l], "--lk": inkOn(LEVEL_COLOURS[l]) }}
+          aria-label={t("widgets.level", { level: levelLabel(l) })} aria-pressed={!hidden.has(l)} onClick={() => onToggle(l)}>
           {levelLabel(l)}
         </button>
       ))}

@@ -20,11 +20,11 @@ import { startNodes } from "../game/fareDefault";
 import { letterOf } from "../game/lineLetter";
 import { cloneName, cloneSymbol } from "../game/cloneNames";
 import { shapesFrom, type LineShape } from "../game/lineShape";
-import { faresOf, START_FARE, START_NODES, tidyHsr, tidyTransfer, type Fares } from "../game/fareCurve";
+import { faresOf, START_FARE, START_NODES, tidyHsr, tidyLineFare, tidyTransfer, type Fares } from "../game/fareCurve";
 import { EVERY, FARE_BASELINE, FARE_E, incomeScale, keepOwn, OLD_FARE_E, oldCurveFactor, oldIncomeScale, runFactorOf, scaleFromOld, START, startFromOld, tidyOwn } from "../game/income";
 import { SHADES } from "../game/shadeTable";
 import { DAY_KINDS, dayKindOf } from "../game/days";
-import { kindOfIn, type HolidayData } from "../game/holidayCalendar";
+import { kindOfIn, rowOfDay, rowOfIn, type DayRow, type HolidayData } from "../game/holidayCalendar";
 import { shiftAt, timeZoneTable } from "../game/localTime";
 import { between, lagged, runLag, strengths, table, type KindOf, type PerHour } from "../game/moneyTiming";
 import { networkFromState, newNetCache, runsTrains, shiftNetCache, type NetworkBuffers } from "../map/network";
@@ -33,6 +33,7 @@ import { setBandCheck, setBandMode } from "../map/lineBands";
 import { besideSamples } from "../map/corridors";
 import { packCross } from "../map/markData";
 import { bandEdges, diagramGraph } from "../diagram/graph";
+import { nodeLngLat, regionGroups } from "../diagram/regions";
 import { StrokeSender, strokesOfPieces, type StrokeKind, type StrokeMode } from "../map/strokePost";
 import { readOutlinesForPlaces, type PackedOutlines } from "../map/coarseOutlines";
 import { buildComplexes, type Complexes } from "../game/complexes";
@@ -41,7 +42,7 @@ import { buildingMembers, buildingsFrom, withBuildingLinks } from "../game/build
 import { IN_BUILDING, UPGRADE, UPGRADE_BITS } from "../game/upgrades";
 import { saveNetKey } from "./demandCache";
 import { fetchRange } from "./rangeFetch";
-import { newDay, newHour, addEntry, currentZones, decodeSave, encodeSave, isThisWorld, isRetiredTrackFormat, trackFrameKind, readStored, failReads, StorageReadError, SAVE_FORMAT, START_CASH, NEW_LINE_CARS, START_CLOCK, writeStored, listSlots, writeSlot, renameSlot, leaseSlot, ORIGINAL_SLOT, listBackups, writeBackup, backupSlot, BACKUP_STEPS, headerUnread, nextGameName, newGameName, slotName, takePending, writePending, readSync, writeSync, sweepDeleted, makeRoom, lastSync, WHOLE_PANEL, type PendingLoad, type GameMode, type NewGameSpec, type SlotBackup, type SlotLease, type SlotSummary, type StoredSave, type DayLedger, type HourLedger, type SaveHeader, type GuideSave, type Achieved } from "./saveFile";
+import { newDay, newHour, addEntry, currentZones, decodeSave, encodeSave, isThisWorld, isRetiredTrackFormat, trackFrameKind, readStored, failReads, StorageReadError, SAVE_FORMAT, START_CASH, NEW_LINE_CARS, START_CLOCK, writeStored, listSlots, writeSlot, renameSlot, leaseSlot, ORIGINAL_SLOT, SAVE_DAMAGED, isDamagedError, unreadableKey, setNetworkCheck, markDamaged, rescueGood, listBackups, writeBackup, backupSlot, BACKUP_STEPS, headerUnread, nextGameName, newGameName, slotName, takePending, writePending, readSync, writeSync, sweepDeleted, makeRoom, lastSync, WHOLE_PANEL, type PendingLoad, type GameMode, type NewGameSpec, type SlotBackup, type SlotLease, type SlotSummary, type StoredSave, type DayLedger, type HourLedger, type SaveHeader, type NewHeadways, cleanNewHeadways, type GuideSave, type Achieved } from "./saveFile";
 import { StateRows, upgradesOf, type RowEnv } from "./stateRows";
 import { PlatformLines } from "./platformLines";
 import { lineProfile } from "./lineProfile";
@@ -85,10 +86,61 @@ function loadFares(f: SaveHeader["fares"] | undefined): Fares {
   const bus = typeof f.bus === "number" && Number.isFinite(f.bus) ? { bus: tidyHsr(f.bus) } : {};
   // T-1801: a save from before has none: changes are free
   const transfer = tidyTransfer(f.transfer ?? 0);
+  // T-3567: lines' own multiples; a save from before has none, every line at 1
+  const own: Record<string, number> = {};
+  for (const [id, v] of Object.entries(f.lines ?? {})) if (typeof v === "number" && Number.isFinite(v) && tidyLineFare(v) !== 1) own[id] = tidyLineFare(v);
+  const lines = Object.keys(own).length ? { lines: own } : {};
   // T-2559: an old save's base and rate are taken from its rounded nodes (what the slot writes next), so the first reload's network is the later ones'
   const curve = faresOf(g, START_FARES);
   const fare = old || !f.nodes ? faresOf({ nodes: curve.nodes }, START_FARES) : curve;
-  return { ...fare, scales, baseline: FARE_BASELINE, basis: "usd", income: FARE_E, ...hsr, ...ferry, ...bus, ...(transfer > 0 ? { transfer } : {}), ...ref };
+  return { ...fare, scales, baseline: FARE_BASELINE, basis: "usd", income: FARE_E, ...hsr, ...ferry, ...bus, ...(transfer > 0 ? { transfer } : {}), ...ref, ...lines };
+}
+/** T-3567: line `line`'s own fare multiple set to `mul` (1 clears it), its quad-track twin's with it; false for
+ * no such line. */
+function setLineFare(a: TrackApi, line: number, mul: number): boolean {
+  const own = { ...fares.lines }, v = tidyLineFare(mul), li = a.lines_info();
+  let found = false;
+  // the hidden twins of the line (T-3333), run on its other pair of tracks, charge as it does
+  const twins: number[] = [];
+  for (let i = 0; i < li.length; i += 22) {
+    if (li[i] === line) found = true;
+    else if (a.line_twin_of(li[i]) === line) twins.push(li[i]);
+  }
+  if (!found) return false;
+  for (const id of [line, ...twins]) { if (v === 1) delete own[String(id)]; else own[String(id)] = v; }
+  const { lines: _, ...rest } = fares;
+  fares = Object.keys(own).length ? { ...rest, lines: own } : rest;
+  return true;
+}
+/** T-3567: the lines' own fare multiples kept to lines that exist, each twin at its line's; called as the network
+ * is sent to demand, so a deleted line's number never carries a multiple to a later line. Integer keys keep
+ * ascending order in any object, so two of the same multiples compare equal as JSON. */
+function tidyLineFares(a: TrackApi): void {
+  if (!fares.lines && !goneLineFares.size) return;
+  const li = a.lines_info(), own: Record<string, number> = {}, had = fares.lines ?? {};
+  for (let i = 0; i < li.length; i += 22) {
+    const id = li[i], key = String(a.line_twin_of(id) >= 0 ? a.line_twin_of(id) : id), v = had[key] ?? goneLineFares.get(key);
+    if (v !== undefined) own[String(id)] = v;
+  }
+  // T-3581: a deleted line's multiple stays in hand for an undo that brings the line back
+  for (const id of Object.keys(own)) goneLineFares.delete(id);
+  for (const [id, v] of Object.entries(had)) if (!(id in own)) goneLineFares.set(id, v);
+  if (JSON.stringify(own) === JSON.stringify(had)) return;
+  const { lines: _, ...rest } = fares;
+  fares = Object.keys(own).length ? { ...rest, lines: own } : rest;
+}
+/** T-3581: the own fare multiples of deleted lines, by id, until an undo brings one back or a new line takes its
+ * id; never saved. */
+const goneLineFares = new Map<string, number>();
+/** T-3581: a new line starts at 1.00x, whatever a deleted line of its id had. */
+function newLineFare(op: EditOp, line: number) {
+  if (op.op !== "addLine" && op.op !== "addBusLine" && op.op !== "addFerryLine" && op.op !== "copyLine") return;
+  const id = String(line);
+  goneLineFares.delete(id);
+  if (fares.lines?.[id] === undefined) return;
+  const { [id]: _, ...own } = fares.lines;
+  const { lines: __, ...rest } = fares;
+  fares = Object.keys(own).length ? { ...rest, lines: own } : rest;
 }
 /** T-2679: the fares as demand reads them, without the reference country, which changes no fare. */
 function demandFares(): Fares {
@@ -115,6 +167,8 @@ let backupSteps = BACKUP_STEPS;
 const LEDGER_DAYS = Infinity;
 const LEDGER_HOURS = 48;
 const LEVEL_OF = { high: 0, medium: 1, low: 2 } as const;
+/** T-3521: each level on each kind of day, weekdays' first, then weekends' (`TrackApi.running_cost`). */
+const SIX = [0, 1, 2, 3, 4, 5];
 /** T-867: hours a day at each demand level, which weigh each line's trains a day for its upkeep share */
 const LEVEL_HOURS = new Float64Array([0, 1, 2].map((l) => PERIODS.reduce((s, p) => s + (LEVEL_OF[p.demand] === l ? p.to - p.from : 0), 0)));
 
@@ -177,7 +231,7 @@ function placeLineCountries() {
 let outlinesIn: (p: PackedOutlines | null) => void = () => {};
 const outlinesGot = new Promise<PackedOutlines | null>((got) => { outlinesIn = got; });
 let outlinesRead: Promise<void> = Promise.resolve();
-let holidaysSent = "";
+let holidaysSent = "", rowsSent = "";
 const kindOfLine = (id: number): KindOf => kindOfIn(holidayData, lineCountries.get(id));
 function loadHolidays() {
   void import("../game/holidays.json").then((m) => {
@@ -200,24 +254,52 @@ function syncHolidays(): boolean {
     if (days.length) out.push(id, days.length / 2, ...days);
   }
   const key = out.join();
-  if (key === holidaysSent) return false;
+  const rows = syncRows();
+  if (key === holidaysSent) return rows;
   holidaysSent = key;
   api.set_line_holidays(new Float64Array(out));
   return true;
 }
+/** T-3521: send the track model each line's kind of each day (`TrackApi.set_line_rows`) where its
+ * calendar is not the week's (public holidays, its country's own weekend, weekend days worked), from
+ * yesterday to 8 days ahead in its local time, every day of that window for such a line, so its
+ * window starts yesterday; true if they changed. */
+function syncRows(): boolean {
+  if (!api || !holidayData) return false;
+  const now = gameNow(), out: number[] = [];
+  for (const [id, c] of lineCountries) {
+    if (!c) continue;
+    const rowOf = rowOfIn(holidayData, c), d0 = Math.floor((now + api.line_shift(id)) / 86400);
+    const days: number[] = [];
+    let own = false;
+    for (let d = d0 - 1; d <= d0 + 8; d++) { const r = rowOf(d); own ||= r !== rowOfDay(d); days.push(d, r); }
+    if (own) out.push(id, days.length / 2, ...days);
+  }
+  const key = out.join();
+  if (key === rowsSent) return false;
+  rowsSent = key;
+  api.set_line_rows(new Float64Array(out));
+  return true;
+}
+/** A line's kind of each local day, weekdays or weekends (game/holidayCalendar.ts `rowOfIn`). */
+const rowOfLine = (id: number) => rowOfIn(holidayData, lineCountries.get(id));
 // T-835: trains run from half a run before their period to half a run into it; `tail`, the cost a
 // day a period adds by running to its own end before no service (`runTail`), spread over it.
-const costHour = (run: number[], tl: number, tail: number[] | undefined) => lagged(((_k, p) => run[LEVEL_OF[PERIODS[p].demand]] + (tail?.[p] ?? 0) / (PERIODS[p].to - PERIODS[p].from)) as PerHour, null, tl, moneyLag, moneyLag / 2);
+// T-3521: `run` per hour by level and kind of day (weekdays' high, medium, low, then weekends';
+// `TrackApi.running_cost`), each day's kind by `rowOf` (the week's unless given).
+const costHour = (run: number[], tl: number, tail: number[][] | undefined, rowOf: (day: number) => DayRow = rowOfDay) => lagged(((r, p) =>
+  run[r * 3 + LEVEL_OF[PERIODS[p].demand]] + (tail?.[r]?.[p] ?? 0) / (PERIODS[p].to - PERIODS[p].from)) as PerHour, null, tl, moneyLag, moneyLag / 2, rowOf);
 /** T-835 (service.rs `period_points`): a period followed by no service runs to its own end, not
  * half a run before it, so its line runs that much longer a day at its level; `run` per hour by
- * level, from `lines_info` entry `i`. Per period, US$M a day. */
-function runTail(li: ArrayLike<number>, i: number, run: number[]): number[] {
+ * level and kind of day as `costHour`'s, `tph` trains an hour likewise, from `lines_info` entry `i`.
+ * Per kind of day and period, US$M a day (the period after the day's last taken on the same kind). */
+function runTail(li: ArrayLike<number>, i: number, run: number[], tph: number[]): number[][] {
   const lead = Math.min(7200, Math.max(0, (li[i + 11] - 2 * li[i + 20]) / 4));
-  return PERIODS.map((p, q) => {
+  return [0, 1].map((r) => PERIODS.map((p, q) => {
     const next = PERIODS.findIndex((x) => x.from === p.to % 24);
-    const nextTph = next >= 0 ? li[i + 5 + LEVEL_OF[PERIODS[next].demand]] : 0;
-    return nextTph > 0 ? 0 : (run[LEVEL_OF[PERIODS[q].demand]] * lead) / 3600;
-  });
+    const nextTph = next >= 0 ? tph[r * 3 + LEVEL_OF[PERIODS[next].demand]] : 0;
+    return nextTph > 0 ? 0 : (run[r * 3 + LEVEL_OF[PERIODS[q].demand]] * lead) / 3600;
+  }));
 }
 /** T-531: each region's ledgers, kept as the network's (a zone id; "" outside every zone or not yet
  * placed, so the regions add up to the network) */
@@ -256,8 +338,14 @@ let achievements: Map<string, Achieved> | null = new Map();
 let lineNotes = new Map<string, [number, string]>();
 /** T-3319: the bullet shape of each line the player gave one, by line id (game/lineShapeState.ts) */
 let lineShapes = new Map<string, LineShape>();
+/** T-3420: the lines the player hid on the map, by line id (game/lineVisibility.ts) */
+let hiddenLines = new Set<string>();
 /** T-1094: the train length last set on any line (0 for the most the platforms fit), a new line's start */
 let newLineCars = NEW_LINE_CARS;
+/** T-3543: the headways (seconds at each level) a new line starts with, set from the timetables window; null: the game's counts */
+let newLineHeadway: NewHeadways = {};
+/** T-3588: the weekend percent "Apply to all lines" last set, which new lines start with; null: none set (100) */
+let newLineWeekendShare: number | null = null;
 /** T-2926: a new tram line's sections, and the most a tram has (an 80 m platform) */
 const TRAM_NEW_CARS = 2, TRAM_MAX_CARS = 4;
 /** T-1822: the Getting started card's progress in this game; undefined: none. `guideWanted`: the page
@@ -336,11 +424,20 @@ let startZone: string | undefined;
  * clock's own, New York's). The ledgers' days run midnight to midnight there, so the Money tab's day
  * turns as its clock passes midnight; their hours stay the clock's. */
 let dayShift = 0;
+/** T-3407: a game with no start zone takes its first built station's, once; saved as `SaveHeader.dayShift`
+ * so days booked under it keep their keys on a reload (the first station can be deleted later). */
+let dayPinned = false;
 const ledgerDay = (t: number) => Math.floor((t + dayShift) / 86400);
-function setStartZone(z: string | undefined) {
+function setStartZone(z: string | undefined, saved?: number) {
   startZone = z;
   const c = z ? CITIES.find((x) => x.id === z) : undefined;
-  dayShift = c ? shiftAt(c.center[0], c.center[1]) : 0;
+  dayPinned = !c && saved !== undefined;
+  dayShift = c ? shiftAt(c.center[0], c.center[1]) : dayPinned ? saved! : 0;
+}
+function pinDayShift() {
+  if (startZone || dayPinned || !firstBuiltAt) return;
+  dayPinned = true;
+  dayShift = shiftAt(firstBuiltAt[0], firstBuiltAt[1]);
 }
 let opened: string[] | undefined = [];
 /** T-1223: the zones demand holds fine, from the page; T-2153 the last two builds' zones */
@@ -537,6 +634,8 @@ let cloudQueue: Promise<unknown> = Promise.resolve();
 const cloudTimers = new Map<string, ReturnType<typeof setTimeout>>();
 /** the game's first load is done: the claim can follow */
 let initDone = false;
+/** T-3478: the first load is opening a file or backup picked before the reload, which is in no slot until it opens */
+let initIncoming = false;
 function cloudRun(f: () => Promise<unknown>): Promise<unknown> {
   cloudQueue = cloudQueue.then(f).catch(() => {});
   return cloudQueue;
@@ -711,9 +810,12 @@ async function pendingGame(p: Exclude<PendingLoad, { kind: "new" }>): Promise<{ 
 
 /** T-1196: the page reloads into another game, which frees all of this one's memory: the game in
  * hand is saved and its slot let go (the reloaded page's worker takes the next) */
-async function leave(msg: Extract<ToClock, { kind: "leave" }>) {
+async function leave(msg: Extract<ToClock, { kind: "leave" }>, opening = false) {
   try {
-    if (!testPage) await flushBeforeSwitch();
+    // T-3478: a game still opening has nothing changed to save (its edits wait behind the load), and
+    // its model may hold an empty network between steps, so it is let go as it is in storage
+    if (opening) switching = true;
+    else if (!testPage) await flushBeforeSwitch();
     if (msg.pending && !await writePending(msg.pending)) throw new Error("Browser storage is unavailable. Download this game as a file to keep it.");
     activeLease?.release();
     activeLease = null;
@@ -872,7 +974,7 @@ function replaceModel() {
   newModel();
   masksIn.clear();
   streetsIn.clear();
-  holidaysSent = "";
+  holidaysSent = rowsSent = "";
 }
 
 /** T-2820: a panic while a game opens: nothing more is asked of the stopped model, and what comes
@@ -1186,6 +1288,14 @@ function sendGround() {
   if (k === groundSent) return;
   groundSent = k;
   send({ kind: "ground", pending: groundPending.size, failed: groundFailed.size });
+}
+
+/** T-3479: the status tag clicked: what failed is fetched again now, and the wait before the next try starts over */
+function retryGroundNow() {
+  if (groundTimer) clearTimeout(groundTimer);
+  groundTimer = 0;
+  groundWait = 0;
+  retryGround();
 }
 
 function retryGroundLater() {
@@ -1612,9 +1722,10 @@ async function masksBeforeLoad(net: Uint8Array) {
 /** Put a network (in the world frame) in the track model, with the masks of the zones it meets. */
 async function openNetwork(net: Uint8Array) {
   await worldWaterIntoModel();
-  await terrainIndexIntoModel();
+  // T-3478: a stalled index holds the open no longer than its blocks may; the blocks follow when it lands
+  await Promise.race([terrainIndexIntoModel(), new Promise((r) => setTimeout(r, LOAD_TERRAIN_WAIT_MS))]);
   await masksBeforeLoad(net);
-  if (!api!.load(net)) throw new Error("This save is damaged.");
+  if (!api!.load(net)) throw new Error(SAVE_DAMAGED);
   await masksForLoaded(net);
   await terrainForLoaded();
   // T-1929: the roads under the blueprint, so its quote has them before Construct waits for them
@@ -1646,7 +1757,7 @@ async function masksForLoaded(net: Uint8Array) {
   if (!missing.length) return;
   a.load(emptyTrack!);
   await ensureMasks(missing);
-  if (!a.load(net)) throw new Error("This save is damaged.");
+  if (!a.load(net)) throw new Error(SAVE_DAMAGED);
 }
 
 // ---------------------------------------------------------------- state for the main thread
@@ -1703,6 +1814,15 @@ function markPoints(rows: Float64Array, stride: number): Float32Array {
     out.set([x, y], k);
     for (let j = 2; j < stride; j++) out[k + j] = rows[k + j];
   }
+  return out;
+}
+
+/** T-3535: `preview_marks` (x, y, kind, tram tracks) as the preview message's marks: x, y in local units, then 1
+ * for a junction, or for a crossing its tram tracks packed as a placed crossing's level carries them (`packCross`
+ * at level 0), so the ghost draws the mark the placed track will. */
+function previewMarkRows(rows: Float64Array): Float32Array {
+  const m = markPoints(rows, 4), out = new Float32Array((m.length / 4) * 3);
+  for (let k = 0, j = 0; k + 3 < m.length; k += 4, j += 3) out.set([m[k], m[k + 1], m[k + 2] === 1 ? 1 : packCross(0, m[k + 3])], j);
   return out;
 }
 
@@ -1812,6 +1932,7 @@ function buildState(): ClockState {
   for (let k = 0; k < stationCount; k++) if (nodes[k].stationBuilt && (!first || nodes[k].id < first.id)) first = nodes[k];
   firstBuiltAt = first ? [first.lng, first.lat] : null;
   pinFareRef();
+  pinDayShift();
   syncHolidays();
   applyRunFactors();
   // Keyframes: phase tables, profile meta, and run 0 of every line resampled; a line whose return run
@@ -1850,14 +1971,11 @@ function buildState(): ClockState {
   });
   const conflicts = a.guard_conflicts();
   const singles = a.guard_singles();
-  const crossings = markPoints(a.crossings_info(), 5);
-  // T-3062: a flat crossing's level carries which modes cross, for the mark's drawing (markData.ts)
-  for (let k = 0, f = 0; k + 4 < crossings.length; k += 5) {
-    if (crossings[k + 2] !== 0) continue;
-    const e1 = conflicts[1 + f * 4], e2 = conflicts[3 + f * 4];
-    f++;
-    const tram = (a.edge_kind(e1) >= 2 ? 1 : 0) + (a.edge_kind(e2) >= 2 ? 1 : 0);
-    crossings[k + 3] = packCross(crossings[k + 3], tram);
+  // T-3062: a flat crossing's level carries its tram tracks, for the mark's drawing (markData.ts)
+  const info = markPoints(a.crossings_info(), 6), crossings = new Float32Array((info.length / 6) * 5);
+  for (let k = 0, j = 0; k + 5 < info.length; k += 6, j += 5) {
+    crossings.set(info.subarray(k, k + 5), j);
+    if (info[k + 2] === 0) crossings[j + 3] = packCross(info[k + 3], info[k + 5]);
   }
   const tq4 = performance.now(); timing.sRest = tq4 - tq3;
   const fullTrack = [0, 1, 2].map((lev) => a.full_track(lev));
@@ -1952,6 +2070,41 @@ function regionEntries(zone: string, day: number, hour: number): [DayLedger, Hou
   ];
 }
 
+/** T-2787: each line's recent days of money, US$M: [day, fares, running cost] per day, oldest first,
+ * the day now last. A forecast is not kept, these are what settling paid. Saved in `SaveHeader.lineDays`. */
+let lineDays = new Map<number, [number, number, number][]>();
+/** Days kept per line: 30 closed days and the day now (T-3566: the line panel's chart is the Money tab's 30 days). */
+const LINE_DAYS = 31;
+
+function lineDayEntry(id: number, day: number): [number, number, number] {
+  let l = lineDays.get(id);
+  if (!l) lineDays.set(id, (l = []));
+  let i = l.length;
+  while (i > 0 && l[i - 1][0] > day) i--;
+  if (i > 0 && l[i - 1][0] === day) return l[i - 1];
+  const e: [number, number, number] = [day, 0, 0];
+  l.splice(i, 0, e);
+  if (l.length > LINE_DAYS) l.splice(0, l.length - LINE_DAYS);
+  return e;
+}
+
+/** The lines' days as the save and the panels read them: per line id, [day, fares, running] flattened;
+ * `round` keeps $100 (the charts cannot tell). */
+function savedLineDays(round = false): Record<string, number[]> {
+  const r = (v: number) => (round ? Math.round(v * 1e4) / 1e4 : v);
+  return Object.fromEntries([...lineDays].filter(([, l]) => l.length).map(([id, l]) => [id, l.flatMap(([d, f, c]) => [d, r(f), r(c)])]));
+}
+
+/** Days after `last` are the ones settling pays again on a load. */
+function loadLineDays(saved: SaveHeader["lineDays"], last: number) {
+  lineDays = new Map();
+  for (const [id, v] of Object.entries(saved ?? {})) {
+    const l: [number, number, number][] = [];
+    for (let i = 0; i + 2 < v.length; i += 3) if (v[i] <= last) l.push([v[i], v[i + 1], v[i + 2]]);
+    if (l.length) lineDays.set(Number(id), l.slice(-LINE_DAYS));
+  }
+}
+
 /** T-531: every region's today and this hour that has an entry today. */
 function regionNow(): RegionNow {
   const day = ledgerDay(moneyNow()), hour = Math.floor(moneyNow() / 3600), out: RegionNow = {};
@@ -1966,17 +2119,19 @@ function regionNow(): RegionNow {
  * running cost per game hour at each demand level (as `running_cost`), with its local time. */
 function regionLines() {
   const a = api!, li = a.lines_info(), unit = prices.economy / 1e6;
-  const costs: { id: number; shift: number; run: number[]; tail: number[]; shares: [string, number][] }[] = [];
+  const costs: { id: number; shift: number; run: number[]; tail: number[][]; rowOf: (day: number) => DayRow; shares: [string, number][] }[] = [];
   for (let i = 0; i < li.length; i += 22) {
     if (li[i + 3] !== 1) continue;
     const id = li[i], km = li[i + 9] / 1000, cars = li[i + 21] || li[i + 8];
     const [perTrainKm, perCarKm] = a.line_fast(id) ? [prices.hsRunCostTrainKm, prices.hsRunCostCarKm] : [prices.runCostTrainKm, prices.runCostCarKm];
     const f = a.line_run_factor(id); // T-2669: its countries' prices
     const ways = a.line_one_way(id) ? 1 : 2; // T-2981
-    const run = [0, 1, 2].map((l) => li[i + 5 + l] * ways * km * (perTrainKm + perCarKm * cars) * unit * f);
-    costs.push({ id, shift: a.line_shift(id), run, tail: runTail(li, i, run), shares: lineShares.get(id)?.run ?? [] });
+    // the rates from the track model, so the cost drained is that of the trains it runs
+    const tph = SIX.map((k) => a.line_tph_on(id, Math.floor(k / 3), k % 3));
+    const run = tph.map((t) => t * ways * km * (perTrainKm + perCarKm * cars) * unit * f);
+    costs.push({ id, shift: a.line_shift(id), run, tail: runTail(li, i, run, tph), rowOf: rowOfLine(id), shares: lineShares.get(id)?.run ?? [] });
   }
-  const fares = [...lineIncome].map(([id, per]) => ({ shift: a.line_shift(id), kindOf: kindOfLine(id), per, shares: lineShares.get(id)?.fare ?? [] }));
+  const fares = [...lineIncome].map(([id, per]) => ({ id, shift: a.line_shift(id), kindOf: kindOfLine(id), per, shares: lineShares.get(id)?.fare ?? [] }));
   const rides = [...lineRides].map(([id, per]) => ({ shift: a.line_shift(id), kindOf: kindOfLine(id), per, shares: lineShares.get(id)?.ride ?? [] }));
   return { costs, fares, rides };
 }
@@ -1995,7 +2150,7 @@ function regionHour(t: number, rl: ReturnType<typeof regionLines>): Map<string, 
   };
   for (const f of rl.fares) spread(f.shares, fareHour(f.per, t + f.shift, f.kindOf), 0);
   for (const f of rl.rides) spread(f.shares, rideHour(f.per, t + f.shift, f.kindOf), 2);
-  for (const c of rl.costs) spread(c.shares, costHour(c.run, t + c.shift, c.tail), 1);
+  for (const c of rl.costs) spread(c.shares, costHour(c.run, t + c.shift, c.tail, c.rowOf), 1);
   return out;
 }
 
@@ -2045,7 +2200,7 @@ function unsettleAfter(clockT: number): number {
   const last = hourLedger[hourLedger.length - 1];
   if (!last || last.hour <= H) return 0;
   const groups = localGroups();
-  const costAt = (h: number) => groups.reduce((s, g) => s + g.costs.reduce((x, c) => x + costHour(c.run, h * 3600 + g.shift, c.tail), 0), 0);
+  const costAt = (h: number) => groups.reduce((s, g) => s + g.costs.reduce((x, c) => x + costHour(c.run, h * 3600 + g.shift, c.tail, c.rowOf), 0), 0);
   const replay = (from: number, to: number) => {
     let c = 0;
     for (let t = from; t < to;) {
@@ -2123,6 +2278,7 @@ function moneyState(): MoneyState {
     ledger: ledger.map((d) => ({ ...d })),
     hours: hourLedger.map((d) => ({ ...d })),
     regions: savedRegions(),
+    lineDays: savedLineDays(),
     stars: Object.fromEntries(stars),
     goals: Object.fromEntries(goals),
     notes: Object.fromEntries(lineNotes),
@@ -2149,8 +2305,9 @@ function sendCash() {
 
 /** One local time's fares and rides in one country (T-872): per kind of day and period. */
 interface CountryPart { kindOf: KindOf; income: number[][]; rides: number[][] }
-/** One local time's running cost: per hour by level, and its tails (`runTail`). */
-interface CostPart { run: number[]; tail: number[] | undefined }
+/** One local time's running cost: per hour by level and kind of day (`costHour`), its tails
+ * (`runTail`), and the kind of each local day (its country's, when it has one). */
+interface CostPart { run: number[]; tail: number[][] | undefined; rowOf: (day: number) => DayRow }
 
 /** T-309: the running lines grouped by the local time they run on, each group's running cost per
  * demand level and its fare income per kind of day and period, split by country (T-872, T-262: each
@@ -2160,19 +2317,20 @@ function localGroups(): { shift: number; costs: CostPart[]; parts: CountryPart[]
   const a = api!;
   const shifts = [...a.running_shifts()];
   const costs = regionLines().costs;
-  // every kind of day runs the same trains (T-2335), so a group's running cost is one part
+  // lines in several countries have no one holiday calendar between them, so such a group takes the
+  // week's
+  const countries = [...new Set([...lineIncome.keys(), ...lineRides.keys()].map((id) => lineCountries.get(id) ?? ""))];
   const costParts = (s: number | null, running: number[]): CostPart[] => {
-    let tail: number[] | undefined;
+    let tail: number[][] | undefined;
     for (const c of costs) {
       if (s !== null && c.shift !== s) continue;
-      tail ??= PERIODS.map(() => 0);
-      c.tail.forEach((v, p) => { tail![p] += v; });
+      tail ??= [0, 1].map(() => PERIODS.map(() => 0));
+      c.tail.forEach((row, r) => row.forEach((v, p) => { tail![r][p] += v; }));
     }
-    return [{ run: running, tail }];
+    return [{ run: running, tail, rowOf: countries.length === 1 ? rowOfIn(holidayData, countries[0]) : rowOfDay }];
   };
-  const countries = [...new Set([...lineIncome.keys(), ...lineRides.keys()].map((id) => lineCountries.get(id) ?? ""))];
   const one = shifts.length <= 1;
-  if (one && countries.length <= 1) return [{ shift: shifts[0] ?? 0, costs: costParts(null, [0, 1, 2].map((l) => a.running_cost(l))), parts: [{ kindOf: kindOfIn(holidayData, countries[0]), income: incomePerHour, rides: ridesPerHour }] }];
+  if (one && countries.length <= 1) return [{ shift: shifts[0] ?? 0, costs: costParts(null, SIX.map((l) => a.running_cost(l))), parts: [{ kindOf: kindOfIn(holidayData, countries[0]), income: incomePerHour, rides: ridesPerHour }] }];
   return (one ? [shifts[0] ?? 0] : shifts).map((s) => {
     const sum = (zero: number[][], by: Map<number, number[][]>, c: string) => {
       const out = zero.map((p) => p.map(() => 0));
@@ -2183,7 +2341,7 @@ function localGroups(): { shift: number; costs: CostPart[]; parts: CountryPart[]
       return out;
     };
     const parts = countries.map((c) => ({ kindOf: kindOfIn(holidayData, c), income: sum(incomePerHour, lineIncome, c), rides: sum(ridesPerHour, lineRides, c) }));
-    return { shift: s, costs: costParts(one ? null : s, [0, 1, 2].map((l) => (one ? a.running_cost(l) : a.running_cost_in(l, s)))), parts };
+    return { shift: s, costs: costParts(one ? null : s, SIX.map((l) => (one ? a.running_cost(l) : a.running_cost_in(l, s)))), parts };
   });
 }
 
@@ -2217,7 +2375,7 @@ function settle(): boolean {
         fare += fareHour(c.income, tl, c.kindOf);
         rides += rideHour(c.rides, tl, c.kindOf);
       }
-      for (const c of g.costs) cost += costHour(c.run, tl, c.tail);
+      for (const c of g.costs) cost += costHour(c.run, tl, c.tail, c.rowOf);
     }
     const wf = full ? 1 : shareAt(h, end - t), wc = full ? 1 : (end - t) / 3600;
     const df = Math.max(0, wf - partFare), dc = Math.max(0, wc - partCost);
@@ -2243,6 +2401,10 @@ function settle(): boolean {
     for (const [z, [f, c, n]] of regionHour(t, rl)) {
       for (const r of regionEntries(z, d.day, h)) { r.fares += f * df; r.running += c * dc; r.rides = (r.rides ?? 0) + n * df; }
     }
+    if (d.day > ledgerDay(now) - LINE_DAYS) { // T-2787: each line's own, for its panel's history
+      for (const f of rl.fares) { const v = fareHour(f.per, t + f.shift, f.kindOf) * df; if (v) lineDayEntry(f.id, d.day)[1] += v; }
+      for (const c of rl.costs) { const v = costHour(c.run, t + c.shift, c.tail) * dc; if (v) lineDayEntry(c.id, d.day)[2] += v; }
+    }
     if (up * dc > 0) for (const [z, s] of upShares) {
       for (const r of regionEntries(z, d.day, h)) r.upkeep = (r.upkeep ?? 0) + up * dc * s;
     }
@@ -2258,6 +2420,11 @@ function settle(): boolean {
     }
     settledT = full ? t + 3600 : end;
     if (full) { ended = true; hourShape.delete(h); }
+  }
+  if (ended && lineDays.size) { // T-2787: a deleted line's days go with it
+    const li = api.lines_info(), have = new Set<number>();
+    for (let i = 0; i < li.length; i += 22) have.add(li[i]);
+    for (const id of [...lineDays.keys()]) if (!have.has(id)) lineDays.delete(id);
   }
   api.set_cash(cash);
   if (kept) kept.cash = cash;
@@ -2394,7 +2561,7 @@ function shapeHour(epoch: number, b: Float32Array) {
 // ---------------------------------------------------------------- saves (T-029)
 
 function header(): SaveHeader {
-  return { game: "anitabuilder", format: SAVE_FORMAT, level: TrackApi.save_level(), city, region: WORLD_ID, cities: CITIES.map(c => c.id), clock: gameNow(), cash: api!.cash(), ...loanToSave(loan), fleet: api!.fleet(), fleetFast: api!.fleet_fast(), ...(api!.fleet_bus() ? { fleetBus: api!.fleet_bus() } : {}), ...(api!.fleet_ferry() ? { fleetFerry: api!.fleet_ferry() } : {}), ...(api!.fleet_tram() ? { fleetTram: api!.fleet_tram() } : {}), fares: { ...fares }, ledger: ledger.map(rounded), hours: hourLedger.map(rounded), regions: savedRegions(rounded), stars: Object.fromEntries(stars), goals: Object.fromEntries(goals), notes: Object.fromEntries(lineNotes), ...savedShapes(), mode, start: startZone, opened: opened && [...opened], ...(demandFine ? { demandFine } : {}), ...(demandBuilt?.length ? { demandBuilt } : {}), newCars: newLineCars, ...(guide ? { guide } : {}), ...(achievements ? { achievements: Object.fromEntries(achievements) } : {}), ...(home ? { home } : {}), ...(copyOf ? { copy: copyOf } : {}) };
+  return { game: "anitabuilder", format: SAVE_FORMAT, level: TrackApi.save_level(), city, region: WORLD_ID, cities: CITIES.map(c => c.id), clock: gameNow(), cash: api!.cash(), ...loanToSave(loan), fleet: api!.fleet(), fleetFast: api!.fleet_fast(), ...(api!.fleet_bus() ? { fleetBus: api!.fleet_bus() } : {}), ...(api!.fleet_ferry() ? { fleetFerry: api!.fleet_ferry() } : {}), ...(api!.fleet_tram() ? { fleetTram: api!.fleet_tram() } : {}), fares: { ...fares }, ledger: ledger.map(rounded), hours: hourLedger.map(rounded), regions: savedRegions(rounded), ...(lineDays.size ? { lineDays: savedLineDays(true) } : {}), stars: Object.fromEntries(stars), goals: Object.fromEntries(goals), notes: Object.fromEntries(lineNotes), ...savedShapes(), ...savedHidden(), mode, start: startZone, ...(dayPinned ? { dayShift } : {}), opened: opened && [...opened], ...(demandFine ? { demandFine } : {}), ...(demandBuilt?.length ? { demandBuilt } : {}), newCars: newLineCars, ...(Object.keys(newLineHeadway).length ? { newHeadway: newLineHeadway } : {}), ...(newLineWeekendShare !== null ? { newWeekendShare: newLineWeekendShare } : {}), ...(guide ? { guide } : {}), ...(achievements ? { achievements: Object.fromEntries(achievements) } : {}), ...(home ? { home } : {}), ...(copyOf ? { copy: copyOf } : {}) };
 }
 
 /** The game as file bytes. The network and header are taken at once, before anything awaits. */
@@ -2736,10 +2903,11 @@ let loadingInto: string | null = null;
 async function loadGame(bytes: Uint8Array, from: "autosave" | "file" | "new", fresh?: NewGameSpec): Promise<boolean> {
   todayGen++;
   todayLast = null;
+  rowsSent = ""; // a load's service starts with no line calendars (`TrackApi.set_line_rows`)
   const decoded = await decodeSave(bytes);
   const { track } = decoded;
   const h: SaveHeader = currentZones(fresh
-    ? { ...decoded.header, clock: startClock(fresh), cash: START_CASH, loan: undefined, loanPay: undefined, loanDays: undefined, ledger: [], hours: [], regions: undefined, stars: undefined, goals: undefined, notes: undefined, newCars: undefined, guide: undefined, achievements: undefined, home: undefined, ...newGameHeader(fresh) }
+    ? { ...decoded.header, clock: startClock(fresh), cash: START_CASH, loan: undefined, loanPay: undefined, loanDays: undefined, ledger: [], hours: [], regions: undefined, lineDays: undefined, stars: undefined, goals: undefined, notes: undefined, newCars: undefined, newHeadway: undefined, newWeekendShare: undefined, guide: undefined, achievements: undefined, home: undefined, ...newGameHeader(fresh) }
     : decoded.header);
   if (!isThisWorld(h)) throw new Error("This save is for another world.");
   if (isRetiredTrackFormat(track)) throw new Error("This save is from an older version of the game and no longer opens.");
@@ -2768,16 +2936,21 @@ async function loadGame(bytes: Uint8Array, from: "autosave" | "file" | "new", fr
   api!.set_fleet_ferry(h.fleetFerry ?? 0);
   api!.set_fleet_tram(h.fleetTram ?? 0);
   fares = fresh ? startFares(fresh) : loadFares(h.fares);
-  setStartZone(h.start); // before the ledgers, whose days follow its local time
+  goneLineFares.clear();
+  setStartZone(h.start, h.dayShift); // before the ledgers, whose days follow its local time
   ledger = mergeLedger(h.ledger, (d) => d.day);
   hourLedger = mergeLedger(h.hours, (d) => d.hour);
   loadRegions(h.regions);
+  loadLineDays(h.lineDays, ledgerDay(h.clock));
   stars = new Map(Object.entries(h.stars ?? {}));
   goals = new Map(Object.entries(h.goals ?? {}));
   achievements = h.achievements ? new Map(Object.entries(h.achievements)) : null;
   lineNotes = new Map(Object.entries(h.notes ?? {}));
   lineShapes = shapesFrom(h.shapes);
+  hiddenLines = new Set(Array.isArray(h.hidden) ? h.hidden.filter((x) => typeof x === "string") : []);
   newLineCars = h.newCars ?? NEW_LINE_CARS;
+  newLineWeekendShare = typeof h.newWeekendShare === "number" && Number.isFinite(h.newWeekendShare) ? h.newWeekendShare : null;
+  newLineHeadway = cleanNewHeadways(h.newHeadway);
   guide = h.mode === "sandbox" ? undefined : h.guide;
   home = h.home;
   copyOf = !fresh && typeof h.copy === "string" && h.copy ? h.copy : undefined;
@@ -2821,6 +2994,7 @@ function setNewGame(spec?: NewGameSpec) {
   home = undefined;
   copyOf = undefined;
   fares = startFares(spec);
+  goneLineFares.clear();
 }
 
 /** After a slot's save was converted on load: keep the old-format copy under a key the saves list
@@ -2852,12 +3026,16 @@ async function newGame(spec?: NewGameSpec) {
   ledger = [];
   hourLedger = [];
   loadRegions(undefined);
+  loadLineDays(undefined, 0);
   stars = new Map();
   goals = new Map();
   achievements = new Map();
   lineNotes = new Map();
   lineShapes = new Map();
+  hiddenLines = new Set();
   newLineCars = NEW_LINE_CARS;
+  newLineHeadway = {};
+  newLineWeekendShare = null;
   restart(startClock(spec), "new");
 }
 
@@ -2885,6 +3063,8 @@ function restart(t: number, from: "autosave" | "file" | "new", reason?: "rebuilt
   sendHome();
   send({ kind: "listOrder", lines: [...api!.list_order(0)], stations: [...api!.list_order(1)] });
   send({ kind: "lineShapes", shapes: Object.fromEntries(lineShapes) });
+  send({ kind: "hiddenLines", lines: [...hiddenLines] });
+  send({ kind: "newHeadway", seconds: newLineHeadway });
   send({ kind: "loaded", from, clock: t, frame: frameSpec(), converted: convertedOnLoad || undefined, game, slot: loadingInto ?? activeSlot, reason });
   convertedOnLoad = false;
   sendState();
@@ -2971,8 +3151,8 @@ function sendState(service = false, effectiveAt?: number, trips = true, ghostFir
   const n = networkFromState({ ...s, render: r, complexOf, buildingLL }, netCache, true);
   const t2 = performance.now();
   // a moved build is off the exact one by float32 rounding: `?patch=shiftcheck` measures by how much
-  if (patchMode === "shiftcheck" && shifted) checkShift(n, networkFromState({ ...s, render: r, complexOf }));
-  const out = (s.net = netForPost(n, patchMode === "check" && !shifted ? networkFromState({ ...s, render: r, complexOf }) : undefined));
+  if (patchMode === "shiftcheck" && shifted) checkShift(n, networkFromState({ ...s, render: r, complexOf, buildingLL }));
+  const out = (s.net = netForPost(n, patchMode === "check" && !shifted ? networkFromState({ ...s, render: r, complexOf, buildingLL }) : undefined));
   s.ms = [t1 - t0, t2 - t1];
   timing.state = t1 - t0;
   timing.buffers = t2 - t1;
@@ -2993,14 +3173,92 @@ function sendState(service = false, effectiveAt?: number, trips = true, ghostFir
 /** whether the page shows the diagram, and the last network's lines, edges and polylines */
 let diagramOn = false;
 let diagramIn: { lines: ClockLine[]; edges: ClockEdge[]; pts: ReadonlyMap<number, Float32Array> } | null = null;
-/** the graph, after the network state it is of; the beside table is the one the bands just built */
+/** T-2261: the graph's points are float32 local units, so they are made from the kept float64 mercator points, from an
+ * origin of the network's own (its box's middle on a 1 degree grid), never the draw anchor: the same network gives the
+ * same graph whatever the camera has done. Each edge's converted points are kept while its mercator ones and the origin
+ * are, so the graph's arc lengths stay cached (per origin: a network of several regions has one each, T-3448). */
+let diagramPts = new Map<number, { m: Float64Array; d: Map<string, Float32Array> }>();
+/** a region's graph also has the track (not on its lines) within this of its stations' box, m */
+const REGION_TRACK_M = 50_000;
+function diagramFrame(pts: ReadonlyMap<number, Float32Array>, keep: Map<number, { m: Float64Array; d: Map<string, Float32Array> }>): { pts: Map<number, Float32Array>; at: Anchor } {
+  const a = anchor();
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const merc = new Map<number, Float64Array>();
+  for (const [id, p] of pts) {
+    let m = edgeMerc.get(id);
+    if (!m || m.length !== p.length) {
+      // not kept (a move or a clear since): from the local points, float32 rounded
+      m = new Float64Array(p.length);
+      for (let k = 0; k < p.length; k += 3) (m[k] = a.merc[0] + p[k] / EARTH_C), (m[k + 1] = a.merc[1] + p[k + 1] / EARTH_C), (m[k + 2] = p[k + 2]);
+    }
+    merc.set(id, m);
+    for (let k = 0; k < m.length; k += 3) (x0 = Math.min(x0, m[k])), (x1 = Math.max(x1, m[k])), (y0 = Math.min(y0, m[k + 1])), (y1 = Math.max(y1, m[k + 1]));
+  }
+  const lng = merc.size ? Math.round(((x0 + x1) / 2) * 360 - 180) : a.lng;
+  const lat = merc.size ? Math.round((Math.asin(Math.tanh(2 * Math.PI * (0.5 - (y0 + y1) / 2))) * 180) / Math.PI) : a.lat;
+  const at = makeAnchor(lng, lat, 0), from = `${lng},${lat}`;
+  const out = new Map<number, Float32Array>();
+  for (const [id, m] of merc) {
+    const had = diagramPts.get(id);
+    let c = keep.get(id);
+    if (!c || c.m !== m) keep.set(id, (c = { m, d: new Map() }));
+    let d = c.d.get(from) ?? (had?.m === m ? had.d.get(from) : undefined);
+    if (!d) {
+      d = new Float32Array(m.length);
+      for (let k = 0; k < m.length; k += 3) (d[k] = (m[k] - at.merc[0]) * EARTH_C), (d[k + 1] = (m[k + 1] - at.merc[1]) * EARTH_C), (d[k + 2] = m[k + 2]);
+    }
+    c.d.set(from, d);
+    out.set(id, d);
+  }
+  return { pts: out, at };
+}
+/** the graph, after the network state it is of; the beside table is the one the bands just built. T-3448: a network of
+ * several regions (diagram/regions.ts) gets a graph per region, each from an origin of its own, so a city far from the
+ * rest gets the graph it gets alone (float32 points thousands of km from the origin move stations and passes). */
 function postDiagram() {
   if (!diagramIn) return;
   const t0 = performance.now();
-  const { lines, edges, pts } = diagramIn;
-  const beside = besideSamples(bandEdges(lines), pts, new Map(edges.map((e) => [e.id, e])));
-  const graph = diagramGraph(lines, edges, pts, complexOfNodes(), beside);
-  send({ kind: "diagramGraph", graph, ms: performance.now() - t0 }, [graph.key.buffer, graph.x.buffer, graph.y.buffer, graph.ea.buffer, graph.eb.buffer, graph.first.buffer, graph.on.buffer]);
+  const { lines, edges } = diagramIn, ends = new Map(edges.map((e) => [e.id, e])), keep: typeof diagramPts = new Map();
+  const build = (ls: ClockLine[], pts0: ReadonlyMap<number, Float32Array>) => {
+    const { pts, at } = diagramFrame(pts0, keep);
+    return diagramGraph(ls, edges, pts, complexOfNodes(), besideSamples(bandEdges(ls), pts, ends), at);
+  };
+  const whole = build(lines, diagramIn.pts), groups = regionGroups(whole);
+  let graphs = [whole];
+  if (groups.length > 1) {
+    // each region: its lines, their track, and other track within REGION_TRACK_M of its stations' box (as a network of that
+    // region alone has), so its origin is the one it has alone
+    const { lng, lat } = nodeLngLat(whole), a = anchor(), pad = REGION_TRACK_M / EARTH_C / Math.cos((whole.origin[1] * Math.PI) / 180);
+    const regionOf = new Int32Array(whole.key.length), boxes = groups.map((nodes, r) => {
+      const b = [Infinity, Infinity, -Infinity, -Infinity];
+      for (const i of nodes) {
+        regionOf[i] = r;
+        const [x, y] = toMerc01(lng[i], lat[i]);
+        (b[0] = Math.min(b[0], x - pad)), (b[1] = Math.min(b[1], y - pad)), (b[2] = Math.max(b[2], x + pad)), (b[3] = Math.max(b[3], y + pad));
+      }
+      return b;
+    });
+    const lineRegion = new Map<number, number>();
+    for (const l of whole.lines) if (l.chain.length) lineRegion.set(l.id, regionOf[l.chain[0]]);
+    const ls: ClockLine[][] = groups.map(() => []), pts = groups.map(() => new Map<number, Float32Array>());
+    for (const l of lines) {
+      const r = lineRegion.get(l.id);
+      if (r === undefined) continue;
+      ls[r].push(l);
+      for (const p of l.path) {
+        const q = diagramIn.pts.get(p >> 1);
+        if (q) pts[r].set(p >> 1, q);
+      }
+    }
+    for (const [id, q] of diagramIn.pts) {
+      if (q.length < 3) continue;
+      const m = edgeMerc.get(id), x = m ? m[0] : a.merc[0] + q[0] / EARTH_C, y = m ? m[1] : a.merc[1] + q[1] / EARTH_C;
+      boxes.forEach((b, r) => { if (x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3] && !pts[r].has(id)) pts[r].set(id, q); });
+    }
+    graphs = groups.map((_, r) => build(ls[r], pts[r]));
+  }
+  diagramPts = keep;
+  send({ kind: "diagramGraph", graphs, ms: performance.now() - t0 }, graphs.flatMap((g) => [g.key.buffer, g.x.buffer, g.y.buffer, g.ea.buffer, g.eb.buffer, g.first.buffer, g.on.buffer]));
 }
 
 // ---------------------------------------------------------------- posting only what changed (T-1029)
@@ -3065,12 +3323,13 @@ function netForPost(n: NetworkBuffers, scratch?: NetworkBuffers): NetworkBuffers
   const out: NetworkBuffers = { ...n };
   delete out.strokePieces;
   const t0 = performance.now();
-  const modes = {} as Record<StrokeKind, StrokeMode>, ranges = {} as Record<StrokeKind, Int32Array>;
+  const modes = {} as Record<StrokeKind, StrokeMode>, ranges = {} as Record<StrokeKind, Int32Array>, moves = {} as Record<StrokeKind, Int32Array>;
   for (const kind of ["track", "lines"] as const) {
     const r = sender.post(kind, pieces[kind], n[kind].count, whole ? null : n.patch![kind], whole ? 0 : kind === "track" ? n.patch!.oldTrack : n.patch!.oldLines);
     out[kind] = r.strokes;
     modes[kind] = r.mode;
     ranges[kind] = r.ranges;
+    moves[kind] = r.moves;
   }
   timing.strokes = performance.now() - t0;
   timing.modes = (["whole", "same", "patch"] as const).indexOf(modes.track) * 10 + (["whole", "same", "patch"] as const).indexOf(modes.lines);
@@ -3093,7 +3352,7 @@ function netForPost(n: NetworkBuffers, scratch?: NetworkBuffers): NetworkBuffers
     out.edgePts = mine;
     for (const k of SAME_FIELDS) { const v = n[k]; if (v) keepPostedField(out, k, v); }
   } else {
-    const patch = { ...n.patch!, same: [] as string[], modes, ranges };
+    const patch = { ...n.patch!, same: [] as string[], modes, ranges, moves };
     for (const k of SAME_FIELDS) {
       const v = n[k];
       if (!v) continue;
@@ -3396,7 +3655,7 @@ function buildSnapshot(): NetworkSnapshot {
     const ferry = a.is_ferry(id);
     const bus = a.is_bus(id) ? busSnapshot(a, id, stations) : null;
     const hopS: number[][][] = [], dwellS: number[][][] = [];
-    const span = a.line_span(id);
+    const span = a.line_span(id), back = a.line_back_stops(id);
     for (let run = 0; run < 2; run++) {
       hopS.push([]);
       dwellS.push([]);
@@ -3407,7 +3666,7 @@ function buildSnapshot(): NetworkSnapshot {
       }
     }
     lines.push({
-      id, name: a.line_name(id), stops: [...a.line_stops(id)], tph: [li[i + 5], li[i + 6], li[i + 7]], hopS, dwellS,
+      id, name: a.line_name(id), stops: [...a.line_stops(id)], ...(back.length ? { backStops: [...back] } : {}), tph: [li[i + 5], li[i + 6], li[i + 7]], hopS, dwellS,
       hopKm: [0, 1].map((run) => { const s = a.line_stop_s(id, run); return Array.from({ length: s.length - 1 }, (_, k) => (s[k + 1] - s[k]) / 1000); }),
       ...(!bus && !ferry && a.line_fast(id) ? { fast: true } : {}),
       ...(ferry ? { ferry: true } : {}),
@@ -3420,6 +3679,7 @@ function buildSnapshot(): NetworkSnapshot {
     });
   }
   snapStations = stationsKey(ni);
+  tidyLineFares(a);
   return { version: ++snapVersion, city, frame: frameSpec(), stations, lines, fare: demandFares(), ...(passages.length ? { passages } : {}) };
 }
 
@@ -3671,10 +3931,21 @@ function savedShapes(): Pick<SaveHeader, "shapes"> {
   return Object.keys(shapes).length ? { shapes } : {};
 }
 
+/** T-3420: the header's hidden lines, of the lines there are */
+function savedHidden(): Pick<SaveHeader, "hidden"> {
+  if (!hiddenLines.size) return {};
+  const info = api!.lines_info(), alive = new Set<string>();
+  for (let i = 0; i < info.length; i += 22) alive.add(String(info[i]));
+  const hidden = [...hiddenLines].filter((id) => alive.has(id));
+  return hidden.length ? { hidden } : {};
+}
+
 /** T-3319: a new line takes no shape left by a deleted line whose id it reuses; a copy takes its source's. */
 function newLineShape(op: EditOp, line: number) {
   if (op.op !== "addLine" && op.op !== "addBusLine" && op.op !== "addFerryLine" && op.op !== "copyLine") return;
   const id = String(line), from = op.op === "copyLine" ? lineShapes.get(String(op.line)) : undefined;
+  // T-3420: a new line or a copy is shown, whatever a deleted line of its id was
+  if (hiddenLines.delete(id)) send({ kind: "hiddenLines", lines: [...hiddenLines] });
   if (from === lineShapes.get(id)) return;
   if (from) lineShapes.set(id, from);
   else lineShapes.delete(id);
@@ -3747,6 +4018,8 @@ function applyInner(op: EditOp): Applied {
       return { r: a.double_up(op.edge) };
     case "oneWay":
       return { r: a.set_edge_oneway(op.edge, op.dir) };
+    case "pieceLimit":
+      return { r: a.set_edges_limit(new Uint32Array(op.edges), op.kmh) };
     case "stationTracks":
       return { r: a.set_station_tracks(op.node, op.one) };
     case "stationWay":
@@ -3801,10 +4074,27 @@ function applyInner(op: EditOp): Applied {
       const tram = op.stops.length > 0 && a.node_kind(op.stops[0]) >= 2;
       const [tramDwell, tramTurn] = tram ? TrackApi.kind_defaults(3) : [dwellS, turnaroundS];
       const r = a.set_line_with_trains(id, new Uint32Array(op.stops), h, m, l, tramDwell, tramTurn, tram ? TRAM_NEW_CARS : newLineCars, colourInt(op.colour), op.name || a.next_line_name());
+      if (r !== 0) return { r, line: id };
       // T-1899: a line started on high-speed track (a track's New line) runs high-speed trains
-      if (r !== 0 || !op.autoFast || hsrShare(a, id) <= 0.5) return { r, line: id };
-      const charge = a.last_charge(), trainCharge = a.last_train_charge();
-      return a.set_line_fast(id, true) === 0 ? { r, line: id, charge: charge + a.last_charge(), trainCharge: trainCharge + a.last_train_charge() } : { r, line: id, charge, trainCharge };
+      let charge = a.last_charge(), trainCharge = a.last_train_charge();
+      let fast = false;
+      if (op.autoFast && hsrShare(a, id) > 0.5 && a.set_line_fast(id, true) === 0) {
+        fast = true;
+        charge += a.last_charge();
+        trainCharge += a.last_train_charge();
+      }
+      // T-3543, T-3588: the headways the player made the default for this kind of line; a refused edit (cash) leaves it on its counts
+      const wanted = newLineHeadway[tram ? "tram" : fast ? "fast" : "rail"];
+      if (wanted && a.set_auto_headway(id, ...wanted) === 0) {
+        charge += a.last_charge();
+        trainCharge += a.last_train_charge();
+      }
+      // T-3588: the weekend percent "Apply to all lines" set for new lines
+      if (newLineWeekendShare !== null && newLineWeekendShare !== 100 && a.set_line_weekend_share(id, newLineWeekendShare) === 0) {
+        charge += a.last_charge();
+        trainCharge += a.last_train_charge();
+      }
+      return { r, line: id, charge, trainCharge };
     }
     case "copyLine": {
       const id = a.new_line_id();
@@ -3869,6 +4159,14 @@ function applyInner(op: EditOp): Applied {
       return { r: a.set_train_counts(op.line, ...op.trains) };
     case "setHeadway":
       return { r: op.seconds ? a.set_auto_headway(op.line, ...op.seconds) : a.clear_auto_headway(op.line) };
+    case "weekendShare":
+      return { r: a.set_line_weekend_share(op.line, op.share) };
+    case "weekendCounts":
+      return { r: op.headways ? a.set_line_weekend_headways(op.line, ...op.counts, ...op.headways) : a.set_line_weekend_counts(op.line, ...op.counts) };
+    case "weekendShareAll":
+      newLineWeekendShare = op.share;
+      dirty = true;
+      return { r: a.set_weekend_share_all(op.share) };
     case "lineLook": {
       let colour = 0;
       if (op.colour === undefined) {
@@ -3902,8 +4200,10 @@ function applyInner(op: EditOp): Applied {
     case "groupLook":
       return { r: a.set_line_group_look(op.group, op.symbol.trim(), op.colour === null ? -1 : colourInt(op.colour)) };
     case "fares":
-      fares = { ...(op.nodes ? faresOf({ nodes: op.nodes }, fares) : faresOf({ base: op.base, perKm: op.perKm }, fares)), scales: fares.scales, baseline: FARE_BASELINE, basis: "usd", income: FARE_E, ...(fares.hsr !== undefined ? { hsr: fares.hsr } : {}), ...(fares.ferry !== undefined ? { ferry: fares.ferry } : {}), ...(fares.bus !== undefined ? { bus: fares.bus } : {}), ...(fares.transfer !== undefined ? { transfer: fares.transfer } : {}), ...(fares.ref ? { ref: fares.ref } : {}) };
+      fares = { ...(op.nodes ? faresOf({ nodes: op.nodes }, fares) : faresOf({ base: op.base, perKm: op.perKm }, fares)), scales: fares.scales, baseline: FARE_BASELINE, basis: "usd", income: FARE_E, ...(fares.hsr !== undefined ? { hsr: fares.hsr } : {}), ...(fares.ferry !== undefined ? { ferry: fares.ferry } : {}), ...(fares.bus !== undefined ? { bus: fares.bus } : {}), ...(fares.transfer !== undefined ? { transfer: fares.transfer } : {}), ...(fares.ref ? { ref: fares.ref } : {}), ...(fares.lines ? { lines: fares.lines } : {}) };
       return { r: 0 };
+    case "fareLine":
+      return { r: Number.isFinite(op.mul) && setLineFare(a, op.line, op.mul) ? 0 : 1 };
     case "fareHsr":
       if (!Number.isFinite(op.mul)) return { r: 1 };
       fares = { ...fares, hsr: tidyHsr(op.mul) };
@@ -4030,6 +4330,10 @@ onmessage = (e: MessageEvent<ToClock>) => {
     return;
   }
   if (msg.kind === "epoch" && parked > 0) return tripsNow(msg.epoch);
+  if (msg.kind === "retryGround") return retryGroundNow();
+  // T-3478: leaving never waits on a download: not on a game still opening (unless it is a picked file,
+  // which would be lost), nor on an edit parked for its ground, whose network is at rest
+  if (msg.kind === "leave" && (parked > 0 || (ready && !initDone && !initIncoming))) return void leave(msg, !initDone);
   if (msg.kind === "view") {
     // outside the queue, so the fetch starts at once; a mask is installed between messages
     const midLat = (msg.s + msg.n) / 2, wide = (msg.e - msg.w) * M_PER_DEG * Math.cos(midLat * Math.PI / 180) > VIEW_SPAN_M;
@@ -4089,6 +4393,8 @@ async function processMessage(msg: ToClock) {
       const t0 = performance.now();
       freezeMemory = (await initWasm(() => init(), "clock worker")).memory; // i18n-ignore
       if (msg.heapStep) set_heap_step(msg.heapStep);
+      // T-3395: the save check here also decodes the network (TWT4-6; anything else is left to the load)
+      setNetworkCheck((track) => !/^TWT[456]$/.test(new TextDecoder().decode(track.subarray(0, 4))) || TrackApi.save_stations(track).length >= 3);
       const model = newModel();
       loadHolidays();
       emptyTrack = model.save();
@@ -4112,7 +4418,11 @@ async function processMessage(msg: ToClock) {
         msg.game = pending.spec;
       } else if (pending) {
         incoming = await pendingGame(pending);
+        initIncoming = !!incoming;
         msg.slot = pending.from;
+      } else if (msg.pending && msg.game) {
+        // T-3478: a new game whose spec is gone from storage is still a new game, never the game left for it
+        msg.newSlot = newGameName(await listSlots().catch(() => []), msg.game);
       }
       if (msg.fresh) {
         // T-320: a new game for a check owns no slot, so nothing it does can reach a saved game
@@ -4172,7 +4482,11 @@ async function processMessage(msg: ToClock) {
           // T-2820: first, so a panic's stopped model is out of the way of everything below
           const panicked = isPanic(err) ? afterLoadPanic(err) : null;
           // Keep the unreadable save aside, and its slot as it is: the new game gets a slot of its own (T-743).
-          await writeStored("unreadable-" + stored.at, stored);
+          await writeStored(unreadableKey(activeSlot, stored.at), stored);
+          // T-3395: a damaged slot is marked so (never uploaded) and its last good copy found; the new game
+          // below has a new slot and no sync record, so nothing of it is written over the game
+          const damaged = isDamagedError(err);
+          if (damaged && activeLease) { await markDamaged(activeSlot, stored.at); await rescueGood(activeSlot); }
           if (activeLease) {
             activeLease.release();
             activeSlot = "slot-" + crypto.randomUUID();
@@ -4183,7 +4497,7 @@ async function processMessage(msg: ToClock) {
             await publishSlots();
           }
           if (panicked !== null) send({ kind: "loaded", from: "new", clock: START_CLOCK, error: SAVE_PANIC, why: panicked, frame: frameSpec(), game });
-          else send({ kind: "loaded", from: "new", clock: START_CLOCK, error: (console.error("last game did not load:", err), loadFailKey(String(err))), frame: frameSpec(), game });
+          else send({ kind: "loaded", from: "new", clock: START_CLOCK, error: (console.error("last game did not load:", err), damaged ? SAVE_DAMAGED : loadFailKey(String(err))), frame: frameSpec(), game });
         }
       }
       keep();
@@ -4353,6 +4667,12 @@ async function handleMessage(msg: ToClock) {
     if (msg.shape) lineShapes.set(msg.line, msg.shape);
     else lineShapes.delete(msg.line);
     dirty = edited = true; editAt = Date.now();
+  } else if (msg.kind === "newHeadway") {
+    newLineHeadway = msg.seconds;
+    dirty = edited = true; editAt = Date.now();
+  } else if (msg.kind === "hideLines") {
+    hiddenLines = new Set(msg.lines);
+    dirty = edited = true; editAt = Date.now();
   } else if (msg.kind === "listOrder") {
     api.set_list_order(msg.list, new Uint32Array(msg.ids));
     dirty = edited = true; editAt = Date.now();
@@ -4364,12 +4684,15 @@ async function handleMessage(msg: ToClock) {
     sendMoney();
     void autosave(); // the slot's card shows the mark at once
   } else if (msg.kind === "edit") {
-    if (msg.op.op === "fares" || msg.op.op === "fareScale" || msg.op.op === "fareHsr" || msg.op.op === "fareFerry" || msg.op.op === "fareBus" || msg.op.op === "fareTransfer") {
-      apply(msg.op);
-      dirty = edited = true; editAt = Date.now();
-      sendMoney();
-      scheduleSnapshot();
-      send({ kind: "edited", seq: msg.seq, ok: true, issues: [], charge: 0 });
+    if (msg.op.op === "fares" || msg.op.op === "fareScale" || msg.op.op === "fareHsr" || msg.op.op === "fareFerry" || msg.op.op === "fareBus" || msg.op.op === "fareTransfer" || msg.op.op === "fareLine") {
+      // T-3567: a line's own multiple for a line that is gone is refused
+      const ok = apply(msg.op).r === 0 || msg.op.op !== "fareLine";
+      if (ok) {
+        dirty = edited = true; editAt = Date.now();
+        sendMoney();
+        scheduleSnapshot();
+      }
+      send({ kind: "edited", seq: msg.seq, ok, issues: [], charge: 0 });
       return;
     }
     if (msg.op.op === "fareRef") {
@@ -4432,7 +4755,9 @@ async function handleMessage(msg: ToClock) {
     // T-2763: blueprint track taken out carries no train, as a segment put in (T-1780)
     const bpRemove = msg.op.op === "removeEdge" && posted.edges.get(msg.op.edge)?.built === false;
     // T-1071: a train count takes effect a moment ahead, once its trips are on screen
-    const service = msg.op.op === "setTrainCount" || msg.op.op === "setHeadway";
+    // T-1073: so is an undo or redo of one
+    const service = msg.op.op === "setTrainCount" || msg.op.op === "setHeadway" || msg.op.op === "weekendShare" || msg.op.op === "weekendCounts" || msg.op.op === "weekendShareAll"
+      || ((msg.op.op === "undo" || msg.op.op === "redo") && api.step_is_service(msg.op.op === "redo"));
     if (service) {
       api.set_now(gameNow());
       api.set_edit_lead(clk.rate * serviceLeadS());
@@ -4448,7 +4773,10 @@ async function handleMessage(msg: ToClock) {
     const answer = (early?: boolean, held?: Float32Array[]) => send({ kind: "edited", seq, ok: r === 0, issues: r === 0 ? why ?? [] : r === INSERT_REFUSED ? ["InsertStop"] : r === DROP_REFUSED ? ["DropStop"] : r === ORDER_REFUSED && fault ? [`StopOrder:${fault.join(":")}`] : issues(), charge, line, node, skipped, ms: { apply: tB - tA, ...timing, total: performance.now() - tA }, early, held }); // i18n-ignore
     if (r !== 0) return answer();
     dirty = edited = true; editAt = Date.now();
-    if (line !== undefined) newLineShape(op, line);
+    if (line !== undefined) { newLineShape(op, line); newLineFare(op, line); }
+    // T-3581: a line deleted or brought back by an undo or redo has its fare multiple dropped or given back in the
+    // state this edit sends, not only at the next network for demand
+    if (op.op === "removeLine" || op.op === "undo" || op.op === "redo") tidyLineFares(api);
     if (charge > 0) bookCharge(seq, charge, trainCharge ?? api.last_train_charge());
     forget();
     const demand = api.dirty_demand_lines();
@@ -4695,7 +5023,7 @@ async function handleMessage(msg: ToClock) {
     if (speeds.length !== Math.max(0, pts.length / 3 - 1)) throw new Error("Preview speed/point length mismatch");
     const lanes = a.preview_render_lanes();
     if (lanes.length !== speeds.length) throw new Error("Preview lane/speed length mismatch");
-    const marks = markPoints(a.preview_marks(), 3);
+    const marks = previewMarkRows(a.preview_marks());
     const ground = msg.kind === "preview" ? Array.from(a.preview_ground()) : undefined;
     const flatJunctions = msg.kind === "preview" ? a.route_flyovers_flat() : 0;
     const joins = msg.kind === "preview" ? a.route_joins() : undefined;
@@ -4755,7 +5083,7 @@ function sendNodePreview(seq: number, out: Float64Array) {
     parts.push(pts.length / 3);
   }
   const v = new Float64Array(verts), p = new Float32Array(pts), pa = new Uint32Array(parts);
-  const marks = markPoints(api!.preview_marks(), 3);
+  const marks = previewMarkRows(api!.preview_marks());
   const partLanes = api!.preview_part_lanes();
   send({ kind: "preview", seq, ok, cost: out[1], lengthM: 0, mult: 0, issues: ok ? [] : issues(), verts: v, pts: p, parts: pa, partLanes, anchor: anchor().version, marks }, [v.buffer, p.buffer, pa.buffer, partLanes.buffer, marks.buffer]);
 }

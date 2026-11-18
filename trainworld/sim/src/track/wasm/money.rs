@@ -120,7 +120,8 @@ impl TrackApi {
         ]
     }
     /// Running cost of the running lines per hour at a demand level, US$M: trains an hour in each
-    /// direction times the line's length and cars, at the game's economy scale (T-081).
+    /// direction times the line's length and cars, at the game's economy scale (T-081). T-3521: `level` 3
+    /// to 5 is a weekend's (3 + level), each line at its own trains then (`Network::line_tph_on`).
     pub fn running_cost(&self, level: usize) -> f64 {
         self.running_cost_in(level, f64::NAN)
     }
@@ -147,7 +148,8 @@ impl TrackApi {
         for (l, s) in self.w.svc.lines.iter().enumerate() {
             if s.running && (shift.is_nan() || s.shift == shift) {
                 // T-2669: priced in its countries' money, so a km costs the factor's share
-                let tk = n.line_tph[l][level.min(LEVELS - 1)] as f64 * s.live_runs() as f64 * s.runs[0].len / 1000.0 * self.line_run_factor(l as u32);
+                let (row, lev) = ((level / LEVELS).min(DAY_ROWS - 1), level % LEVELS);
+                let tk = n.line_tph_on(l, row, lev) as f64 * s.live_runs() as f64 * s.runs[0].len / 1000.0 * self.line_run_factor(l as u32);
                 let k = fleet_kind(n, l);
                 train_km[k] += tk;
                 car_km[k] += tk * s.cars as f64;
@@ -209,6 +211,12 @@ impl TrackApi {
         for l in 0..w.len() as u32 {
             if weight(l) <= 0.0 || !n.line_ok(l) { continue }
             let mut stops = n.line_stops(l).to_vec();
+            // T-3348: and the platforms each run stops at
+            if let Some(ls) = self.w.svc.lines.get(l as usize).filter(|s| !s.is_bus()) {
+                for r in 0..2 {
+                    stops.extend((0..ls.runs[r].stop_idx.len()).filter_map(|k| ls.stop_node(r, k)));
+                }
+            }
             stops.sort_unstable();
             stops.dedup();
             for s in stops {
@@ -256,7 +264,7 @@ impl TrackApi {
     }
     /// Per stretch between stops of run 0 (T-817): the highest speed the trains reach there, the
     /// highest the limits allow, km/h, and what sets that limit: 0 the trains' top speed, 1 the
-    /// track (ordinary track's 160), 2 curves, 3 a crossover.
+    /// track (ordinary track's 160), 2 curves, 3 a crossover, 4 a piece's own speed limit (T-3405).
     pub fn line_stretch_speeds(&self, line: u32) -> Vec<f64> {
         let net = &self.w.net;
         let Some(s) = self.w.svc.lines.get(line as usize).filter(|s| s.ok) else { return vec![] };
@@ -280,7 +288,7 @@ impl TrackApi {
                     let v = curve.min(cap).min(top);
                     if v > best + 1e-9 {
                         best = v;
-                        why = if top <= cap && top <= curve { 0.0 } else if cap <= curve { if net.edge_crossover[e as usize] { 3.0 } else { 1.0 } } else { 2.0 };
+                        why = if top <= cap && top <= curve { 0.0 } else if cap <= curve { if net.edge_crossover[e as usize] { 3.0 } else if cap < net.v_kind_cap(e) { 4.0 } else { 1.0 } } else { 2.0 };
                     }
                 }
             }

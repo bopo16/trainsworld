@@ -90,6 +90,7 @@ MODULE_OUTLINES = {"england", "france", "germany", "usa"}  # plan_hooks giving a
 # A step still running after this long is stopped and its row parks (four times as long for a row
 # over BIG_PEOPLE): the longest seen, a 20M pack's build, takes under an hour on 3 cores.
 STEP_LIMIT_S = {"build_city": 5400, "routes": 3600, "pack_gate": 5400, "intercity": 7200, None: 1800}
+MARKET_BASE_S, MARKET_S_PER_ZONE = 1800, 2  # the join's market step: 1800 s plus 2 s per registered zone (T-2627)
 BIG_PEOPLE = 15e6
 # T-1978: while a region builds, its built rows are gated in chunks of at least this many (each
 # chunk pays a snapshot, a register and a Vite start, about 2 minutes); the rest once its builds
@@ -100,6 +101,15 @@ GATE_SLOTS = 2
 
 class RunFault(Exception):
     """A fault of the run, not of a row (T-764, T-773): the run stops and parks nothing for it."""
+
+
+def browser_fault(results):
+    """T-2399: the message when 3 or more gated rows' browser checks all failed the same way (results: {id: the
+    gate's result}), which says the app or the check is broken, not the rows; None otherwise."""
+    sigs = {i: (r.get("browser") or {}).get("sig") for i, r in results.items()}
+    if len(sigs) >= 3 and all(sigs.values()) and len(set(sigs.values())) == 1:
+        return f"the browser check failed the same way on all {len(sigs)} rows ({next(iter(sigs.values()))}), so the app or the check is at fault"
+    return None
 
 
 class Slots:
@@ -242,6 +252,8 @@ def step_main(argv):
     elif os.environ.get("TW_STEP_LOG"):
         quiet_watch(os.environ["TW_STEP_LOG"], int(os.environ.get("TW_QUIET_S", QUIET_S)))
     sys.path[:0] = [str(HERE), str(REAL / "checks")]
+    if argv and any(a in ("--help", "-h") for a in argv[1:]):
+        return step_help(argv[0])  # before anything imports or runs: no step may see --help (T-2398)
     root = os.environ.get("TW_RUN_ROOT")
     if root:
         Redirect(root).install()
@@ -252,6 +264,21 @@ def step_main(argv):
            "@preview": preview}[name](args)
     if out is not None:
         print("RESULT " + json.dumps(out))
+
+
+def step_help(name):
+    """`step <name> --help` (or -h): the script's docstring, read from its source without importing
+    or running it. Whatever flags the step parses itself, it never gets to see the help flag."""
+    print(f"world_run.py step {name} [args...]")
+    if name.startswith("@"):
+        print("a runner piece (@read_extract, @groups, @preview); see its function in world_run.py")
+        return
+    path = next((p for d in (HERE, REAL / "checks") for p in [d / (name + ".py")] if p.exists()), None)
+    if path is None:
+        raise SystemExit(f"no step named {name} in pipeline/ or checks/")
+    doc = ast.get_docstring(ast.parse(path.read_text(encoding="utf-8-sig")))
+    print(f"\n{path}\n\n{doc or '(no docstring; read the script for its arguments)'}")
+    print("\nThe step was not run. Its own flags are in its source; --help is never passed on.")
 
 
 def quiet_watch(log, secs):
@@ -353,6 +380,7 @@ class Run:
         self.streak = (None, 0)  # T-775: the last park's reason, as compared, and how many in a row
         self.stopping = False
         self.vite = None
+        self.frozen = None  # the gate's copy of app/ (freeze_app, T-2298)
         self.everyday = None  # the gate's rates test, built once a run (build_everyday)
         self.report = {"batch": self.batch, "root": str(self.root), "jobs": self.jobs, "rows": {}, "regions": []}
 
@@ -432,7 +460,7 @@ class Run:
 
     # ---------------------------------------------------------------- one step
 
-    def step(self, name, args, log, threads=None, env=None, quiet=False, big=False):
+    def step(self, name, args, log, threads=None, env=None, quiet=False, big=False, limit=None):
         """(ok, seconds, the RESULT line's value or the log's last lines). A step outside a row's
         build gets every core of --jobs: a run's regions go one at a time, so its builds are idle."""
         t = threads or self.jobs
@@ -451,7 +479,7 @@ class Run:
             f.flush()
             p = subprocess.Popen([sys.executable, "-I", "-u", os.path.abspath(__file__), "step", name, *args],
                                  stdout=f, stderr=subprocess.STDOUT, env=e, cwd=str(MAPS), creationflags=flags)
-            limit = STEP_LIMIT_S.get(name, STEP_LIMIT_S[None]) * (4 if big else 1)
+            limit = limit or STEP_LIMIT_S.get(name, STEP_LIMIT_S[None]) * (4 if big else 1)
             size, still, said = -1, time.time(), False
             while True:
                 try:
@@ -687,7 +715,10 @@ class Run:
 
     def join_only(self):
         """T-786: the joint solve for every gated row (of --countries), once, after the parallel
-        runs' regions; one at a time (the packs lock), on every core of --jobs."""
+        runs' regions; one at a time (the packs lock), on every core of --jobs. With --market-only
+        (T-2777) only the market and trips step of a failed join, see market_only."""
+        if self.o.get("market_only"):
+            return self.market_only()
         rows = [r for r in self.rows() if r["status"] == "gated"]
         if self.o.get("countries"):
             cs = set(self.o["countries"].split(","))
@@ -1282,6 +1313,11 @@ class Run:
             self.unregister(ids)
             raise RunFault(f"the gate {'crashed' if not ok else 'ended'} with no result for {' '.join(none)} "
                            f"({str(tail)[-300:]}); the region's rows stay built for the next run (see {L}.gate.log)")
+        # T-2399: a browser check failing the same way on every row (3 or more) is the check or the app, not the rows
+        fault = browser_fault({i: json.loads((gd / f"{i}.json").read_text(encoding="utf-8")) for i in ids}) if self.browser else None
+        if fault:
+            self.unregister(ids)
+            raise RunFault(f"{fault}; the rows stay built for the next run (see {L}.gate.log, and run checks/smoke.mjs)")
         shipped = []
         for i in ids:
             p = gd / f"{i}.json"
@@ -1317,8 +1353,9 @@ class Run:
         self.check_port()
         log = open(f"{L}.vite.log", "a", encoding="utf-8")
         flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
+        env = dict(os.environ, TW_APP_DIR=str(self.freeze_app(L)))
         self.vite = subprocess.Popen(["node", str(REAL / "checks/dev-nowatch.mjs"), str(self.port)], cwd=str(MAPS),
-                                     stdout=log, stderr=subprocess.STDOUT, creationflags=flags)
+                                     stdout=log, stderr=subprocess.STDOUT, creationflags=flags, env=env)
         base = f"http://localhost:{self.port}"
         for _ in range(120):
             try:
@@ -1335,6 +1372,38 @@ class Run:
                 time.sleep(1)
         raise SystemExit(f"Vite on {self.port} did not answer in 2 minutes")
 
+    def freeze_app(self, L):
+        """T-2298: the gate's Vite serves a copy of app/ made now (after the rows are registered, so it holds
+        their registry entries), so a WASM or UI landing in the tree mid-gate cannot change the page under the
+        browser check (72 of Russia's rows parked on a half-rebuilt sim). The copy's node_modules and its
+        sibling data are junctions: vite.config.ts reads ../data/packs, terrain and the rest from there."""
+        import tempfile
+        self.drop_frozen()
+        src = self.root / "app"
+        top = Path(tempfile.mkdtemp(prefix="tw-frozen-"))
+        shutil.copytree(src, top / "app", ignore=shutil.ignore_patterns("node_modules", "dist"))
+        for name, target in (("app/node_modules", src / "node_modules"), ("data", self.root / "data")):
+            target = target.resolve()
+            if os.name == "nt":
+                r = subprocess.run(["cmd", "/c", "mklink", "/J", str(top / name), str(target)], capture_output=True, text=True)
+                if r.returncode:
+                    raise RunFault(f"could not link {name} into the gate's app copy: {r.stdout}{r.stderr}")
+            else:
+                os.symlink(target, top / name, target_is_directory=True)
+        self.frozen = top
+        print(f"    the gate's app/ is frozen at {top / 'app'}", flush=True)
+        return top / "app"
+
+    def drop_frozen(self):
+        """Remove the frozen copy: the links first (rmdir, never rmtree through them), then the rest."""
+        top, self.frozen = self.frozen, None
+        if top is None:
+            return
+        for name in ("app/node_modules", "data"):
+            with contextlib.suppress(OSError):
+                os.rmdir(top / name) if os.name == "nt" else os.unlink(top / name)
+        shutil.rmtree(top, ignore_errors=True)
+
     def stop_vite(self):
         """The runner's own Vite only: its PID and its children."""
         if self.vite and self.vite.poll() is None:
@@ -1344,6 +1413,7 @@ class Run:
                 self.vite.terminate()
             self.vite.wait(timeout=30)
         self.vite = None
+        self.drop_frozen()
 
     # ---------------------------------------------------------------- joint gravity and the market
 
@@ -1382,13 +1452,7 @@ class Run:
                 changed -= set(parked)
         order = [c["id"] for c in self.registry()["cities"]]
         ids = sorted((i for i in changed if i in order), key=order.index)  # a unit that parked later took its packs out
-        if ids:
-            ok, _, tail = self.step("register", ids + ["--market", "--trips"], f"{L}.market.log")
-        else:
-            ok, _, tail = self.step("market_zones", ["--rows"], f"{L}.market.log")
-        if not ok:
-            # the packs are registered and gated; a market failure leaves them so and says it
-            self.report.setdefault("problems", []).append(f"market step failed: {str(tail)[-300:]}")
+        self.market_step(ids, L)
         for i in shipped:
             missing = [x for x in VITE_FILES if not (self.packs / f"{i}{x}").exists()]
             if missing:
@@ -1417,6 +1481,82 @@ class Run:
                 print(f"  warning: zone search aliases not rebuilt: {str(tail)[-200:]}", flush=True)
         except Exception as e:
             print(f"  warning: zone search aliases not rebuilt: {e}", flush=True)
+
+    def market_step(self, ids, L):
+        """The join's market and trips step for `ids` (registry order). Its limit grows with the registry,
+        since the local trips run over every registered zone whatever the ids (T-2627: 3,545 zones took 26
+        minutes on a busy machine); a hung step is still told by QUIET_S's stack dump."""
+        zones = len(self.registry()["cities"])
+        limit = MARKET_BASE_S + MARKET_S_PER_ZONE * zones
+        if ids:
+            ok, _, tail = self.step("register", ids + ["--market", "--trips"], f"{L}.market.log", limit=limit)
+        else:
+            ok, _, tail = self.step("market_zones", ["--rows"], f"{L}.market.log", limit=limit)
+        if not ok:
+            # the packs are registered and gated; a market failure leaves them so and says it
+            self.report.setdefault("problems", []).append(f"market step failed: {str(tail)[-300:]}")
+        return ok
+
+    def market_only(self):
+        """T-2777: a failed join's market and trips step again, on its own. The ids are the join's own
+        register line (the last `register ... --market --trips` header of --from-log, else of the newest
+        `<batch>/join.market.log`), or --ids; the packs lock is held and gates are waited for, as in a join.
+        The solves are not redone. Ends with the freeze the failed join skipped."""
+        if self.o.get("ids"):
+            want = self.o["ids"].split(",")
+        else:
+            want = self.join_ids(self.o.get("from_log"))
+        if self.stop_file.exists():
+            raise SystemExit(f"{self.stop_file} exists: delete it to run")
+        with self.start():
+            print(f"batch {self.batch}: the market step again for {len(want)} ids; jobs {self.jobs}; logs {self.logs}", flush=True)
+            t0 = time.time()
+            try:
+                with self.held("packs", "market step"):
+                    self.wait_gates()
+                    order = [c["id"] for c in self.registry()["cities"]]
+                    gone = [i for i in want if i not in order]
+                    if gone:
+                        print(f"  not registered now, left out: {' '.join(gone)}", flush=True)
+                    ids = sorted((i for i in want if i in order), key=order.index)
+                    if not ids:
+                        raise SystemExit("none of the ids is registered")
+                    ok = self.market_step(ids, self.logs / "join")
+                    for i in ids:
+                        missing = [x for x in VITE_FILES if not (self.packs / f"{i}{x}").exists()]
+                        if missing:
+                            self.report.setdefault("problems", []).append(f"{i}: files a production build copies are missing: {', '.join(missing)}")
+                    if ok:
+                        self.freeze()
+            except RunFault as x:
+                self.report["fault"] = str(x)
+                print(f"\nRUN FAULT, the market step stops: {x}", flush=True)
+            self.report["seconds"] = round(time.time() - t0)
+            self.write_report()
+            print(f"market step {'ok' if not self.report.get('problems') else 'with problems: ' + '; '.join(self.report['problems'])}"
+                  f"; {self.report['seconds']} s", flush=True)
+        if "fault" in self.report or self.report.get("problems"):
+            sys.exit(2)
+
+    def join_ids(self, log=None):
+        """The id list of a join's market step: the last register header in its log. The newest
+        join.market.log of any batch when no log is named."""
+        base = (self.root / "artifacts") if self.scratch else (MAPS / "artifacts/trainworld/world_run")
+        if log:
+            p = Path(log)
+        else:
+            found = sorted(base.glob("*/join.market.log"), key=lambda q: q.stat().st_mtime)
+            if not found:
+                raise SystemExit(f"no join.market.log under {base}; name the ids with --ids a,b or the log with --from-log")
+            p = found[-1]
+        ids = None
+        for ln in p.read_text(encoding="utf-8", errors="replace").splitlines():
+            if ln.startswith("### ") and " register " in ln and ln.rstrip().endswith("--market --trips"):
+                ids = ln.split(" register ", 1)[1].rsplit(" --market --trips", 1)[0].split()
+        if not ids:
+            raise SystemExit(f"{p} has no register step header; name the ids with --ids a,b")
+        print(f"  ids from {p}: {len(ids)}", flush=True)
+        return ids
 
     def freeze(self):
         """T-928: the state this join left, frozen for publishing (pipeline/freeze.py), unless its
@@ -1633,8 +1773,8 @@ def status(root):
 def parse(argv):
     o = {}
     flags = {"--no-browser": "no_browser", "--keep-downloads": "keep_downloads", "--no-join": "no_join",
-             "--build-only": "build_only"}
-    valued = {"--rows": "rows", "--countries": "countries", "--limit": "limit", "--jobs": "jobs",
+             "--build-only": "build_only", "--market-only": "market_only"}
+    valued = {"--ids": "ids", "--from-log": "from_log", "--rows": "rows", "--countries": "countries", "--limit": "limit", "--jobs": "jobs",
               "--port": "port", "--root": "root", "--workers": "workers", "--coarse": "coarse"}
     i = 0
     while i < len(argv):

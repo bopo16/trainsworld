@@ -3,7 +3,7 @@
 
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { budgetGB, gbText, liveGB } from "../game/memoryEstimate";
+import { budgetGB, budgetKind, gbText, liveGB } from "../game/memoryEstimate";
 import { CURRENCIES, CURRENCY, isCurrency } from "../game/currency";
 import { exact } from "../game/format";
 import { awayNear, rushRun, whenAway, whenBack, whenOut } from "../game/days";
@@ -13,11 +13,13 @@ import type { BubbleScheme } from "../game/palette";
 import { DETAIL_RANGE } from "../map/demandOverlay";
 import { makeSandbox, saveGuide } from "../workers/clockClient";
 import { mobileDevice } from "../workers/deviceMemory";
-import { Check, Icon, Segmented, ShapePicker, Stepper } from "./widgets";
+import { Check, Icon, LevelToggles, Segmented, ShapePicker, Stepper } from "./widgets";
+import { hiddenLevels, hideBuses, showAllLevels, toggleLevel } from "../game/lineVisibility";
 import { SHAPE_MODES } from "../game/lineShape";
 import type { Vehicle } from "../game/vehicle";
 import { Credits } from "./Credits";
 import { helpOpen } from "./HelpPanel";
+import { HELP_KEY } from "./toolKeys";
 import { accountState } from "../game/account";
 import { AccountButton, AccountSection, loginText } from "./AccountPanel";
 import { CommunityButton } from "./Community";
@@ -55,8 +57,8 @@ export function SettingsTab() {
   return (
     <>
       <div class="settings-top">
-        <button class={"btn icon help-open" + (helpOpen.value ? " on" : "")} data-tip={t("settingsTab.controls")} aria-label={t("settingsTab.controls")} aria-pressed={helpOpen.value} onClick={() => (helpOpen.value = !helpOpen.peek())}>
-          <Icon.help />
+        <button class={"btn icon help-open" + (helpOpen.value ? " on" : "")} data-tip={mobileDevice() ? t("help.name") : t("dock.tabTip", { name: t("help.name"), key: HELP_KEY })} aria-label={t("help.name")} aria-pressed={helpOpen.value} onClick={() => (helpOpen.value = !helpOpen.peek())}>
+          <Icon.question />
         </button>
         <CommunityButton settings />
         <AccountButton kind="settings" />
@@ -133,16 +135,29 @@ export function SettingsTab() {
           <span data-tip={t("settingsTab.terrainTip")}>{t("settingsTab.terrain")}</span>
         </Check>
       </div>
+      {/* T-3420: every level lit; a click draws that level's track, lines, stations and trains faint and not pickable (T-3560) while the page is open */}
+      <div class="level-show">
+        <div class="level-head">
+          <span>{t("settingsTab.showLevels")}</span>
+          {/* the space is kept while nothing is hidden, so the row below does not move */}
+          <button class="btn text mini" style={{ visibility: hiddenLevels.value.size ? undefined : "hidden" }} tabIndex={hiddenLevels.value.size ? undefined : -1}
+            aria-hidden={!hiddenLevels.value.size} onClick={showAllLevels}>{t("settingsTab.showAllLevels")}</button>
+        </div>
+        <LevelToggles hidden={hiddenLevels.value} onToggle={toggleLevel} />
+      </div>
+      <div class="checks">
+        <Check checked={!hideBuses.value} onChange={(v) => (hideBuses.value = !v)}>
+          {t("settingsTab.busesFerries")}
+        </Check>
+      </div>
+      <GameMode />
       <div class="h">{t("settingsTab.realNetwork")}</div>
       <Segmented<RealNetworkShown> options={worded(REAL_OPTIONS)} value={d.realNetwork} onChange={(v) => setDisplay("realNetwork", v)}
         tips={(v) => (v === "all" ? t("settingsTab.realAllTip") : undefined)} />
-      <div class="h">{t("settingsTab.riders")}</div>
+      {/* T-3570: small rings on real stations, the name on hover; off by default */}
       <div class="checks">
-        <Check checked={d.trainLoad} onChange={(v) => setDisplay("trainLoad", v)}>
-          {t("settingsTab.trainLoad")}
-        </Check>
-        <Check checked={d.platformCrowds !== "off"} onChange={(v) => setDisplay("platformCrowds", v ? "patch" : "off")}>
-          {t("settingsTab.platformLoad")}
+        <Check checked={d.realStations} onChange={(v) => setDisplay("realStations", v)}>
+          {t("settingsTab.realStations")}
         </Check>
       </div>
       <div class="h">{t("settingsTab.upClose")}</div>
@@ -193,6 +208,9 @@ export function SettingsTab() {
         <Check checked={d.runInBackground} onChange={(v) => setDisplay("runInBackground", v)}>
           {t("settingsTab.runInBackground")}
         </Check>
+        <Check checked={d.recalcWhilePaused} onChange={(v) => setDisplay("recalcWhilePaused", v)}>
+          {t("settingsTab.recalcWhilePaused")}
+        </Check>
         {mobileDevice() && (
           <Check checked={d.mobileIntercity} onChange={(v) => setDisplay("mobileIntercity", v)}>
             <span data-tip={t("settingsTab.mobileIntercityTip")}>{t("settingsTab.mobileIntercity")}</span>
@@ -200,7 +218,6 @@ export function SettingsTab() {
         )}
       </div>
       <MemoryRow />
-      <GameMode />
       <div class="h">{t("settingsTab.lineShapes")}</div>
       <div class="shape-grid">
         {SHAPE_MODES.map((m) => (
@@ -227,10 +244,12 @@ function MemoryRow() {
   const [used, setUsed] = useState(liveGB);
   useEffect(() => { const id = setInterval(() => setUsed(liveGB()), 2000); return () => clearInterval(id); }, []);
   if (used === null) return null;
-  const budget = budgetGB();
-  return <div class="slider" data-tip={t("settingsTab.memoryTip", { budget: gbText(budget) })}>
+  const budget = budgetGB(), kind = budgetKind();
+  // T-3494: with no device figure from the browser the total is a guess, so only the game's own use shows
+  const vars = { used: gbText(used), budget: gbText(budget) };
+  return <div class="slider" data-tip={t(kind === "cap" ? "settingsTab.memoryTipCap" : kind === "known" ? "settingsTab.memoryTip" : "settingsTab.memoryTipUnknown")}>
     <span>{t("settingsTab.memory")}</span>
-    <span class={"num" + (used > 0.85 * budget ? " memory-bad" : "")}>{t("settingsTab.memoryValue", { used: gbText(used), budget: gbText(budget) })}</span>
+    <span class={"num" + (kind !== "unknown" && used > 0.85 * budget ? " memory-bad" : "")}>{t(kind === "cap" ? "settingsTab.memoryValueCap" : kind === "unknown" ? "settingsTab.memoryValueUnknown" : "settingsTab.memoryValue", vars)}</span>
   </div>;
 }
 
@@ -271,8 +290,15 @@ function Slider({ label, min, max, step, value, tip, percent: pct, set }: { labe
 /** T-728: the game's mode; a normal game can be made a sandbox once, after a confirmation, never back. */
 function GameMode() {
   const m = moneyState.value;
-  if (!m) return null;
-  const sandbox = m.mode === "sandbox";
+  const sandbox = m?.mode === "sandbox";
+  const busOneWay = (
+    <div class="checks">
+      <Check checked={display.value.busOneWay} onChange={(v) => setDisplay("busOneWay", v)}>
+        {t("settingsTab.busOneWay")}
+      </Check>
+    </div>
+  );
+  if (!m) return <><div class="h">{t("settingsTab.game")}</div>{busOneWay}</>;
   return (
     <>
       <div class="h">{t("settingsTab.game")}</div>
@@ -290,6 +316,7 @@ function GameMode() {
           <button class="btn text" data-guide-restart onClick={() => saveGuide({ done: 0 })}>{t("settingsTab.startAgain")}</button>
         </div>
       )}
+      {busOneWay}
     </>
   );
 }
@@ -302,6 +329,7 @@ function UiScale() {
     const to = UI_SCALES[Math.max(0, Math.min(UI_SCALES.length - 1, (i < 0 ? UI_SCALES.indexOf(1) : i) + d))];
     if (to === s) return false;
     setDisplay("uiScale", to);
+    return undefined;
   };
   return (
     <>

@@ -229,7 +229,7 @@ fn markets_beside_split_by_network_and_pairs_need_track() {
     for (sel, m) in [([0f32, 0.], 0u32), ([300000., 0.], 2)] {
         let j = both.selection_flows_day(m, &sel, &[1.], 0);
         let a = parts[0].selection_flows_day(m, &sel, &[1.], 0);
-        let b = parts[1].unpack_rail(&parts[1].selection_rail_day(m, &sel, &[1.], 0));
+        let b = parts[1].unpack_rail(&parts[1].selection_rail_day(m, &sel, &[1.], &[], 0));
         assert!(j.iter().zip(a.iter().zip(&b)).all(|(j, (a, b))| (j - (a + b)).abs() <= 1e-9 * j.abs().max(1.)), "{j:?}\n{a:?}\n{b:?}");
         assert!(b.iter().any(|v| *v > 0.) == (m == 2));
     }
@@ -336,7 +336,7 @@ fn rush_days_lean_towards_touristy_zones() {
     assert_eq!((touristy(0., 1000.), touristy(3000., 1000.), touristy(30000., 1000.), touristy(1e6, 0.)), (0., 0., 1., 1.));
     assert!((touristy(3000. * 10f64.sqrt(), 1000.) - 0.5).abs() < 1e-6);
     let mut a = api();
-    let flows = |a: &IntercityApi, day: u32| a.unpack_selection(&a.selection_all_day(2, &[60000., 0.], &[1.], day, 31));
+    let flows = |a: &IntercityApi, day: u32| a.unpack_selection(&a.selection_all_day(2, &[60000., 0.], &[1.], &[], day, 31));
     let (wd0, out0) = (flows(&a, 0), flows(&a, OUT as u32));
     let m = Rc::get_mut(&mut a.m).unwrap();
     let z = m.zones.iter().position(|z| z.place == 2).unwrap();
@@ -424,7 +424,7 @@ fn expanded_markets_route_boston_and_washington_and_keep_flow_layouts() {
     solve_all(&mut a);
     let nz = a.zone_count();
     let selected = a.selection_flows(3, &[180000., 0.], &[1.]);
-    assert_eq!(selected.len(), 41 + 7 * nz + 20 + 4 * nz + 30 * nz + 2);
+    assert_eq!(selected.len(), 41 + 7 * nz + 20 + 4 * nz + 6 * E_CROSS.len() * nz + 2);
     assert_eq!(selected[0], 1.);
     assert!(selected[1 + 8 * 4 + 1] > 0., "Boston to Washington is served");
     let washington = a.selection_flows(4, &[240000., 0.], &[1.]);
@@ -469,22 +469,47 @@ fn compact_pack_accepts_metadata_and_rejects_malformed_sites() {
         assert!(IntercityApi::new(bad).is_err(), "accepted {bad}");
     }
 }
-/// T-373: rides nest with a site's walks, so a dear ride adds little and a cheap one a lot.
+/// T-373, T-3426: a site's ways to a station add up at the station choice's scale, so a dear ride
+/// adds little and a cheap one a lot.
 #[test]
 fn rides_nest_with_walks() {
     let total = |walks: &[(usize, f32)], rides: &[Ride]| {
         let mut m = BTreeMap::new();
-        add_access(&mut m, walks, rides, 0.025, 0.2, 1.);
+        add_access(&mut m, walks, rides, 0.2, 1.);
         m.values().sum::<f32>()
     };
     let walks = [(0, 20.), (1, 30.)];
     let alone = total(&walks, &[]);
-    assert!((alone - ((-0.5f32).exp() + (-0.75f32).exp()) / 2.).abs() < 1e-6);
+    assert!((alone - ((-4f32).exp() + (-6f32).exp())).abs() < 1e-6);
     let dear = total(&walks, &[(2, 60., 0., 0.)]);
     assert!(dear > alone && dear < alone * 1.01, "{alone} {dear}");
     let cheap = total(&walks, &[(2, 10., 0., 0.)]);
-    assert!(cheap > (-0.25f32).exp(), "{cheap}");
-    assert!((total(&[], &[(2, 20., 0., 0.)]) - (-0.5f32).exp()).abs() < 1e-6);
+    assert!(cheap > (-2f32).exp(), "{cheap}");
+    assert!((total(&[], &[(2, 20., 0., 0.)]) - (-4f32).exp()).abs() < 1e-6);
+}
+/// T-3426: a feeder's station within the same walk never makes rail dearer: a site 10 minutes from
+/// the inter-city station (30 minutes on to the far end) gains a metro stop 5 minutes away whose
+/// way on, with the change, takes 45.
+#[test]
+fn another_station_never_makes_rail_dearer() {
+    let inf = f32::INFINITY;
+    let sk = Skims { s: 3, n: 3, r: vec![0., inf, 30., inf, 0., 45., inf, inf, 0.], walk: vec![], walk_max: vec![], slot: vec![], next: vec![], board: vec![], order: vec![], change: vec![], entry: vec![] };
+    let p = Params::default();
+    let theta = p.band_unsoftened(p.n_bands() - 1);
+    let list = |walks: &[(usize, f32)]| {
+        let mut m = BTreeMap::new();
+        add_access(&mut m, walks, &[], theta, 1.);
+        at_beta(&mut m, p.beta, theta);
+        m.into_iter().collect::<Vec<_>>()
+    };
+    let mut terms = vec![];
+    for car in [60f32, 200., 600.] {
+        let th = p.soften(theta, car);
+        let (one, _) = rail_logsum(&sk.r, sk.s, 0., &list(&[(0, 10.)]), &[(2, 1.)], p.beta, th, &mut terms);
+        let (two, _) = rail_logsum(&sk.r, sk.s, 0., &list(&[(0, 10.), (1, 5.)]), &[(2, 1.)], p.beta, th, &mut terms);
+        assert!((one - 40.).abs() < 1e-3, "{one}");
+        assert!(two <= one && two > one - 5., "the car at {car}: {one} alone, {two} with the metro stop");
+    }
 }
 /// T-128: a pack that names its frame measures zone distances on the ground; one without keeps
 /// its plane.
@@ -737,7 +762,7 @@ fn world_market_serves_zones_in_every_frame_and_no_car_keeps_trips_fixed() {
     assert!(rail > 0.);
     // a selection in place 3: all its trips to place 0 are shown, none by rail
     let sel = a.selection_flows(3, &[0., 0.], &[1.]);
-    assert!(sel[1 + 8 * 0] > 0. && sel[2 + 8 * 0] == 0., "{:?}", &sel[..9]);
+    assert!(sel[1] > 0. && sel[2] == 0., "{:?}", &sel[..9]);
     // the far place: all of place 0's trips there, none by rail; its zones in the zone block
     let s0 = a.selection_flows(0, &[0., 0.], &[1.]);
     assert!(s0[1 + 8 * 2] > 0. && s0[2 + 8 * 2] == 0.);
@@ -852,8 +877,8 @@ fn everyday_pairs_by_purpose_in_selections_and_the_explorer() {
     let far0 = a.m.places[0].off as usize;
     for (market, end, far) in [(0usize, 0usize, far1), (1, 1, far0)] {
         let (xy, share) = sites(market);
-        let base = a.unpack_selection(&a.selection_all_day(market as u32, &xy, &share, WEEKDAY as u32, all_q));
-        let with = a.unpack_rail(&a.selection_rail_day(market as u32, &xy, &share, WEEKDAY as u32));
+        let base = a.unpack_selection(&a.selection_all_day(market as u32, &xy, &share, &[], WEEKDAY as u32, all_q));
+        let with = a.unpack_rail(&a.selection_rail_day(market as u32, &xy, &share, &[], WEEKDAY as u32));
         assert_eq!(base.len(), etail + E_CROSS.len() * 6 * ng + 2);
         for (ki, &k) in E_CROSS.iter().enumerate() {
             let o = etail + ki * 6 * ng + 6 * far + 3 * end;
@@ -891,6 +916,133 @@ fn everyday_pairs_by_purpose_in_selections_and_the_explorer() {
     let back = a.market_trip(0, WEEKDAY as u32, 1, &xy, &share, 1, 0, -1);
     let both = a.market_trip_between(0, WEEKDAY as u32, 1, -1, 1, 0, -1);
     assert!(back[19] > 0. && (back[19] - both[19]).abs() < 1e-6 * both[19]);
+}
+/// T-3500: airport trips across a zone line: a selection lists them at the home end by people and
+/// at the airport's end by the terminals selected (none without them), and `airport_legs` spreads
+/// a zone's over its points by weight, with the selection's legs and rail.
+#[test]
+fn airport_pairs_across_a_zone_line() {
+    let packs = world_packs();
+    let rows = rows_json(&packs);
+    let mut v: serde_json::Value = serde_json::from_str(&with_everyday(&packs[0], [1000., 100.], true)).unwrap();
+    v["everyday_kind"] = serde_json::json!([0, E_AIRPORT]);
+    let mut e_packs = packs.clone();
+    e_packs[0] = v.to_string();
+    let mut a = IntercityApi::new(&composition(&e_packs, Some(&rows))).unwrap();
+    world_lines(&mut a, true, true);
+    solve_all(&mut a);
+    let (all_q, day) = ((1u32 << PERIODS) - 1, WEEKDAY as u32);
+    let ki = E_CROSS.iter().position(|&k| k == E_AIRPORT).unwrap();
+    let (np, ng) = (a.m.places.len(), a.m.n_gid);
+    let etail = 1 + 8 * np + 11 * ng + 4 * np;
+    // each place's first zone (the homes in place 0, the airport in place 1) and its sites
+    let sites = |place: usize| {
+        let z = (0..a.m.zones.len()).find(|&z| a.m.zones[z].gid == a.m.places[place].off).unwrap();
+        (0..a.m.n_sites())
+            .filter(|&s| a.m.cell_zone[s] == z)
+            .map(|s| {
+                let (g, i) = a.m.site(s);
+                [g.city.x[i], g.city.y[i]]
+            })
+            .collect::<Vec<_>>()
+    };
+    let (homes, airport) = (sites(0), sites(1));
+    let flat = |s: &[[f32; 2]]| s.iter().flatten().copied().collect::<Vec<f32>>();
+    let (xy, share) = (flat(&airport), vec![1f32; airport.len()]);
+    let o = etail + ki * 6 * ng + 6 * a.m.places[0].off as usize + 3;
+    // no terminals given: none at the airport's end
+    let none = a.unpack_selection(&a.selection_all_day(1, &xy, &share, &[], day, all_q));
+    assert_eq!(none[o], 0.);
+    // every terminal selected: the 100 outings' 200 legs; half the terminals' weight: half
+    let air: Vec<f32> = airport.iter().flat_map(|s| [s[0], s[1], 1., 1.]).collect();
+    let base = a.unpack_selection(&a.selection_all_day(1, &xy, &share, &air, day, all_q));
+    let rail = a.unpack_rail(&a.selection_rail_day(1, &xy, &share, &air, day));
+    assert!((base[o] - 200.).abs() < 1e-3, "legs {}", base[o]);
+    assert!(rail[o + 1] > 0. && rail[o + 1] < base[o], "rail {}", rail[o + 1]);
+    let half: Vec<f32> = airport.iter().flat_map(|s| [s[0], s[1], 2., 1.]).collect();
+    let h = a.unpack_selection(&a.selection_all_day(1, &[], &[], &half, day, all_q));
+    assert!((h[o] - 100.).abs() < 1e-3, "half {}", h[o]);
+    // the homes' end, by people as every kind's
+    let (hxy, hshare) = (flat(&homes), vec![1f32; homes.len()]);
+    let at_home = a.unpack_selection(&a.selection_all_day(0, &hxy, &hshare, &[], day, all_q));
+    let oh = etail + ki * 6 * ng + 6 * a.m.places[1].off as usize;
+    assert!((at_home[oh] - 200.).abs() < 1e-3, "home end {}", at_home[oh]);
+    // two points of the airport's zone weighing 3 and 1, and one outside the market
+    let p = [airport[0][0], airport[0][1], airport[0][0], airport[0][1], 1e9, 1e9];
+    let w = [3., 1., 1.];
+    let legs = a.airport_legs_day(1, 1, &p, &w, day, all_q, false);
+    assert!((legs[0] - 150.).abs() < 1e-3 && (legs[3] - 50.).abs() < 1e-3, "{legs:?}");
+    assert_eq!(&legs[6..], &[0., 0., 0.]);
+    let r = a.airport_legs_day(1, 1, &p, &w, day, all_q, true);
+    assert!(r[0] == 0. && (r[1] + r[4] - rail[o + 1]).abs() < 1e-6 * rail[o + 1], "rail {} {}", r[1] + r[4], rail[o + 1]);
+    // the homes' end: every home site of the zone, evenly
+    let n = homes.len() as f32;
+    let at = a.airport_legs_day(0, 0, &hxy, &vec![1.; homes.len()], day, all_q, false);
+    assert!((at.iter().step_by(3).sum::<f64>() - 200.).abs() < 1e-3);
+    assert!((at[0] - 200. / n as f64).abs() < 1e-3);
+}
+/// T-3503: `zone_legs` over every site of a place adds up to a selection of all of them, its trips
+/// with other places at each end (longer trips, commutes, everyday outings), all modes and rail;
+/// and `everyday_place_legs` counts each outing at both its places.
+#[test]
+fn zone_legs_add_up_to_a_whole_place_selection() {
+    let packs = world_packs();
+    let rows = rows_json(&packs);
+    let mut e_packs = packs.clone();
+    e_packs[0] = with_everyday(&packs[0], [1000., 100.], true);
+    let mut a = IntercityApi::new(&composition(&e_packs, Some(&rows))).unwrap();
+    world_lines(&mut a, true, true);
+    solve_all(&mut a);
+    let (np, ng) = (a.m.places.len(), a.m.n_gid);
+    let all_q = (1u32 << PERIODS) - 1;
+    let etail = 1 + 8 * np + 11 * ng + 4 * np;
+    let every = u32::MAX;
+    for place in 0..2usize {
+        let g = a.m.groups.iter().find(|g| a.m.zones[a.m.cell_zone[g.lo]].place == place).unwrap();
+        let xy: Vec<f32> = (0..g.city.len()).flat_map(|i| [g.city.x[i], g.city.y[i]]).collect();
+        let share = vec![1f32; g.city.len()];
+        for day in [WEEKDAY as u32, crate::demand::days::OUT as u32] {
+            let all = a.unpack_selection(&a.selection_all_day(place as u32, &xy, &share, &[], day, all_q));
+            let rail = a.unpack_rail(&a.selection_rail_day(place as u32, &xy, &share, &[], day));
+            let legs = a.zone_legs_day(place as u32, &xy, day, all_q, every, false);
+            let rl = a.zone_legs_day(place as u32, &xy, day, all_q, every, true);
+            for end in 0..2 {
+                let sum = |v: &[f64], j: usize| v.chunks_exact(6).map(|c| c[3 * end + j]).sum::<f64>();
+                let (mut want, mut want_rail, mut want_walk) = (0f64, 0f64, 0f64);
+                for p in (0..np).filter(|&p| p != place) {
+                    want += all[1 + 8 * p + 4 * end];
+                    want_rail += rail[1 + 8 * p + 4 * end + 1];
+                    let o = 1 + 8 * np + 7 * ng + 4 * p + 2 * end;
+                    want += all[o];
+                    want_rail += rail[o + 1];
+                }
+                for (ki, &k) in E_CROSS.iter().enumerate() {
+                    if end == 1 && k == E_AIRPORT {
+                        continue;
+                    }
+                    for gid in (0..ng).filter(|&g| a.m.gid_place[g] as usize != place) {
+                        let o = etail + ki * 6 * ng + 6 * gid + 3 * end;
+                        want += all[o];
+                        want_rail += rail[o + 1];
+                        want_walk += all[o + 2] + rail[o + 2];
+                    }
+                }
+                let (got, got_rail, got_walk) = (sum(&legs, 0), sum(&rl, 1), sum(&legs, 2) + sum(&rl, 2));
+                let close = |x: f64, y: f64| (x - y).abs() <= 1e-6 * x.abs().max(y.abs()).max(1.);
+                assert!(want > 0., "place {place} end {end} day {day} has trips");
+                assert!(close(got, want) && close(got_rail, want_rail) && close(got_walk, want_walk), "place {place} end {end} day {day}: {got} {want}, rail {got_rail} {want_rail}, walk {got_walk} {want_walk}");
+                assert_eq!(sum(&rl, 0), 0.);
+            }
+        }
+    }
+    // only the outings: place 0's homes and place 1's activities each count them once
+    let q = 1;
+    let v = a.everyday_place_legs(q);
+    let by: HashMap<usize, Vec<f64>> = v.chunks_exact(5).map(|c| (c[0] as usize, c[1..].to_vec())).collect();
+    let s = a.part_summary(q);
+    let total: f64 = by.values().map(|c| c[0]).sum();
+    assert!((total - 2. * s[4]).abs() <= 1e-6 * s[4], "{total} {}", s[4]);
+    assert!(by.values().all(|c| c[1] <= c[0] && c[2] <= c[3] + 1e-9));
 }
 #[test]
 fn places_not_open_answer_by_place() {
@@ -1126,8 +1278,8 @@ fn market_packs_compose_and_answer_all_modes_without_a_solve() {
         solve_all(a);
     }
     let whole = direct.selection_flows(0, &[0., 0.], &[1.]);
-    let all = base.unpack_selection(&base.selection_all_day(0, &[0., 0.], &[1.], 0, 31));
-    let rail = part.unpack_rail(&part.selection_rail_day(0, &[0., 0.], &[1.], 0));
+    let all = base.unpack_selection(&base.selection_all_day(0, &[0., 0.], &[1.], &[], 0, 31));
+    let rail = part.unpack_rail(&part.selection_rail_day(0, &[0., 0.], &[1.], &[], 0));
     assert!(rail.iter().any(|v| *v > 0.));
     for i in 0..whole.len() {
         assert!((whole[i] - (all[i] + rail[i])).abs() <= 1e-9 * whole[i].abs().max(1.), "{i}: {} vs {} + {}", whole[i], all[i], rail[i]);
@@ -1294,6 +1446,9 @@ fn real_far_lines_share_rail_with_air() {
 #[test]
 fn a_streamed_pass_is_the_pass_to_the_bit() {
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
+    if !have_packs(root, &["tyo", "gnm"]) {
+        return;
+    }
     // the commutes between zones here are Tokyo's to Gunma's
     let mut api = IntercityApi::new(&real_world(root, Some(&["tyo", "gnm"]))).unwrap();
     let ll = [139.7671, 35.6812, 139.7387, 35.6285, 139.6970, 35.5313, 139.6222, 35.4660, 139.7006, 35.6896, 139.7774, 35.7138, 139.6239, 35.9064, 139.0124, 36.3221];
@@ -1357,6 +1512,9 @@ fn a_streamed_pass_is_the_pass_to_the_bit() {
 #[test]
 fn the_window_keeps_every_trip() {
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
+    if !have_packs(root, &["tyo", "gnm"]) {
+        return;
+    }
     let mut api = IntercityApi::new(&real_world(root, Some(&["tyo", "gnm"]))).unwrap();
     let ll = [139.7671, 35.6812, 139.7387, 35.6285, 139.6970, 35.5313, 139.6222, 35.4660, 139.7006, 35.6896, 139.7774, 35.7138, 139.6239, 35.9064, 139.0124, 36.3221];
     let mut times = vec![];
@@ -1390,6 +1548,9 @@ fn the_window_keeps_every_trip() {
 #[test]
 fn a_window_keeps_its_pairs_trips() {
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
+    if !have_packs(root, &["tyo", "gnm"]) {
+        return;
+    }
     let mut api = IntercityApi::new(&real_world(root, Some(&["tyo", "gnm"]))).unwrap();
     let ll = [139.7671, 35.6812, 139.7387, 35.6285, 139.6970, 35.5313, 139.6222, 35.4660, 139.7006, 35.6896, 139.7774, 35.7138, 139.6239, 35.9064, 139.0124, 36.3221];
     let mut times = vec![];
@@ -1497,6 +1658,9 @@ fn same_joins_reads_the_zones_joined() {
 #[test]
 fn fare_factors_weigh_trips_by_their_origin() {
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
+    if !have_packs(root, &["tyo", "gnm"]) {
+        return;
+    }
     let mut api = IntercityApi::new(&real_world(root, Some(&["tyo", "gnm"]))).unwrap();
     let ll = [139.7671, 35.6812, 139.7387, 35.6285, 139.6970, 35.5313, 139.6222, 35.4660, 139.7006, 35.6896, 139.7774, 35.7138, 139.6239, 35.9064, 139.0124, 36.3221];
     let mut times = vec![];
@@ -1555,6 +1719,9 @@ fn fare_factors_weigh_trips_by_their_origin() {
 #[test]
 fn the_explorer_counts_commutes_as_the_selection() {
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
+    if !have_packs(root, &["tyo", "gnm"]) {
+        return;
+    }
     let mut api = IntercityApi::new(&real_world(root, Some(&["tyo", "gnm"]))).unwrap();
     let ll = [139.7671, 35.6812, 139.7006, 35.6896, 139.7774, 35.7138, 139.6239, 35.9064, 139.0124, 36.3221];
     let mut t = vec![0f32; 6 * 5];
@@ -1635,6 +1802,17 @@ fn t761_market_bench() {
 }
 /// The world composition as the app opens it: the market rows of the registry's zones (T-776:
 /// market-rows.json, in registry order) and the packs of `ids` (all that exist with None).
+/// The tests that read real places' packs return early when a pack is missing: `data/packs` is not in
+/// the open-source copy.
+pub(crate) fn have_packs(root: &str, ids: &[&str]) -> bool {
+    match ids.iter().find(|id| !std::path::Path::new(&format!("{root}/data/packs/{id}.market.json")).exists()) {
+        Some(id) => {
+            eprintln!("skipping: data/packs/{id}.market.json is missing (packs are not in the open-source copy)");
+            false
+        }
+        None => true,
+    }
+}
 pub(crate) fn real_world(root: &str, ids: Option<&[&str]>) -> String {
     // T-780: a copy of the registry and rows (`TW_REGISTRY`, `TW_ROWS`) while a batch is adding zones
     let reg = std::env::var("TW_REGISTRY").unwrap_or(format!("{root}/app/src/game/registry.json"));
@@ -1705,6 +1883,9 @@ pub(crate) fn t780_net_with(path: &str, chunk: f64, before: impl FnOnce(&mut Int
 #[test]
 fn eachway_with_its_curves_is_eachway() {
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
+    if !have_packs(root, &["tyo", "gnm"]) {
+        return;
+    }
     let api = IntercityApi::new(&real_world(root, Some(&["tyo", "gnm"]))).unwrap();
     let m = &api.m;
     for a in m.zones.iter().step_by(7) {
@@ -1719,6 +1900,9 @@ fn eachway_with_its_curves_is_eachway() {
 #[test]
 fn sampled_pairs_keep_each_zones_trips_with_each_place() {
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
+    if !have_packs(root, &["tyo", "gnm"]) {
+        return;
+    }
     let api = IntercityApi::new(&real_world(root, Some(&["tyo", "gnm"]))).unwrap();
     let m = &api.m;
     let served: Vec<usize> = (0..m.zones.len()).collect();
@@ -1760,6 +1944,9 @@ fn sampled_pairs_keep_each_zones_trips_with_each_place() {
 #[test]
 fn far_chunk_pairs_keep_each_place_pairs_trips() {
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
+    if !have_packs(root, &["tyo", "gnm", "osa"]) {
+        return;
+    }
     let api = IntercityApi::new(&real_world(root, Some(&["tyo", "gnm", "osa"]))).unwrap();
     let m = &api.m;
     let served: Vec<usize> = (0..m.zones.len()).collect();
@@ -1774,18 +1961,15 @@ fn far_chunk_pairs_keep_each_place_pairs_trips() {
     // per zone and later place, and per place pair: exact trips, chunked, far-chunked
     let mut zp: HashMap<(usize, usize), (f64, f64)> = HashMap::new();
     let mut pp: HashMap<(usize, usize), (f64, f64)> = HashMap::new();
-    let (mut bit, mut k0, mut kc, mut k1) = (0, 0, 0, 0);
+    let (mut bit, mut k0, mut k1) = (0, 0, 0);
     let mut far_seen = 0;
     let mut kind: HashMap<(usize, usize), bool> = HashMap::new();
     for i in 0..n {
         for k in i + 1..n {
-            let (on0, onc, on1) = (any0[bit / 64] >> (bit % 64) & 1 == 1, anyc[bit / 64] >> (bit % 64) & 1 == 1, any[bit / 64] >> (bit % 64) & 1 == 1);
+            let (on0, _onc, on1) = (any0[bit / 64] >> (bit % 64) & 1 == 1, anyc[bit / 64] >> (bit % 64) & 1 == 1, any[bit / 64] >> (bit % 64) & 1 == 1);
             bit += 1;
             let (za, zb) = (&m.zones[i], &m.zones[k]);
             let t0 = if on0 { k0 += 1; each0[k0 - 1] } else { 0. };
-            if onc {
-                kc += 1;
-            }
             let t1 = if on1 { k1 += 1; each[k1 - 1] } else { 0. };
             assert!(!on1 || on0, "a far-chunk pair that is not a pair");
             if !on0 {
@@ -1858,6 +2042,9 @@ fn t2641_dump() {
 #[test]
 fn sampled_selection_rail_stays_within_trips() {
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
+    if !have_packs(root, &["tyo", "gnm"]) {
+        return;
+    }
     let mut api = IntercityApi::new(&real_world(root, Some(&["tyo", "gnm"]))).unwrap();
     api.set_chunk(1.);
     // the streamed pass's two lines across Tokyo, changing at Tokyo station
@@ -2014,8 +2201,8 @@ fn t1204_signature() {
             }
             let p = zz.place as u32;
             sig.push((format!("selection_flows_day z{z} {day}"), f64s(&a.selection_flows_day(p, &xy, &share, day))));
-            sig.push((format!("selection_all_day z{z} {day}"), f64s(&a.unpack_selection(&a.selection_all_day(p, &xy, &share, day, 31)))));
-            sig.push((format!("selection_rail_day z{z} {day}"), f64s(&a.unpack_rail(&a.selection_rail_day(p, &xy, &share, day)))));
+            sig.push((format!("selection_all_day z{z} {day}"), f64s(&a.unpack_selection(&a.selection_all_day(p, &xy, &share, &[], day, 31)))));
+            sig.push((format!("selection_rail_day z{z} {day}"), f64s(&a.unpack_rail(&a.selection_rail_day(p, &xy, &share, &[], day)))));
         }
     }
     let pt = a.place_trips(&[(0, 1), (100, 200), (5, 5)], 30.);
@@ -2495,7 +2682,7 @@ fn t2878_ab() {
     let window = |a: &mut IntercityApi| {
         a.set_window(&now, &part.zones_at(&was), 180., share, floor);
     };
-    let mut sub = |shared: bool| -> (IntercityApi, f64) {
+    let sub = |shared: bool| -> (IntercityApi, f64) {
         let mut s = part.beside();
         s.set_chunk(MARKET_CHUNK);
         window(&mut s);

@@ -2,7 +2,7 @@
 //! Coarse destination gravity is integrated by deterministic stratified cell samples. Endpoint
 //! distances, the 150 m exclusion, walking and regional overlap use the actual sampled cells.
 use super::{
-    api::{fare_extra_usd, put_fares, scale_triples, DemandApi, PEAK_HOUR_FACTOR},
+    api::{fare_extra_usd, fare_x_usd, put_fares, scale_triples, DemandApi, PEAK_HOUR_FACTOR},
     clock::now_ms,
     days::{day_rate, everyday, load_factor, share_out, share_ret, SATURDAY, SUNDAY, WEEKDAY},
     kernel::*,
@@ -542,15 +542,17 @@ struct LaneLoads {
     pax_min: [f64; LANES],
     /// `Loads::rn_fare_x` of every purpose together
     rn_fare_x: Vec<f32>,
+    /// `Loads::rn_base_x` of every purpose together
+    rn_base_x: Vec<f32>,
 }
 
 impl LaneLoads {
     fn zero(s: usize, nr: usize) -> LaneLoads {
-        LaneLoads { seg: vec![ZERO; nr], board: vec![ZERO; s], alight: vec![ZERO; s], rn_board: vec![ZERO; nr], rn_alight: vec![ZERO; nr], entry: vec![ZERO; s], exit: vec![ZERO; s], pax_min: [0.0; LANES], rn_fare_x: vec![0.0; nr] }
+        LaneLoads { seg: vec![ZERO; nr], board: vec![ZERO; s], alight: vec![ZERO; s], rn_board: vec![ZERO; nr], rn_alight: vec![ZERO; nr], entry: vec![ZERO; s], exit: vec![ZERO; s], pax_min: [0.0; LANES], rn_fare_x: vec![0.0; nr], rn_base_x: vec![0.0; nr] }
     }
     fn lane(&self, k: usize) -> Loads {
         let f = |v: &[Lanes]| v.iter().map(|x| x[k]).collect();
-        Loads { seg: f(&self.seg), board: f(&self.board), alight: f(&self.alight), rn_board: f(&self.rn_board), rn_alight: f(&self.rn_alight), entry: f(&self.entry), exit: f(&self.exit), pax_min: self.pax_min[k], rn_fare_x: vec![0.0; self.seg.len()] }
+        Loads { seg: f(&self.seg), board: f(&self.board), alight: f(&self.alight), rn_board: f(&self.rn_board), rn_alight: f(&self.rn_alight), entry: f(&self.entry), exit: f(&self.exit), pax_min: self.pax_min[k], rn_fare_x: vec![0.0; self.seg.len()], rn_base_x: vec![0.0; self.seg.len()] }
     }
 }
 
@@ -587,7 +589,10 @@ fn assign_lanes(g: &Graph, sk: &Skims, cols: &Columns, ix: &XferIndex, xfer: &mu
     let mut dep: Vec<(u32, f32)> = vec![];
     let mut km: Vec<f32> = vec![];
     let mut fxq: Vec<f32> = vec![];
+    let mut mb: Vec<f32> = vec![];
     let bent = !g.fare_curve.is_line();
+    // T-3578
+    let based = !g.rn_base_mul.is_empty();
     let used: Vec<(usize, &[u32])> = cols.off.iter().enumerate().filter(|(_, o)| !o.is_empty()).map(|(k, o)| (k, &o[..])).collect();
     for dst in 0..s {
         let mut total = ZERO;
@@ -608,10 +613,16 @@ fn assign_lanes(g: &Graph, sk: &Skims, cols: &Columns, ix: &XferIndex, xfer: &mu
                 head.fill(NONE);
                 rec.clear();
             }
-            if bent {
+            if bent || based {
                 let st = sk.strategy(slot);
                 trip_km(g, st, dst, &mut km, &mut dep);
-                board_extra(g, st, dst, |src| flow[src].iter().sum(), &km, &mut dep, &mut fxq, &mut l.rn_fare_x);
+                if bent {
+                    board_extra(g, st, dst, |src| flow[src].iter().sum(), &km, &mut dep, &mut fxq, &mut l.rn_fare_x);
+                }
+                if based {
+                    trip_base_mul(g, st, dst, &mut mb, &mut dep);
+                    board_base(g, st, dst, |src| flow[src].iter().sum(), &km, &mb, &mut dep, &mut fxq, &mut l.rn_base_x);
+                }
             }
             let mut w = LaneWalk { g, s, n, dst, bits: &sk.board[slot][..], cn: &sk.change[slot], flow: &mut flow, l: &mut l, head: &mut head, rec: &mut rec, use_k: &mut use_k, dep: &mut dep, xfer: if counting { Some((ix, &mut *xfer)) } else { None } };
             match (&sk.next[slot], &sk.order[slot]) {
@@ -1632,6 +1643,7 @@ impl EverydayApi {
                 add_loads(&mut total, l);
             }
             total.rn_fare_x = lanes.rn_fare_x;
+            total.rn_base_x = lanes.rn_base_x;
             (total, parts.iter().map(Part::of).collect::<Vec<_>>())
         });
         (probability, loads, parts, xfer, walk_lost, rail_d, unr_lost)
@@ -1666,6 +1678,37 @@ impl EverydayApi {
             rail += r;
         }
         (trips, rail, if part.1 > 1 { walk } else { walk.max(0.0) })
+    }
+}
+
+/// T-2496: heap bytes by structure (`demand::mem`).
+impl EverydayApi {
+    pub(crate) fn mem_into(&self, r: &mut super::mem::Report, at: &str) {
+        use super::mem::{self, vb};
+        self.engine.mem_into(r, &format!("{at}engine: "), false);
+        r.add(format!("{at}samples: destinations"), vb(&self.destinations));
+        r.add(format!("{at}samples: pairs (Pair)"), vb(&self.pairs));
+        r.add(format!("{at}samples: edge_pair"), vb(&self.edge_pair));
+        r.add(format!("{at}samples: live, first, norm, kept"), [&self.live, &self.first].iter().map(|v| vb(*v) + v.iter().map(vb).sum::<usize>()).sum::<usize>() + vb(&self.norm) + self.norm.iter().map(vb).sum::<usize>() + vb(&self.kept) + self.kept.iter().map(vb).sum::<usize>());
+        r.add(format!("{at}per cell and zone (sz_part, airports, attractions, enrollment)"), vb(&self.sz_part) + vb(&self.wplace) + vb(&self.wpark) + vb(&self.school_enrollment) + vb(&self.university_enrollment) + vb(&self.airport_origin) + vb(&self.airport_scale) + vb(&self.attraction_origin) + vb(&self.attraction_scale) + vb(&self.attractions));
+        let (mut net, mut g, mut l, mut parts, mut rest) = (0, 0, 0, 0, 0);
+        for p in self.per.iter().flatten() {
+            net += mem::network(&p.net);
+            g += mem::graph(&p.g);
+            l += mem::loads(&p.loads);
+            parts += vb(&p.parts) + p.parts.iter().map(|x| vb(&x.seg) + vb(&x.rn_board) + vb(&x.rn_alight)).sum::<usize>();
+            rest += vb(&p.probability) + vb(&p.fac) + vb(&p.seen) + vb(&p.walk_lost) + vb(&p.unr_lost) + mem::xfer(&p.xi) + vb(&p.xfer);
+        }
+        r.add(format!("{at}periods: network copies"), net);
+        r.add(format!("{at}periods: graphs"), g);
+        r.add(format!("{at}periods: loads"), l);
+        r.add(format!("{at}periods: loads by purpose (parts)"), parts);
+        r.add(format!("{at}periods: probability, crowding, transfers"), rest);
+    }
+    pub fn mem_report(&self) -> String {
+        let mut r = super::mem::Report::default();
+        self.mem_into(&mut r, "");
+        r.text()
     }
 }
 
@@ -2001,6 +2044,10 @@ impl EverydayApi {
     pub fn set_bus(&mut self, catch_n: &[u32], catch_xy: &[f32]) {
         self.engine.set_bus(catch_n, catch_xy);
     }
+    /// `DemandApi::set_back_stops` (T-3348).
+    pub fn set_back_stops(&mut self, back: &[u32]) {
+        self.engine.set_back_stops(back);
+    }
     pub fn set_network(
         &mut self,
         xy: &[f32],
@@ -2059,6 +2106,14 @@ impl EverydayApi {
         }
         Ok(())
     }
+    /// T-3578: `DemandApi::set_base_mul`.
+    pub fn set_base_mul(&mut self, mul: &[f32]) -> Result<(), String> {
+        self.engine.set_base_mul(mul)?;
+        if self.engine.same == 0 {
+            self.per.iter_mut().for_each(|v| *v = None);
+        }
+        Ok(())
+    }
     /// T-2196: which lines are ferries, a byte a line in `set_network`'s order (1 a ferry), after
     /// it; empty with none. Their fans ride them (`FAN_SHARE`).
     pub fn set_ferry(&mut self, lines: &[u8]) -> Result<(), String> {
@@ -2073,10 +2128,12 @@ impl EverydayApi {
         }
         Ok(())
     }
-    /// T-1277: `DemandApi::set_fare_weight`.
+    /// T-1277: `DemandApi::set_fare_weight`. T-3512: it comes before `set_network`, so the engine's
+    /// `same` is still the last network's mask here; only a new weight drops the periods.
     pub fn set_fare_weight(&mut self, w: f32) -> Result<(), String> {
+        let was = self.engine.base.fare_w.to_bits();
         self.engine.set_fare_weight(w)?;
-        if self.engine.same == 0 {
+        if self.engine.base.fare_w.to_bits() != was {
             self.per.iter_mut().for_each(|v| *v = None);
         }
         Ok(())
@@ -2114,7 +2171,7 @@ impl EverydayApi {
         };
         let net = DemandApi::period_net(svc, q);
         let mut g = build_graph(&net, &p);
-        put_fares(&mut g, &self.engine.fare_curve, &self.engine.fare_km, &self.engine.fare_mul, self.engine.base.fare_min, self.engine.fare_per_km, self.engine.base.fare_w);
+        put_fares(&mut g, &self.engine.fare_curve, &self.engine.fare_km, &self.engine.fare_mul, &self.engine.base_mul, self.engine.base.fare_min, self.engine.fare_per_km, self.engine.base.fare_w);
         let fac = vec![1.0; g.rn_ride.len()];
         set_crowding(&mut g, &fac);
         let xi = xfer_index(&g);
@@ -2172,7 +2229,7 @@ impl EverydayApi {
         if g.rn_ride.len() != src.g.rn_ride.len() || g.n != src.g.n {
             return false;
         }
-        put_fares(&mut g, &self.engine.fare_curve, &self.engine.fare_km, &self.engine.fare_mul, self.engine.base.fare_min, self.engine.fare_per_km, self.engine.base.fare_w);
+        put_fares(&mut g, &self.engine.fare_curve, &self.engine.fare_km, &self.engine.fare_mul, &self.engine.base_mul, self.engine.base.fare_min, self.engine.fare_per_km, self.engine.base.fare_w);
         let fac = vec![1.0; g.rn_ride.len()];
         set_crowding(&mut g, &fac);
         let xi = xfer_index(&g);
@@ -2252,6 +2309,7 @@ impl EverydayApi {
             msa(&mut st.loads.entry, &loads.entry, st.round);
             msa(&mut st.loads.exit, &loads.exit, st.round);
             msa(&mut st.loads.rn_fare_x, &loads.rn_fare_x, st.round);
+            msa(&mut st.loads.rn_base_x, &loads.rn_base_x, st.round);
             // the same averaging, so the purposes still add up to the total
             for (old, new) in st.parts.iter_mut().zip(&parts) {
                 msa(&mut old.seg, &new.seg, st.round);
@@ -2402,6 +2460,10 @@ impl EverydayApi {
             .and_then(|v| v.as_ref())
             .map_or(vec![], |s| s.loads.rn_alight.clone())
     }
+    /// As `DemandApi::base_extra`.
+    pub fn base_extra(&self, q: usize) -> Vec<f32> {
+        self.per.get(q).and_then(|v| v.as_ref()).map_or(vec![], |s| fare_x_usd(&s.loads.rn_base_x, s.p.fare_w))
+    }
     /// As `DemandApi::fare_extra`.
     pub fn fare_extra(&self, q: usize) -> Vec<f32> {
         self.per.get(q).and_then(|v| v.as_ref()).map_or(vec![], |s| fare_extra_usd(&s.loads.rn_fare_x, &s.p, &s.g, &s.xi, &s.xfer))
@@ -2528,6 +2590,29 @@ impl EverydayApi {
                         out[(4 * x + 2) * N_LEN + b] += f[k] * (lead * self.lens[o + n2 + i] - wl[k * n2 + i]);
                         out[(4 * x + 3) * N_LEN + b] += f[k] * (lead * self.lens[o + 2 * n2 + i] - ul[k * n2 + i]);
                     }
+                }
+            }
+        }
+        out
+    }
+    /// T-2790: `trip_lengths_day`'s trips block kept per purpose: one block of `N_LEN` per purpose,
+    /// in `RATE`'s order, adding up to that block bin by bin. Read off the sums made once per zone,
+    /// so it costs the same in any zone.
+    pub fn trip_lengths_kinds_day(&self, day: u32, mask: u32) -> Vec<f64> {
+        let nk = self.totals.len();
+        let mut out = vec![0f64; nk * N_LEN];
+        for q in 0..PERIODS {
+            if mask >> q & 1 == 0 {
+                continue;
+            }
+            let Some(st) = self.per.get(q).and_then(|v| v.as_ref()) else { continue };
+            if st.part.0 != 0 {
+                continue;
+            }
+            for k in 0..nk {
+                let w = load_factor(day as usize, everyday(k), q) as f64 * (OUTWARD[k][q] + RETURN[k][q]) as f64;
+                for b in 0..N_LEN {
+                    out[k * N_LEN + b] += w * self.lens[k * 6 * N_LEN + b];
                 }
             }
         }

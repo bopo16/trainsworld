@@ -195,6 +195,16 @@ svg .stroke2 { stroke-width: 2; }
   max-height: calc(100% - 48px); overflow-y: auto; padding: 4px 14px 12px; background: var(--bg);
   border: 1px solid var(--rule); box-shadow: 0 2px 8px rgb(0 0 0 / 18%); }
 .help-panel h3 { font-size: inherit; margin: 10px 0 4px; }
+/* T-3527: the common questions above the controls, one answer open at a time, ruled off from the controls */
+.help-qs { list-style: none; margin: 8px 0 0; padding: 0 0 8px; border-bottom: 1px solid var(--rule); }
+.help-q { display: flex; align-items: center; gap: 4px; width: 100%; min-height: 24px; padding: 0; border: 0; background: none;
+  color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.help-q:focus-visible { color: var(--accent); }
+@media (hover: hover) { .help-q:hover { color: var(--accent); } }
+.help-q svg { width: 12px; height: 12px; flex: none; }
+.help-q.open svg { transform: rotate(90deg); }
+.help-a { margin: 0 0 6px 16px; }
+.help-ctl { color: var(--accent); }
 /* T-2603: the timetable chart (MareyChart.tsx), over the map beside the dock's foot */
 .marey { position: absolute; bottom: 10px; left: calc(100% + 10px); z-index: 20; padding: 6px 10px 4px; background: var(--bg);
   border: 1px solid var(--rule); box-shadow: 0 2px 8px rgb(0 0 0 / 18%); max-width: calc(100vw - var(--dock-w) - 24px); overflow-x: auto; }
@@ -221,6 +231,11 @@ svg .stroke2 { stroke-width: 2; }
 /* T-2660: other lines' trains, quieter than the line's own; flat junctions and crossings as dashed rules */
 .marey-chart .run.other { stroke-width: 1; stroke-opacity: 0.55; }
 .marey-chart .run.other.on { stroke-width: 2.4; stroke-opacity: 1; }
+/* T-3475: under a timetable, the way it doesn't show dimmed behind, and the rest faded while a train is hovered */
+.marey-chart .run.back { stroke-width: 1.2; stroke-opacity: 0.3; }
+.marey-chart .run.other.back { stroke-width: 1; stroke-opacity: 0.2; }
+.marey-layer { will-change: opacity; }
+.marey-chart.hot .marey-layer { opacity: 0.35; }
 .marey-pass { --run-ink: var(--run); fill: var(--run-ink); stroke: var(--bg); stroke-width: 1; }
 :root[data-shade="dark"] .marey-pass { --run-ink: color-mix(in srgb, var(--run) 65%, #fff); }
 .marey-flat { stroke: var(--text); stroke-opacity: 0.4; stroke-dasharray: 4 3; }
@@ -230,14 +245,14 @@ svg .stroke2 { stroke-width: 2; }
 .marey-past { fill: var(--bg); fill-opacity: 0.5; stroke: none; pointer-events: none; }
 .marey-now { stroke: var(--accent); stroke-width: 1.5; }
 /* T-3346: the schedule panel (SchedulePanel.tsx), centred like Community */
-.saves-panel.sched-panel { width: min(1040px, calc(100vw - 40px)); }
+.saves-panel.sched-panel { width: min(1320px, calc(100vw - 40px)); }
 .saves-head.sp-title h2 { display: flex; align-items: center; gap: 8px; flex: none; min-width: 0; }
 .sp-title .sp-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sp-title .sp-word { color: var(--muted); font-weight: 400; font-size: 14px; }
 .sp-title .sp-mode { margin-left: 14px; }
 .sp-title .sp-close { margin-left: auto; }
-.sp-body { display: flex; gap: 32px; align-items: flex-start; }
-.sp-left { flex: 0 0 300px; min-width: 0; }
+.sp-body { display: flex; gap: 28px; align-items: flex-start; }
+.sp-left { flex: 0 0 270px; min-width: 0; }
 .sp-left .h:first-child { margin-top: 6px; }
 .sp-left .h.set-by { font-weight: 400; color: var(--muted); align-items: center; }
 .sp-left .h.set-by .right { margin-left: 12px; color: var(--text); }
@@ -247,15 +262,16 @@ svg .stroke2 { stroke-width: 2; }
 .sp-tabs .sp-others.on { background: var(--tint); color: var(--text); }
 .sp-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; min-width: 0; }
 .sp-tools select { max-width: 100%; min-width: 0; text-overflow: ellipsis; }
-/* the departures board: hour rows, each direction's minutes in its own column */
-.sp-view { display: flex; flex-direction: column; }
-.sp-board { flex: 1; min-height: 0; overflow-y: auto; font-variant-numeric: tabular-nums; }
-.sp-row { display: grid; grid-template-columns: 34px repeat(var(--runs), minmax(0, 1fr)); column-gap: 12px; min-height: 24px; align-items: center; }
+/* the departures board, under the schedule: hour rows, each direction's minutes in its own column */
+.sp-tools .sp-board-h { margin: 0; flex: none; }
+.sp-left .sp-tools { margin-top: 16px; }
+.sp-board { max-height: 340px; overflow-y: auto; font-size: 11px; font-variant-numeric: tabular-nums; border-top: 1px solid var(--rule); }
+.sp-row { display: grid; grid-template-columns: 26px repeat(var(--runs), minmax(0, 1fr)); column-gap: 8px; min-height: 17px; align-items: center; border-bottom: 1px solid var(--shade); }
 .sp-row.sp-heads { position: sticky; top: 0; z-index: 1; background: var(--bg); border-bottom: 1px solid var(--rule); }
-.sp-dir { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-dir { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sp-hour { align-self: stretch; display: grid; place-items: center; font-weight: 700; background: color-mix(in srgb, var(--text) 6%, var(--bg)); }
 .sp-heads .sp-hour { background: none; }
-.sp-mins { display: flex; flex-wrap: wrap; column-gap: 10px; padding: 2px 0; }
+.sp-mins { display: flex; flex-wrap: wrap; column-gap: 6px; padding: 1px 0; }
 .sp-row.now { background: var(--tint); }
 .sp-row.now .sp-hour { background: color-mix(in srgb, var(--accent) 22%, var(--bg)); }
 @media (max-width: 720px) {
@@ -263,6 +279,30 @@ svg .stroke2 { stroke-width: 2; }
   .sp-left { flex: none; width: 100%; }
   .sp-right { width: 100%; }
 }
+/* T-3469: the timetable (TrainTable.tsx), as a printed one: a column per train, small type */
+.tt-scroll { overflow: auto; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); font-size: 10px; line-height: 1; font-variant-numeric: tabular-nums; }
+.tt-inner { position: relative; }
+.tt-head { position: sticky; top: 0; z-index: 3; background: var(--bg); border-bottom: 1px solid var(--rule); }
+.tt-corner { position: sticky; left: 0; z-index: 2; height: 100%; background: var(--bg); }
+.tt-hour { position: absolute; top: 2px; padding-left: 3px; color: var(--muted); border-left: 1px solid var(--shade); line-height: 10px; white-space: nowrap; }
+.tt-hour.full { color: var(--text); font-weight: 700; border-left-color: var(--rule); }
+.tt-bullet { position: absolute; display: flex; justify-content: center; }
+.tt-strip { display: block; width: 15px; padding: 2px 0; border-radius: 3px; background: var(--c); color: var(--ct); font-size: 10px; font-weight: 700; line-height: 11px; text-align: center; }
+.tt-strip span { display: block; }
+.tt-body { position: relative; background-image: repeating-linear-gradient(to bottom, transparent 0 calc(5 * var(--row) - 1px), var(--rule) calc(5 * var(--row) - 1px) calc(5 * var(--row))); }
+.tt-names { position: sticky; left: 0; z-index: 2; background: var(--bg); background-image: inherit; }
+.tt-names span { display: block; height: var(--row); line-height: var(--row); padding-right: 8px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-hour-rule { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--shade); }
+.tt-hour-rule.full { border-left-color: var(--rule); }
+.tt-col { position: absolute; top: 0; color: color-mix(in srgb, var(--ink) 78%, var(--text)); border-left: 1px solid var(--shade); }
+.tt-col span { display: block; height: var(--row); line-height: var(--row); text-align: center; }
+.tt-col .pass { color: var(--muted); }
+.tt-col.past { opacity: 0.5; }
+.tt-now { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--accent); }
+.tt-veil { position: absolute; inset: 0; z-index: 1; background: var(--bg); opacity: 0.65; pointer-events: none; }
+.tt-col.on, .tt-bullet.on { z-index: 1; pointer-events: none; }
+.tt-col.on { background: var(--shade); opacity: 1; }
+.tt-chart { margin-top: 6px; }
 .help-panel dl { display: grid; grid-template-columns: 170px 1fr; gap: 3px 12px; margin: 0; }
 .help-panel dt { color: var(--muted); }
 .help-panel dd { margin: 0; }
@@ -370,6 +410,25 @@ body.resizing, body.resizing * { user-select: none; }
 .lines-box .rows.dragging > li { cursor: grabbing; }
 .lines-box .rows > li.drop-on { box-shadow: inset 0 0 0 2px var(--accent); }
 .lines-box .rows > li.dragged { opacity: 0.5; }
+/* T-3420: the lines hidden on the map, their bullet and name faded; in hide mode a box per row, the Settings
+   checkbox at a smaller size, ticked while the row's lines are drawn (a group's half lit while some are) */
+.list-vis { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.lines-box .rows > li.hidden-line > :is(.chip, .group-pill, .line-name) { opacity: 0.4; }
+.lines-box .vis-check { appearance: none; width: calc(12 * var(--px)); height: calc(12 * var(--px)); margin: 0; flex: none; cursor: pointer;
+  border: 1px solid var(--rule); background: var(--bg); }
+/* (the inner box as an inset ring, which stays square at any row position, where a centred ::after blurred) */
+.lines-box .vis-check:checked { border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 calc(2 * var(--px)) var(--tint); }
+.lines-box .vis-check.some { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 40%, var(--tint)); box-shadow: inset 0 0 0 calc(2 * var(--px)) var(--tint); }
+.lines-box .rows > li:has(> .vis-check) { min-height: 24px; }
+.lines-box.vis-on .rows > li.in-group { padding-left: 6px; }
+.lines-box.vis-on .rows > li.in-group > .vis-check { margin-right: 16px; }
+.lines-box.vis-on .sort-head > .sort-btn:first-child { padding-left: calc(11 * var(--px) + 8px); }
+/* T-3420: Settings' Show levels, the label over the level buttons */
+:is(:root, :root[data-shade="dark"]) .level-toggles .btn.lv.on { border-color: color-mix(in srgb, var(--lc) 60%, var(--bg)); box-shadow: none; }
+.level-head { display: flex; align-items: center; gap: 10px; height: 24px; }
+.level-head .btn.text.mini { height: 22px; padding: 0 7px; font-size: 12px; }
+.level-show + .checks { margin-top: 8px; }
+.level-show { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 4px; }
 .row-ghost { position: fixed; z-index: 50; pointer-events: none; display: flex; align-items: center; gap: 6px; padding: 3px 8px;
   background: var(--bg); border: 1px solid var(--rule); border-radius: 4px; box-shadow: 0 2px 8px rgb(0 0 0 / 0.25); }
 /* T-1791 stage 2: the group view */
@@ -482,6 +541,9 @@ body.resizing, body.resizing * { user-select: none; }
 .pane-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 8px; }
 /* T-1134: an inspector's buttons, in a row under its header */
 .inspector-actions { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; margin: 8px 0; gap: 6px 8px; }
+/* T-3408: a built piece's rebuild choices, then the hint pointing to the Select tool */
+.piece-rebuild { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 8px 0; }
+.piece-rebuild-hint { margin: -2px 0 12px; }
 
 /* a hairline slider (the settings pane's) */
 .slider { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
@@ -536,6 +598,9 @@ body.resizing, body.resizing * { user-select: none; }
 .shape-icon path { stroke: var(--c, currentColor); stroke-linejoin: round; }
 .group.shapes .btn { display: grid; place-items: center; min-width: 32px; }
 .chip > svg text { fill: currentColor; }
+/* T-3436: the outline bullet is a ring in the line's colour with its letter in it */
+.chip > svg rect.ring, .shape-icon rect.ring { fill: none; stroke: var(--c, currentColor); }
+.chip.ring > svg text { fill: var(--c); }
 /* T-1792: a line with no trains at its level now */
 .chip.idle { opacity: 0.7; filter: grayscale(0.3); }
 .chip.link { cursor: pointer; }
@@ -590,7 +655,9 @@ body.resizing, body.resizing * { user-select: none; }
 /* T-1812: the panel's title row stays at the top of the scrolled panel; it covers the panel's padding
    (12 px above, 14 px at the sides) and gives back the 6 px it takes below, so nothing moves */
 #inspector > .title:first-child { position: sticky; top: -12px; z-index: 3; background: var(--bg); margin: -12px -14px -6px; padding: 12px 14px 6px; }
-.title .name { font-size: 18px; font-weight: 700; flex: 1; min-width: 0; }
+.title .name { font-size: 18px; font-weight: 700; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* T-3416: a very long group name makes a long bullet; it shrinks (ellipsis) so the buttons stay in the panel */
+.title > .badge-edit:has(.group-pill) { flex: 0 1 auto; min-width: 0; max-width: 96px; }
 .name-edit { flex: 1; min-width: 0; font: inherit; font-size: 18px; font-weight: 700; color: var(--text);
              background: var(--bg); border: 1px solid var(--accent); border-radius: 0; padding: 0 4px; height: 30px; }
 .sub { margin: 2px 0 0 40px; }
@@ -608,6 +675,20 @@ table.sched th:first-child, table.sched td:first-child { text-align: left; }
 table.sched td { text-align: right; padding: 2px 0; }
 table.sched + .rows { margin-top: 4px; }
 table.sched tr.now td:first-child { font-weight: 700; }
+/* T-3521: the schedule panel's Weekdays and Weekends sections: a heading row each, parted by the room
+   above it, not a rule (docs/ui-panels.md "Look"); the Weekends row carries its percent and button */
+table.sched tr.sched-day th { text-align: left; padding: 12px 0 2px; color: var(--text); font-weight: 700; }
+table.sched tr.sched-day:nth-child(2) th { padding-top: 4px; }
+table.sched .sched-day-row { display: flex; align-items: center; gap: 8px; }
+table.sched .sched-day-row .btn.text { margin-left: auto; font-weight: 400; }
+table.sched .sched-day-row .stepper { font-weight: 400; }
+/* T-3543: the headways new lines start with, under the schedule panel's table */
+.sched-default { margin-top: 16px; font-size: 12px; }
+.sched-default .btn.text.mini { font-size: inherit; }
+/* small-text buttons in the schedule window sit 1px tighter on every side (Anita, 2026-11-17) */
+table.sched .btn.text.mini, .sched-default .btn.text.mini { height: 26px; padding: 0 7px; }
+.sched-default-head { font-weight: 700; }
+.sched-default-btns { display: flex; gap: 8px; margin-top: 6px; }
 /* T-692: every cell one line; the demand column takes what the others leave and is cut with an ellipsis */
 table.sched th, table.sched td { white-space: nowrap; }
 table.sched th:not(:first-child), table.sched td:not(:first-child) { padding-left: 10px; }
@@ -671,8 +752,8 @@ table.ledger tr.b td { font-weight: 700; }
 :root[data-shade="dark"] { --revenue: #6aa2ea; --expense: #ec7b7b; }
 .hist-title { display: flex; align-items: baseline; margin: 8px 0 2px; }
 .hist-title .right { margin-left: auto; }
-.hist-title .hist-fares { color: var(--revenue); }
-.hist-title .hist-costs { color: var(--expense); }
+span.hist-fares { color: var(--revenue); }
+span.hist-costs { color: var(--expense); }
 rect.hist-oneoff, path.hist-oneoff { fill: color-mix(in srgb, var(--expense) 28%, var(--bg)); stroke: none; }
 path.hist-oneoff.cap { fill: var(--expense); }
 svg.hist { width: 100%; height: auto; stroke-width: 1.5; }
@@ -808,9 +889,15 @@ rect.now { fill-opacity: .45; }
 .bus-stops li.street .bs-mk { width: 7px; height: 7px; margin: 0 2.5px; border-width: 1.5px; border-color: var(--c); }
 .bus-stops .stop-more { flex: none; width: 10px; font-size: 12px; text-align: center; color: var(--muted); }
 /* T-1293: the schedule's copy and paste, small and muted beside the heading */
-.h .sched-copy { display: inline-flex; align-self: center; margin-left: 6px; font-weight: 400; }
+.h .sched-copy { display: inline-flex; align-items: center; align-self: center; margin: -2px 0 -2px 6px; font-weight: 400; }
 .sched-copy .btn { color: var(--muted); }
-.sched-copy .btn.mini svg { width: 14px; height: 14px; }
+.sched-copy .btn.icon.mini { width: 24px; min-width: 24px; height: 24px; }
+.sched-copy .btn.mini svg { width: 18px; height: 18px; }
+/* the schedule button stands out: its icon 40% bigger than the chart's (Anita, 2026-11-17) */
+.sched-copy .btn.icon.mini.sched-open { width: 26px; min-width: 26px; height: 26px; }
+.sched-copy .btn.mini.sched-open svg { width: 19.5px; height: 19.5px; }
+/* the chart icon fills 13 of its 16 units where the timetable's fills 11: drawn smaller so the two look one size */
+.sched-copy .btn.mini.marey-open svg { width: 15px; height: 15px; }
 .sched-copy .btn:hover:not(:disabled) { color: var(--text); }
 .stops .grow { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stops .t { margin-left: 8px; }
@@ -949,6 +1036,9 @@ rect.now { fill-opacity: .45; }
 .slider.diagram-width { margin: 0; width: 84px; }
 .demand-busy { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .status-tag .load-bar.thin { height: 4px; margin-right: 0; }
+/* T-3479: terrain that failed to load, clicked to try again */
+button.status-tag { cursor: pointer; text-align: left; }
+button.status-tag:hover { background: var(--shade); color: var(--text); }
 .bar { display: flex; width: 100%; height: 10px; border: 1px solid var(--rule); background: var(--bg); }
 .seg { display: block; height: 100%; }
 /* train, walking, driving: the commuter dot map's colours whatever the theme (T-084;
@@ -1104,11 +1194,34 @@ a.btn { text-decoration: none; }
 .start-update-line { flex: 1; min-width: 0; }
 .start-update .btn { flex: none; height: 24px; padding: 0 6px; color: inherit; font-size: inherit; }
 .start-update .btn.icon { width: 24px; min-width: 24px; padding: 0; }
+/* T-3468: the links to each x.y version's page, under the title */
+.changelog-pages { margin: 0 0 12px; }
+.changelog-pages .btn { font-size: 12px; padding: 3px 9px; }
 .changelog-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; font-size: 14px; }
 .changelog-head span { font-weight: 400; }
 section + section > .changelog-head { margin-top: 16px; }
-.changelog-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
-.changelog-list ul { margin: 3px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.changelog-sub { margin: 0 0 4px; font-size: 12px; font-weight: 600; }
+.changelog-list.changelog-rest { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--rule); }
+.changelog-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.changelog-list > li { display: flex; gap: 6px; align-items: flex-start; }
+.changelog-list ul { margin: 3px 0 0; padding-left: 14px; display: flex; flex-direction: column; gap: 3px; }
+/* T-3466: each item's area icon, in its colour: track blue (the station circle's), demand the bubble control's purple,
+   scheduling and fares green, map yellow, community orange, a fix of no area grey, performance a near-white computer
+   with a grey edge (white on the dark shade); a bug fix's text a little lighter */
+.cl-area { flex: none; display: grid; place-items: center; width: 15px; height: 16px; }
+.cl-area svg { width: 14px; height: 14px; }
+.cl-track { color: #2456e0; }
+:root[data-shade="dark"] .cl-track { color: #8aa6ff; }
+.cl-demand .bubble { fill: color-mix(in oklab, color-mix(in oklab, #ff4d4d, #4d4dff) 62%, #fff); stroke: none; }
+.cl-scheduling, .cl-fares { color: var(--good); }
+.cl-schematic { color: var(--yellow); }
+.cl-community { color: var(--warn); }
+.cl-bug, .cl-other { color: var(--muted); }
+.cl-performance { color: #5aa9e6; }
+.cl-performance .screen { fill: #d6ecff; }
+:root[data-shade="dark"] .cl-performance { color: #9fd0ff; }
+:root[data-shade="dark"] .cl-performance .screen { fill: color-mix(in srgb, #9fd0ff 22%, transparent); }
+.changelog-list li.fix { color: color-mix(in srgb, var(--text) 72%, var(--bg)); }
 .changelog-list .nerf { color: var(--bad); }
 .start-saves { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .start-save { display: flex; gap: 12px; width: 100%; padding: 8px; text-align: left; font: inherit; color: inherit;
@@ -1117,6 +1230,8 @@ section + section > .changelog-head { margin-top: 16px; }
 /* T-1612: the bin sits on the card's bottom right, where the saves panel's buttons are */
 .start-slot { position: relative; }
 .start-delete { position: absolute; right: 8px; bottom: 8px; }
+/* T-3395: the damaged line is the card's last, beside the bin */
+.start-save .save-damaged { padding-right: 36px; }
 .start-saves .pane-foot { justify-content: flex-start; margin-top: 6px; }
 .start-save .save-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 /* T-728: the new game sheet, in the start menu's box or the saves panel */
@@ -1596,6 +1711,7 @@ button.save-add:hover { color: var(--text); }
   #tools { right: 10px; }
   #tool-notes { width: auto; max-width: none; }
   .help-panel { left: 0; width: 100%; max-height: calc(100% - 48px); border-left: 0; border-right: 0; }
+  .help-q { min-height: calc(32px / var(--ui, 1)); }
   /* T-2603: the timetable chart just above the dock, scrolling sideways when wider than the screen */
   .marey { left: 0; right: 0; bottom: calc(100% + 1px); max-width: none; border-left: 0; border-right: 0; }
   /* T-1259, T-1852, T-1885: under the tab row the tab area takes the dock's whole height, the inspector
@@ -1838,7 +1954,7 @@ button.save-add:hover { color: var(--text); }
 .trouble-btn { grid-auto-flow: column; gap: 5px; color: var(--warn); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .trouble-btn svg { width: 20px; height: 20px; stroke-width: 1.8; }
 .trouble-fig.bad { color: var(--bad); }
-.rows.pick.trouble-list { width: 300px; max-width: 100%; max-height: min(260px, 50vh); overflow-y: auto; margin: 0 0 -1px;
+.rows.pick.trouble-list { width: 300px; max-width: 100%; max-height: min(260px, 50vh); overflow-y: auto; margin: 0 0 4px;
   padding: 2px 6px; border: 1px solid var(--rule); background: var(--bg); font-size: 12px; }
 .rows.pick.trouble-list > li { margin: 0 -6px; }
 .trouble-list .val { display: inline-flex; align-items: center; }

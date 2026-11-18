@@ -16,7 +16,7 @@
 //! data/work/intercity.json, the joint commute gravity's input, and the tests' fixtures) opens as
 //! a closed world over its own zones with the ground curve alone.
 use super::{
-    api::{check_fare_curve, demand_catches, demand_groups, demand_passages, demand_ups, fare_x_usd, merge_stations, put_fares, check_fare_mul, same_bits, span_for, scale_triples, DemandApi, Service, FARE_MIN_PER_USD, PEAK_HOUR_FACTOR, TO_HOME, TO_WORK},
+    api::{check_fare_curve, demand_back, demand_catches, demand_groups, demand_passages, demand_ups, fare_x_usd, merge_stations, put_fares, check_fare_mul, same_bits, span_for, scale_triples, DemandApi, Service, FARE_MIN_PER_USD, PEAK_HOUR_FACTOR, TO_HOME, TO_WORK},
     clock::now_ms,
     days::{everyday as everyday_purpose, lean_sign, load_factor, share_out, share_ret, LONGER, WEEKDAY, WORK},
     everyday::{KIND_COUNT, OUTWARD, RETURN},
@@ -928,10 +928,12 @@ struct Rules {
 struct Corridors {
     /// distinct for each set worked out (`IntercityApi::corridors_id`)
     id: u32,
-    /// the corridors with longer trips, ascending, and their trips a day (T-2122: dense, it was 8
-    /// bytes for each of the world's 12.7M corridors in every solving worker, two thirds of them 0)
-    trips_at: Vec<u32>,
-    trips: Vec<f64>,
+    /// the corridors with longer trips, a bit each of the world's corridors (T-2496: 2 MB where their
+    /// indices took 31), and their trips a day in corridor order, as f32 (T-2496: 31 MB less, the
+    /// figures within 1e-7 of the f64 sum; T-2122 made them dense, 8 bytes for each of the world's
+    /// 12.7M corridors before)
+    has_trips: Vec<u64>,
+    trips: Vec<f32>,
     commute: Vec<(u32, f64)>,
     commuters: f64,
     leaving_by: Vec<f64>,
@@ -940,6 +942,22 @@ struct Corridors {
     place_pairs: usize,
     /// T-1849: how many corridors have trips or commutes (`IntercityApi::table_rows`), once counted
     rows: std::cell::OnceCell<usize>,
+}
+
+impl Corridors {
+    /// The corridors with longer trips, ascending, and their trips a day.
+    fn with_trips(&self) -> impl Iterator<Item = (usize, f64)> + '_ {
+        self.has_trips.iter().enumerate().flat_map(|(k, &w)| {
+            let mut w = w;
+            std::iter::from_fn(move || {
+                (w != 0).then(|| {
+                    let b = w.trailing_zeros() as usize;
+                    w &= w - 1;
+                    64 * k + b
+                })
+            })
+        }).zip(self.trips.iter().map(|&t| t as f64))
+    }
 }
 
 /// A longer trips' zone pair, both ways apart: the modes but rail come from its place pair's rule
@@ -977,9 +995,11 @@ struct EPair {
     trips: f32,
     walk: f32,
 }
-/// T-1229: the everyday kinds that cross zone lines (errands, social, school, university, medical),
-/// which `IntercityApi::selection` lists by kind.
-pub const E_CROSS: [usize; 5] = [0, 1, 2, 3, 5];
+/// T-1229: the everyday kinds that cross zone lines (errands, social, school, university, airport,
+/// medical), which `IntercityApi::selection` lists by kind.
+pub const E_CROSS: [usize; 6] = [0, 1, 2, 3, 4, 5];
+/// T-3500: the airport kind, whose outings across a zone line end at the airport's terminals.
+pub const E_AIRPORT: usize = 4;
 /// T-1175: an everyday pair some station serves: its index in `everyday`, the car's perceived
 /// minutes (the commutes' car to the activity zone), the walk's weight against it, as `exp(uw)` of
 /// the local layer's logit, from the pair's share walking with no rail.
@@ -1010,6 +1030,7 @@ mod api;
 mod pass;
 mod setup;
 mod exports;
+mod mem;
 mod selection;
 use logsum::*;
 pub use costs::*;

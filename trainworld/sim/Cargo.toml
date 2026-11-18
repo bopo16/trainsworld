@@ -88,6 +88,12 @@ name = "zone_summary"
 path = "src/bin/zone_summary.rs"
 required-features = ["demand"]
 
+# T-2496: what a solving demand worker's heap holds on the real New York network, stage by stage.
+[[bin]]
+name = "demand_mem"
+path = "src/bin/demand_mem.rs"
+required-features = ["demand"]
+
 # T-509: one calibration run, a weekday on a city's real network with a parameter set.
 [[bin]]
 name = "calib"
@@ -99,6 +105,15 @@ required-features = ["demand"]
 name = "start_difficulty"
 path = "src/bin/start_difficulty.rs"
 required-features = ["demand"]
+
+# T-3443: clippy (checks/lint.cmd) runs with -D warnings; the style and complexity groups are
+# allowed, they are mostly taste (index loops, chunks_exact, long argument lists).
+[lints.clippy]
+style = { level = "allow", priority = -1 }
+complexity = { level = "allow", priority = -1 }
+# the tests' 6.28 stays (a literal TAU would shift their random draws), and the model's enums are not hot
+approx_constant = "allow"
+large_enum_variant = "allow"
 
 [profile.release]
 opt-level = 3

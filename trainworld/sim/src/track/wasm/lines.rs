@@ -14,7 +14,7 @@ impl TrackApi {
         let Some((stops, path)) = edited_stops(&self.w.net, stops, false) else {
             return self.refuse(Issue::LinePath { line: id });
         };
-        self.run(Op::Line { id, data: Some(LineData { symbol: String::new(), trains: Some([high, medium, low]), auto: None, name, colour, tph: if stops.len() < 2 { [0.0; 3] } else { [6.0, 3.0, 1.0] }, stops, path, dwell_s, turnaround_s, cars, fast: false, bus: None, ferry: None, group: 0, group_name: String::new(), group_look: Default::default(), day: 0, hand: false, one_way: false, limit: 0, twin: Default::default() }) })
+        self.run(Op::Line { id, data: Some(LineData { symbol: String::new(), trains: Some([high, medium, low]), auto: None, name, colour, tph: if stops.len() < 2 { [0.0; 3] } else { [6.0, 3.0, 1.0] }, stops, path, dwell_s, turnaround_s, cars, fast: false, bus: None, ferry: None, group: 0, group_name: String::new(), group_look: Default::default(), day: 0, hand: false, one_way: false, limit: 0, twin: Default::default(), weekend: Default::default() }) })
     }
     /// Change a line's stops, keeping everything else; the path is found again.
     pub fn set_stops(&mut self, id: u32, stops: &[u32]) -> u32 {
@@ -52,6 +52,11 @@ impl TrackApi {
                 }
             }
             let mut memo = HopMemo::new();
+            // T-3565: one-way stations go where the track puts them, whatever the cost
+            if let Some((stops, path)) = super::legs::sorted(net, &once, &mut memo) {
+                (d.stops, d.path) = (stops, path);
+                return self.run(Op::Line { id, data: Some(d) });
+            }
             let mut best = Some((vec![], vec![]));
             for &s in &once {
                 best = best.and_then(|b| best_slot(net, &b.0, s, &mut memo));
@@ -104,7 +109,13 @@ impl TrackApi {
     pub fn stop_passed(&mut self, id: u32, station: u32) -> u32 {
         let Some(mut d) = self.w.net.line_data(id) else { return self.refuse(Issue::NoSuchLine { line: id }) };
         let Some(stops) = stopped_at(&self.w.net, &d, station) else { return self.refuse(Issue::LinePath { line: id }) };
-        d.stops = stops;
+        // T-3565: a one-way station goes where the track puts it
+        if let Some((s, p)) = (!d.hand).then(|| super::legs::ordered(&self.w.net, &stops, &mut HopMemo::new())).flatten() {
+            d.path = p;
+            d.stops = s;
+        } else {
+            d.stops = stops;
+        }
         self.run(Op::Line { id, data: Some(d) })
     }
     /// Stops `lo..=hi` out; `lo..=hi` is one interior stop, a start or an end of the line.
@@ -438,13 +449,21 @@ impl TrackApi {
         // way its platform's trains run
         let one_way_at = |n: u32| net.one_side(n).map(|s| [n as f64, net.node_heading[n as usize] + if s == 0 { 0.0 } else { PI }]);
         if !ls.one_way {
+            // T-3565: a one-way station, which the run on the other track passes
+            let mut legs: Vec<u32> = ls.runs.iter().flat_map(|r| r.away.iter().map(|x| x.1)).collect();
+            legs.sort_unstable();
+            legs.dedup();
+            let legs: Vec<f64> = legs.into_iter().filter_map(|n| net.leg_heading(n).map(|th| [n as f64, th])).flatten().collect();
             if ls.is_bus() || !ls.stops.iter().any(|&n| net.one_side(n).is_some()) {
-                return vec![];
+                return legs;
             }
-            let mut out: Vec<u32> = ls.stops.iter().copied().filter(|&n| net.one_side(n).is_some()).collect();
+            // T-3348: a stop whose two runs stop at platforms of their own is served both ways
+            let n = ls.stops.len();
+            let split = |k: usize| ls.stop_node(0, k) != ls.stop_node(1, n - 1 - k);
+            let mut out: Vec<u32> = (0..n).filter(|&k| !split(k)).map(|k| ls.stops[k]).filter(|&n| net.one_side(n).is_some()).collect();
             out.sort_unstable();
             out.dedup();
-            return out.into_iter().filter_map(one_way_at).flatten().collect();
+            return out.into_iter().filter_map(one_way_at).flatten().chain(legs).collect();
         }
         if let Some(plan) = ls.bus.as_ref() {
             let l = line as usize;
@@ -514,6 +533,83 @@ impl TrackApi {
         self.run(Op::TrainCounts { id, trains: Some([high, medium, low]), tph: d.tph })
     }
 
+    /// T-3521: a line's weekends: its percent, 1 where its counts are set by hand (else 0), then its
+    /// whole trains at high, medium and low demand on weekends (the weekdays' where it runs those),
+    /// whole-line counts as `set_train_counts` takes them. Empty for no line.
+    pub fn line_weekend(&self, id: u32) -> Vec<f64> {
+        let (net, l) = (&self.w.net, id as usize);
+        if !net.line_ok(id) { return vec![] }
+        let (Some(w), Some(Some(t))) = (net.line_weekend.get(l).copied(), net.line_trains.get(l).copied()) else { return vec![] };
+        let k = if pairs_split(net, id) { 2 } else { 1 };
+        let c = self.w.weekend_counts(l).unwrap_or(t);
+        let h = if w.counts.is_some() { w.headways.map(|h| h / k) } else { [0; 3] };
+        vec![w.share as f64, w.counts.is_some() as u8 as f64, (c[0] * k) as f64, (c[1] * k) as f64, (c[2] * k) as f64, h[0] as f64, h[1] as f64, h[2] as f64]
+    }
+    /// T-3521: a line's trains an hour at level `lev` on kind of day `row` (0 weekdays, 1 weekends;
+    /// `Network::line_tph_on`).
+    pub fn line_tph_on(&self, id: u32, row: u32, lev: u32) -> f32 {
+        if id as usize >= self.w.net.line_count() || lev as usize >= LEVELS { return 0.0 }
+        self.w.net.line_tph_on(id as usize, (row as usize).min(DAY_ROWS - 1), lev as usize)
+    }
+    /// T-3521: a line's trains an hour on weekends, high, medium, low (`line_tph_on`), with its hidden
+    /// twin's for a line on both pairs, as its panel shows the weekdays' (T-3333).
+    pub fn line_tph_rest(&self, id: u32) -> Vec<f32> {
+        let net = &self.w.net;
+        let twin = net.twin_line(id);
+        (0..LEVELS).map(|lev| net.line_tph_on(id as usize, WEEKEND, lev) + twin.map_or(0.0, |t| net.line_tph_on(t as usize, WEEKEND, lev))).collect()
+    }
+    /// T-3521: run a line's weekends at `share` percent of its weekdays (10 to 200), its counts set by
+    /// hand dropped. One undoable edit, charged for the trains it makes the line need (`cars_needed`).
+    pub fn set_line_weekend_share(&mut self, id: u32, share: u32) -> u32 {
+        if !self.w.net.line_ok(id) { return self.refuse(Issue::NoSuchLine { line: id }) }
+        let weekend = Weekend { share: share.clamp(WEEKEND_SHARE_MIN, WEEKEND_SHARE_MAX) as u16, counts: None, headways: [0; 3] };
+        if self.w.net.line_weekend[id as usize] == weekend { return 0; }
+        self.run(Op::Weekend { id, weekend })
+    }
+    /// T-3521: set a line's whole trains at high, medium and low demand on weekends by hand (counts as
+    /// `set_train_counts` takes them); its percent is kept for the panel. One undoable edit.
+    pub fn set_line_weekend_counts(&mut self, id: u32, high: u32, medium: u32, low: u32) -> u32 {
+        if !self.w.net.line_ok(id) { return self.refuse(Issue::NoSuchLine { line: id }) }
+        let c = if pairs_split(&self.w.net, id) { [high, medium, low].map(|x| x.div_ceil(2)) } else { [high, medium, low] };
+        let was = self.w.net.line_weekend[id as usize];
+        // a headway stepped to stays only at a level whose count did not change
+        let now = self.w.weekend_counts(id as usize).or(self.w.net.line_trains[id as usize]).unwrap_or([0; 3]);
+        let headways = std::array::from_fn(|i| if c[i] == now[i] { was.headways[i] } else { 0 });
+        let weekend = Weekend { counts: Some(c), headways, ..was };
+        if was == weekend { return 0; }
+        self.run(Op::Weekend { id, weekend })
+    }
+    /// T-3557: set a headway line's weekend trains by hand as `set_line_weekend_counts`, and the
+    /// headways in seconds they run (0 = a level run by count): the weekends then run that headway,
+    /// as the weekdays' headway line does.
+    pub fn set_line_weekend_headways(&mut self, id: u32, high: u32, medium: u32, low: u32, h_high: u32, h_medium: u32, h_low: u32) -> u32 {
+        if !self.w.net.line_ok(id) { return self.refuse(Issue::NoSuchLine { line: id }) }
+        let split = pairs_split(&self.w.net, id);
+        let c = if split { [high, medium, low].map(|x| x.div_ceil(2)) } else { [high, medium, low] };
+        let mut headways = if split { [h_high, h_medium, h_low].map(|h| h * 2) } else { [h_high, h_medium, h_low] };
+        // a level not stepped keeps the headway the weekends ran there, or its trains would run
+        // their own rate at it
+        if let Some(cur) = self.w.weekend_auto(id as usize) {
+            for i in 0..3 { if headways[i] == 0 && c[i] > 0 { headways[i] = cur[i]; } }
+        }
+        let was = self.w.net.line_weekend[id as usize];
+        let weekend = Weekend { counts: Some(c), headways, ..was };
+        if was == weekend { return 0; }
+        self.run(Op::Weekend { id, weekend })
+    }
+    /// T-3521: run every line's weekends at `share` percent of its weekdays, counts set by hand
+    /// dropped (`set_line_weekend_share`), as one undoable edit. A hidden twin follows its line.
+    pub fn set_weekend_share_all(&mut self, share: u32) -> u32 {
+        let weekend = Weekend { share: share.clamp(WEEKEND_SHARE_MIN, WEEKEND_SHARE_MAX) as u16, counts: None, headways: [0; 3] };
+        let net = &self.w.net;
+        let ops: Vec<Op> = (0..net.line_count() as u32)
+            .filter(|&l| net.line_ok(l) && !net.is_twin(l) && net.line_weekend[l as usize] != weekend)
+            .map(|id| Op::Weekend { id, weekend })
+            .collect();
+        if ops.is_empty() { return 0; }
+        self.run(Op::Batch(ops))
+    }
+
     /// T-625: the line's counts follow a headway in seconds per level (0 = no service): the
     /// fewest trains that keep it over the round trip, worked out again after every edit. Switching
     /// to headways keeps the trains the line has (T-752).
@@ -550,6 +646,11 @@ impl TrackApi {
     }
     pub fn can_redo(&self) -> bool {
         self.w.can_redo()
+    }
+    /// T-1073: the next undo (or redo) only changes train counts or headways, so it takes effect a
+    /// moment ahead like the edit it undoes.
+    pub fn step_is_service(&self, redo: bool) -> bool {
+        self.w.step_is_service(redo)
     }
     pub fn undo(&mut self) -> u32 {
         self.step(false)
@@ -602,6 +703,12 @@ fn distinct_stops(stops: &[u32]) -> Vec<u32> {
 /// it stops at (T-3122, `every_pass`).
 fn edited_stops(net: &Network, stops: &[u32], hand: bool) -> Option<(Vec<u32>, Vec<u32>)> {
     let stops = distinct_stops(stops);
+    // T-3565: one-way stations where the track puts them
+    if !hand {
+        if let Some(r) = super::legs::ordered(net, &stops, &mut HopMemo::new()) {
+            return Some(r);
+        }
+    }
     let path = net.route(&stops)?;
     if !closed(&stops) {
         return Some(if hand { (stops, path) } else { straighten(net, &stops, &path).unwrap_or((stops, path)) });
@@ -634,15 +741,21 @@ fn dropped(net: &Network, d: &LineData, lo: usize, hi: usize) -> Option<(Vec<u32
     if closed(&d.stops) && (lo == 0 || hi == n - 1 || n - (hi - lo + 1) < 3) {
         return None;
     }
-    let at = super::super::net::match_stops(&path_node_list(net, &d.path), &d.stops, &net.stop_reversals(&d.path))?;
+    let at = net.match_run(&path_node_list(net, &d.path), &d.stops, &net.stop_reversals(&d.path))?.0;
     let stops: Vec<u32> = d.stops[..lo].iter().chain(&d.stops[hi + 1..]).copied().collect();
     if stops.windows(2).any(|w| w[0] == w[1]) {
         return None;
     }
+    // T-3565: with one-way stations the path is found again, as they go where the track puts them
+    if !d.hand {
+        if let Some(r) = super::legs::ordered(net, &stops, &mut HopMemo::new()) {
+            return Some(r);
+        }
+    }
     let first = if lo == 0 { hi + 1 } else { 0 };
     let last = if hi == n - 1 { lo - 1 } else { n - 1 };
     let path = d.path[at[first]..at[last]].to_vec();
-    super::super::net::match_stops(&path_node_list(net, &path), &stops, &net.stop_reversals(&path))?;
+    net.match_run(&path_node_list(net, &path), &stops, &net.stop_reversals(&path))?;
     Some((stops, path))
 }
 
@@ -654,7 +767,7 @@ fn stopped_at(net: &Network, d: &LineData, station: u32) -> Option<Vec<u32>> {
     }
     let nodes = path_node_list(net, &d.path);
     let must = net.stop_reversals(&d.path);
-    let at = super::super::net::match_stops(&nodes, &d.stops, &must)?;
+    let at = net.match_run(&nodes, &d.stops, &must)?.0;
     nodes.iter().enumerate().filter(|x| *x.1 == station).find_map(|(k, _)| {
         let pos = at.iter().filter(|&&a| a < k).count();
         let mut stops = d.stops.clone();
@@ -662,7 +775,7 @@ fn stopped_at(net: &Network, d: &LineData, station: u32) -> Option<Vec<u32>> {
             return None;
         }
         stops.insert(pos, station);
-        super::super::net::match_stops(&nodes, &stops, &must).map(|_| stops)
+        net.match_run(&nodes, &stops, &must).map(|_| stops)
     })
 }
 

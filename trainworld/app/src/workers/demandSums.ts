@@ -17,7 +17,7 @@ import { mergeEveryday } from "./selectionMerge";
 
 /** The everyday kinds (`EVERYDAY_KEYS` order) whose outings cross zone lines, in the order of
  * `IntercityApi.selection`'s blocks (sim `E_CROSS`). */
-export const CROSS_KINDS = [0, 1, 2, 3, 5];
+export const CROSS_KINDS = [0, 1, 2, 3, 4, 5];
 
 /** A selection's numbers per far zone (sim `SEL_Z`): all and rail of the longer trips starting in the
  * selection and ending there, the same of the commutes (T-276), then per `CROSS_KINDS` kind
@@ -284,7 +284,7 @@ export function flowsBody(p: Float32Array, purposeParts: PurposePart[]): Omit<Fl
 // ---------------------------------------------------------------- the views of each kind of day (T-1208)
 
 /** The parts of a period's result (`FromDemand` "result") the day views read. */
-export type DayResult = Pick<Extract<FromDemand, { kind: "result" }>, "summary" | "citySummary" | "cityParts" | "intercitySummary" | "intercityParts" | "corridorKey" | "corridorShares" | "corridorRail" | "elsewhere" | "seg" | "board" | "alight" | "arrive" | "loadOfCrush" | "fareX" | "xferIn" | "parts" | "fareSense"> & { corridorDay?: [number, number] };
+export type DayResult = Pick<Extract<FromDemand, { kind: "result" }>, "summary" | "citySummary" | "cityParts" | "intercitySummary" | "intercityParts" | "corridorKey" | "corridorShares" | "corridorRail" | "elsewhere" | "everydayPlaces" | "seg" | "board" | "alight" | "arrive" | "loadOfCrush" | "fareX" | "baseX" | "xferIn" | "parts" | "fareSense"> & { corridorDay?: [number, number] };
 type PeriodResult = Extract<FromDemand, { kind: "result" }>;
 /**
  * T-1543: one period's result from its parts (`result.part`, one from each solving worker, a part
@@ -343,12 +343,14 @@ export function addParts(list: readonly PeriodResult[]): PeriodResult {
     corridorShares: market.corridorShares,
     corridorRail: market.corridorRail,
     elsewhere: market.elsewhere,
+    everydayPlaces: market.everydayPlaces,
     seg: sum((r) => r.seg)!,
     board,
     alight: sum((r) => r.alight)!,
     arrive,
     loadOfCrush: sum((r) => r.loadOfCrush)!,
     fareX: sum((r) => r.fareX),
+    baseX: sum((r) => r.baseX),
     xferIn: sum((r) => r.xferIn),
     parts: first.parts && { keys: first.parts.keys, seg: sum((r) => r.parts?.seg)!, board: sum((r) => r.parts?.board)!, alight: sum((r) => r.parts?.alight)!, ...(list.some((r) => r.parts?.lean) ? { lean: sum((r) => r.parts?.lean) } : {}) },
     ms: most((r) => r.ms),
@@ -360,8 +362,8 @@ export function addParts(list: readonly PeriodResult[]): PeriodResult {
 /** A result's fields `DayResult` names, without the rest (the corridor table and modes are large and
  * read elsewhere). */
 export function dayResultOf(r: DayResult): DayResult {
-  const { summary, citySummary, cityParts, intercitySummary, intercityParts, corridorKey, corridorShares, corridorRail, elsewhere, seg, board, alight, arrive, loadOfCrush, fareX, xferIn, parts, fareSense } = r;
-  return { summary, citySummary, cityParts, intercitySummary, intercityParts, corridorKey, corridorShares, corridorRail, elsewhere, seg, board, alight, arrive, loadOfCrush, fareX, xferIn, parts, fareSense };
+  const { summary, citySummary, cityParts, intercitySummary, intercityParts, corridorKey, corridorShares, corridorRail, elsewhere, everydayPlaces, seg, board, alight, arrive, loadOfCrush, fareX, baseX, xferIn, parts, fareSense } = r;
+  return { summary, citySummary, cityParts, intercitySummary, intercityParts, corridorKey, corridorShares, corridorRail, elsewhere, everydayPlaces, seg, board, alight, arrive, loadOfCrush, fareX, baseX, xferIn, parts, fareSense };
 }
 
 /** What a solve's views are worked out from: its version, the round published and whether it is
@@ -373,7 +375,7 @@ export interface DayInput {
   version: number;
   round: number;
   final: boolean;
-  layout: { id: string; o: number; n: number; stops: string[] }[];
+  layout: { id: string; o: number; n: number; stops: string[]; back?: string[] }[];
   res: DayResult[];
   dayTable: number[];
   peakHourFactor: number[];
@@ -412,9 +414,10 @@ function purposeDemand(layout: DayInput["layout"], res: DayResult[]): Map<Purpos
     const members = membersOf(key);
     if (!res.some((r) => members.some((m) => r.parts?.keys.includes(m)))) continue;
     const lines: PurposeDemand["lines"] = new Map(), stations: PurposeDemand["stations"] = new Map();
-    for (const { id, o, n, stops } of layout) {
+    for (const { id, o, n, stops, back } of layout) {
       const boardings = stops.map(() => 0);
       const loads: Float32Array[] = [];
+      const stAt = (s: string) => { let sd = stations.get(s); if (!sd) stations.set(s, (sd = { boardings: 0, alightings: 0 })); return sd; };
       res.forEach((r) => {
         const seg = new Float32Array(2 * (n - 1));
         loads.push(seg);
@@ -427,10 +430,17 @@ function purposeDemand(layout: DayInput["layout"], res: DayResult[]): Map<Purpos
           for (let k = 0; k < n; k++) {
             const a = base + o + k, b = base + o + 2 * n - 1 - k;
             boardings[k] += p.board[a] + p.board[b];
-            let sd = stations.get(stops[k]);
-            if (!sd) stations.set(stops[k], (sd = { boardings: 0, alightings: 0 }));
-            sd.boardings += p.board[a] + p.board[b];
-            sd.alightings += p.alight[a] + p.alight[b];
+            // T-3348: run 1 may stop at a platform beside the stop
+            const sa = stAt(stops[k]), sb = stAt(back?.[k] ?? stops[k]);
+            if (sa === sb) {
+              sa.boardings += p.board[a] + p.board[b];
+              sa.alightings += p.alight[a] + p.alight[b];
+            } else {
+              sa.boardings += p.board[a];
+              sa.alightings += p.alight[a];
+              sb.boardings += p.board[b];
+              sb.alightings += p.alight[b];
+            }
           }
           for (let k = 0; k < n - 1; k++) {
             seg[k] += p.seg[base + o + k];
@@ -490,6 +500,7 @@ function dayResult(dayTable: ArrayLike<number>, r: DayResult, q: number, day: De
   const loadOfCrush = r.loadOfCrush.map((v, j) => (r.seg[j] > 0 ? (v * seg[j]) / r.seg[j] : 0));
   // the fare curve's extra follows the riders on the stretch where it is counted (T-1516)
   const fareX = r.fareX?.map((v, j) => (r.seg[j] > 0 ? (v * seg[j]) / r.seg[j] : 0));
+  const baseX = r.baseX?.map((v, j) => (r.seg[j] > 0 ? (v * seg[j]) / r.seg[j] : 0));
   // T-1255: the riders coming to a platform follow its boardings
   const arrive = r.arrive?.map((v, j) => (r.board[j] > 0 ? (v * board[j]) / r.board[j] : v));
   const citySummary: Record<CityId, number[]> = {};
@@ -508,6 +519,11 @@ function dayResult(dayTable: ArrayLike<number>, r: DayResult, q: number, day: De
   const intercityParts = ip && marketPartsOn(ip, fl, fw, factor);
   if (intercityParts && intercityParts.length >= 7) { intercitySummary[1] += intercityParts[4]; intercitySummary[2] += intercityParts[5]; intercitySummary[3] = intercityParts[6]; }
   const elsewhere = r.elsewhere?.map((v) => v * fl);
+  // T-3503: each place's outings across a zone line by the market's whole factor for them (each
+  // place's mix of purposes taken as the market's)
+  const ratio = (k: number) => (ip && intercityParts && ip[k] > 0 ? intercityParts[k] / ip[k] : 1);
+  const [el, er, ew] = [ratio(4), ratio(5), ratio(6)];
+  const everydayPlaces = r.everydayPlaces?.map((v, i) => (i % 4 === 1 ? v * el : i % 4 === 2 ? v * er : i % 4 === 3 ? v * ew : v));
   const summary = r.summary.slice();
   summary[1] = summary[2] = summary[3] = 0;
   for (const v of [...Object.values(citySummary), intercitySummary]) for (const k of [1, 2, 3]) summary[k] += v[k] ?? 0;
@@ -516,7 +532,7 @@ function dayResult(dayTable: ArrayLike<number>, r: DayResult, q: number, day: De
   const by = (day: number, raw: number) => (raw > 0 ? day / raw : 1);
   const fareSense = r.fareSense && [r.fareSense[0] * by(railOf(citySummary), railOf(r.citySummary)), r.fareSense[1] * by(intercitySummary[2] ?? 0, r.intercitySummary[2] ?? 0), r.fareSense[2], r.fareSense[3]] as [number, number, number, number];
   // the corridors keep the weekday's numbers and their factors, applied as `dayCorridors` adds them (T-789)
-  return { ...r, fareSense, seg, board, alight, arrive, loadOfCrush, fareX, citySummary, intercitySummary, intercityParts, corridorDay: [fl, fw], elsewhere, summary, parts: { keys: p.keys, seg: ps, board: pb, alight: pa } };
+  return { ...r, fareSense, seg, board, alight, arrive, loadOfCrush, fareX, baseX, citySummary, intercitySummary, intercityParts, corridorDay: [fl, fw], elsewhere, everydayPlaces, summary, parts: { keys: p.keys, seg: ps, board: pb, alight: pa } };
 }
 
 /**
@@ -570,23 +586,37 @@ function dayViewsOf(input: DayInput, day: DemandDay, res: DayResult[]): DayViews
   };
   // T-1530: the day's block of each period's transfers in (`xferIn`, every kind of day's)
   const withXfer = res.length > 0 && res.every((r) => r.xferIn?.length === DEMAND_DAYS.length * r.board.length);
-  for (const { id, o, n, stops } of input.layout) {
+  for (const { id, o, n, stops, back } of input.layout) {
     const boardings = stops.map(() => 0);
     let fullest = 0;
     const loads: Float32Array[] = [], board: Float32Array[] = [], alight: Float32Array[] = [], arrive: Float32Array[] = [];
-    const fareX: number[] = [];
+    const fareX: number[] = [], baseX: number[] = [];
     res.forEach((r, q) => {
-      let fx = 0;
+      let fx = 0, bx = 0;
       if (r.fareX) for (let k = o; k < o + 2 * n; k++) fx += r.fareX[k];
+      if (r.baseX) for (let k = o; k < o + 2 * n; k++) bx += r.baseX[k];
       fareX.push(fx);
+      baseX.push(bx);
       for (let k = 0; k < n; k++) {
         // stop k is route node o + k on run 0 and o + n + (n - 1 - k) on run 1
         const a = o + k, b = o + 2 * n - 1 - k;
         boardings[k] += r.board[a] + r.board[b];
-        const sd = st(stops[k]);
-        sd.boardings += r.board[a] + r.board[b];
-        sd.alightings += r.alight[a] + r.alight[b];
-        if (withXfer) { const x = day * r.board.length; sd.transfers = (sd.transfers ?? 0) + r.xferIn![x + a] + r.xferIn![x + b]; }
+        // T-3348: run 1 may stop at a platform beside the stop
+        const sa = st(stops[k]), sb = st(back?.[k] ?? stops[k]), x = day * r.board.length;
+        if (sa === sb) {
+          sa.boardings += r.board[a] + r.board[b];
+          sa.alightings += r.alight[a] + r.alight[b];
+          if (withXfer) sa.transfers = (sa.transfers ?? 0) + r.xferIn![x + a] + r.xferIn![x + b];
+        } else {
+          sa.boardings += r.board[a];
+          sa.alightings += r.alight[a];
+          sb.boardings += r.board[b];
+          sb.alightings += r.alight[b];
+          if (withXfer) {
+            sa.transfers = (sa.transfers ?? 0) + r.xferIn![x + a];
+            sb.transfers = (sb.transfers ?? 0) + r.xferIn![x + b];
+          }
+        }
       }
       const seg = new Float32Array(2 * (n - 1));
       for (let k = 0; k < n - 1; k++) {
@@ -601,7 +631,7 @@ function dayViewsOf(input: DayInput, day: DemandDay, res: DayResult[]): DayViews
       if (PERIODS[q].demand === "high")
         for (let k = 0; k < 2 * n; k++) fullest = Math.max(fullest, r.loadOfCrush[o + k]);
     });
-    lines.set(id, { ridersPerDay: boardings.reduce((x, y) => x + y, 0), fullestPct: Math.round(100 * fullest), boardings, loads, board, alight, arrive, fareX });
+    lines.set(id, { ridersPerDay: boardings.reduce((x, y) => x + y, 0), fullestPct: Math.round(100 * fullest), boardings, loads, board, alight, arrive, fareX, baseX });
   }
   const network: DemandView = {
     version: input.version,
@@ -629,18 +659,26 @@ function dayViewsOf(input: DayInput, day: DemandDay, res: DayResult[]): DayViews
   // the regional layer between places: longer trips and (T-276) commutes between zones together
   let interTrips = 0, interRail = 0, commuteTrips = 0, commuteRail = 0;
   const elsewhere = Array.from({ length: input.places }, () => 0);
+  // T-3503: each place's everyday outings across a zone line: legs, rail legs, walking legs
+  const everydayAt = new Map<number, [number, number, number]>();
   for (const r of res) {
     interTrips += r.intercitySummary[1] ?? 0; interRail += r.intercitySummary[2] ?? 0;
     if (r.intercityParts && r.intercityParts.length >= 4) { commuteTrips += r.intercityParts[2]; commuteRail += r.intercityParts[3]; }
     r.elsewhere?.forEach((v, p) => { if (p < elsewhere.length) elsewhere[p] += v; });
+    const e = r.everydayPlaces ?? [];
+    for (let i = 0; i + 3 < e.length; i += 4) {
+      const t = everydayAt.get(e[i]) ?? everydayAt.set(e[i], [0, 0, 0]).get(e[i])!;
+      t[0] += e[i + 1]; t[1] += e[i + 2]; t[2] += e[i + 3];
+    }
   }
+  const everyday = [...everydayAt].sort((x, y) => x[0] - y[0]).flatMap(([p, t]) => [p, ...t]);
   // T-1300: the day's fare sensitivity, with the rail trips it is of; packed with the view's skeleton
   if (res.every((r) => r.fareSense)) {
     const sum = (i: number) => res.reduce((a, r) => a + r.fareSense![i], 0);
     const reach = (i: number, j: number) => { const d = sum(i); return d < 0 ? res.reduce((a, r) => a + r.fareSense![i] * (r.fareSense![j] ?? 1), 0) / d : 1; };
     network.fareSense = { local: sum(0), market: sum(1), localReach: reach(0, 2), marketReach: reach(1, 3), marketRail: interRail };
   }
-  return { view: network, cities, intercity: { version: input.version, round: input.round, tripsPerDay: interTrips, railTripsPerDay: interRail, commuteTripsPerDay: commuteTrips, commuteRailPerDay: commuteRail, corridors: input.noCorridors ? null : dayCorridors(res), elsewhere } };
+  return { view: network, cities, intercity: { version: input.version, round: input.round, tripsPerDay: interTrips, railTripsPerDay: interRail, commuteTripsPerDay: commuteTrips, commuteRailPerDay: commuteRail, corridors: input.noCorridors ? null : dayCorridors(res), elsewhere, everyday } };
 }
 
 /** T-260: each asked kind of day's views: the weekday is the solve itself; a weekend is worked out
@@ -693,6 +731,7 @@ export function packDays(views: DayViews[], layout: DayInput["layout"], periods:
       f64.push(l.ridersPerDay, l.fullestPct);
       put64(l.boardings);
       put64(l.fareX!);
+      put64(l.baseX!);
       for (let q = 0; q < periods; q++) { put32(l.loads[q]); put32(l.board![q]); put32(l.alight![q]); put32(l.arrive![q]); }
     }
     const nStations = stationsOf(stations);
@@ -732,10 +771,10 @@ export function unpackDays(p: PackedDays, layout: DayInput["layout"], periods: n
     const lines = new Map<string, LineDemand>();
     for (const { id, n } of layout) {
       const ridersPerDay = f64[b++], fullestPct = f64[b++];
-      const boardings = take64(n), fareX = take64(periods);
+      const boardings = take64(n), fareX = take64(periods), baseX = take64(periods);
       const loads: Float32Array[] = [], board: Float32Array[] = [], alight: Float32Array[] = [], arrive: Float32Array[] = [];
       for (let q = 0; q < periods; q++) { loads.push(take32(2 * (n - 1))); board.push(take32(2 * n)); alight.push(take32(2 * n)); arrive.push(take32(2 * n)); }
-      lines.set(id, { ridersPerDay, fullestPct, boardings, loads, board, alight, arrive, fareX });
+      lines.set(id, { ridersPerDay, fullestPct, boardings, loads, board, alight, arrive, fareX, baseX });
     }
     const stations = stationsOf(d.stations);
     const purposes = new Map<PurposeKey, PurposeDemand>();

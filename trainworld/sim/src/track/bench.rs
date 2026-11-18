@@ -153,7 +153,7 @@ pub fn synth(km: f64, stations: usize, lines: usize, seed: u64) -> Network {
                 V::Node(n) => {
                     if let Some(a) = from {
                         let id = net.alloc_edge();
-                        net.set_edge(id, Some(EdgeData { a, b: n, tracks: 2, pis: std::mem::take(&mut pis), built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::Regular, sep: false, day: 0, oneway: 0, join: [0; 2] })).unwrap();
+                        net.set_edge(id, Some(EdgeData { a, b: n, tracks: 2, pis: std::mem::take(&mut pis), built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::Regular, sep: false, day: 0, oneway: 0, join: [0; 2], limit: 0 })).unwrap();
                     }
                     from = Some(n);
                     pis.clear();
@@ -209,7 +209,7 @@ pub fn synth(km: f64, stations: usize, lines: usize, seed: u64) -> Network {
         }
         let id = net.alloc_line();
         let tph = if express { [6.0, 3.0, 0.0] } else { [12.0, 6.0, 3.0] };
-        net.set_line(id, Some(LineData { symbol: String::new(), trains: None, auto: None, name: format!("L{id}"), colour: 0, stops, path, tph, dwell_s: 30.0, turnaround_s: 180.0, cars: 0, fast: false, bus: None, ferry: None, group: 0, group_name: String::new(), group_look: Default::default(), day: 0, hand: false, one_way: false, limit: 0, twin: Default::default() })).unwrap();
+        net.set_line(id, Some(LineData { symbol: String::new(), trains: None, auto: None, name: format!("L{id}"), colour: 0, stops, path, tph, dwell_s: 30.0, turnaround_s: 180.0, cars: 0, fast: false, bus: None, ferry: None, group: 0, group_name: String::new(), group_look: Default::default(), day: 0, hand: false, one_way: false, limit: 0, twin: Default::default(), weekend: Default::default() })).unwrap();
         made += 1;
     }
     let TrackWorld { net, .. } = w;
@@ -373,7 +373,7 @@ pub fn run(km: f64, stations: usize, lines: usize, reps: usize) -> (String, Vec<
         Op::Batch(vec![
             Op::Node { id: a, data: Some(NodeData { x: far, y: 0.0, level: 0, flying: false }) },
             Op::Node { id: b, data: Some(NodeData { x: far + 3000.0, y: 4000.0, level: 0, flying: false }) },
-            Op::Edge { id: e, data: Some(EdgeData { a, b, tracks: 2, pis: vec![Pi::new(far + 3000.0, 0.0, 0.0, 0)], built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::Regular, sep: false, day: 0, oneway: 0, join: [0; 2] }) },
+            Op::Edge { id: e, data: Some(EdgeData { a, b, tracks: 2, pis: vec![Pi::new(far + 3000.0, 0.0, 0.0, 0)], built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::Regular, sep: false, day: 0, oneway: 0, join: [0; 2], limit: 0 }) },
         ])
     });
     out += &report("delete the busiest edge (lines reroute or break)", &mut w, &|_| Op::DeleteEdge { id: busiest });

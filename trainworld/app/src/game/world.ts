@@ -98,7 +98,7 @@ export async function edit(op: EditOp, quiet = false, silent = false, early: boo
   return a;
 }
 
-const TRAIN_OPS = new Set(["setStops", "insertStop", "dropStop", "endLineAt", "stopPassed", "orderStops", "sortStops", "turnEnd", "openLoop", "setTrainCount", "setHeadway", "lineCars", "copyLine", "undo", "redo"]);
+const TRAIN_OPS = new Set(["setStops", "insertStop", "dropStop", "endLineAt", "stopPassed", "orderStops", "sortStops", "turnEnd", "openLoop", "setTrainCount", "setHeadway", "weekendShare", "weekendCounts", "weekendShareAll", "lineCars", "copyLine", "undo", "redo"]);
 const BUILD_OPS = new Set(["route", "construct", "constructAll", "constructLine", "addStation", "crossover", "doubleUp", "stationUpgrade", "rebuild"]);
 /** What a refused-for-money edit would have paid for: line edits cost trains only, track edits construction. */
 function buysOf(op: EditOp): Buys | undefined {
@@ -142,6 +142,170 @@ function changeTrains(id: LineId, demand: Demand, to: (now: number, step: number
   if (t[lev] === base[lev]) return false;
   setTrainCounts(id, t);
   return true;
+}
+
+// ---- T-3521: weekend trains (`LineStats.weekend`): a percent of the weekdays' or counts set by
+// hand; the sim settles weekends on the track on their own and buys what the busier kind of day needs.
+
+/** The percents a line's weekends may run at, and the step (sim params.rs `WEEKEND_SHARE_MIN`). */
+export const WEEKEND_SHARE_MIN = 10, WEEKEND_SHARE_MAX = 200, WEEKEND_SHARE_STEP = 5;
+
+/** A line's weekends as they show: its percent, whether its counts are set by hand (the percent
+ * then no longer says what runs), and its whole trains per level on weekends. */
+export interface WeekendShown { share: number; custom: boolean; counts: [number, number, number]; headways?: [number, number, number] }
+
+/** Weekend edits sent and not yet in the world, as `pendingTrains`: a second click steps from the
+ * first's. */
+const pendingWeekend = signal<ReadonlyMap<LineId, WeekendShown>>(new Map());
+
+/** A line's weekends as they show (`WeekendShown`); null without figures. A count line following
+ * its weekdays at a percent follows a weekday count still on its way too. */
+export function weekendShown(id: LineId): WeekendShown | null {
+  const p = pendingWeekend.value.get(id);
+  if (p) return p;
+  const st = world.value?.lineStats[id], wk = trainsShown(id);
+  if (!st || !wk) return null;
+  const x = st.weekend, share = x ? x[0] : 100, custom = !!x && x[1] === 1;
+  const sim = x ? ([x[2], x[3], x[4]] as [number, number, number]) : wk;
+  const headways = x && x.length >= 8 && (x[5] || x[6] || x[7]) ? ([x[5], x[6], x[7]] as [number, number, number]) : undefined;
+  if (custom || st.autoS || !pendingTrains.value.has(id)) return { share, custom, counts: sim, headways };
+  return { share, custom, counts: wk.map((n) => weekendCount(n, share)) as [number, number, number] };
+}
+
+/** A weekday count at a percent: rounded up (sim world.rs `weekend_counts`). */
+export const weekendCount = (n: number, share: number) => Math.ceil((n * share) / 100 - 1e-9);
+
+/** A line's trains per level on kind of day `row` (0 weekdays, 1 weekends) as they show. */
+export function restShown(id: LineId, row: number): [number, number, number] | null {
+  return row === 0 ? trainsShown(id) : weekendShown(id)?.counts ?? null;
+}
+
+function sendWeekend(id: LineId, next: WeekendShown, op: EditOp) {
+  pendingWeekend.value = new Map(pendingWeekend.value).set(id, next);
+  void edit(op, false, true).finally(() => {
+    if (pendingWeekend.peek().get(id) !== next) return;
+    const m = new Map(pendingWeekend.peek());
+    m.delete(id);
+    pendingWeekend.value = m;
+  });
+}
+
+/** Run a line's weekends at `share` percent of its weekdays (kept between the stepper's ends), its
+ * counts set by hand dropped; false when that changes nothing (the stepper shakes). */
+export function setWeekendShare(id: LineId, share: number): boolean {
+  const cur = weekendShown(id), wk = trainsShown(id);
+  if (!cur || !wk) return false;
+  const s = Math.max(WEEKEND_SHARE_MIN, Math.min(WEEKEND_SHARE_MAX, Math.round(share)));
+  if (s === cur.share && !cur.custom) return false;
+  sendWeekend(id, { share: s, custom: false, counts: wk.map((n) => weekendCount(n, s)) as [number, number, number] }, { op: "weekendShare", line: num(id), share: s });
+  return true;
+}
+
+/** Set a line's weekend trains at a level by hand, kept between none and `most` (`trainCap`, as a
+ * weekday count); false when that changes nothing. */
+export function setWeekendCount(id: LineId, demand: Demand, want: number, most: number): boolean {
+  const cur = weekendShown(id);
+  if (!cur) return false;
+  const i = DEMAND_INDEX[demand], to = Math.max(0, Math.min(most, want));
+  if (to === cur.counts[i]) return false;
+  const counts = [...cur.counts] as [number, number, number];
+  counts[i] = to;
+  // a headway stepped to stays at the levels this leaves alone (sim `set_line_weekend_counts`)
+  const headways = cur.headways?.map((h, k) => (k === i ? 0 : h)) as [number, number, number] | undefined;
+  sendWeekend(id, { share: cur.share, custom: true, counts, headways: headways?.some(Boolean) ? headways : undefined }, { op: "weekendCounts", line: num(id), counts });
+  return true;
+}
+
+/** A weekday headway at a weekend percent, to a whole minute from a minute up (sim `weekend_headway`). */
+export function weekendHeadwayAt(headwayS: number, share: number): number {
+  if (!(headwayS > 0) || !(share > 0)) return 0;
+  const raw = Math.floor((headwayS * 100) / share);
+  return raw >= 60 ? Math.floor(raw / 60) * 60 : Math.max(1, raw);
+}
+
+/** The trains an hour the weekends' row shows at level `lev` with `n` trains. On a headway line it
+ * is the stepped headway the weekends are asked to run, as the weekdays' row shows its stored one:
+ * the hand-set headway, or the weekday headway at the percent (sim `weekend_headway`). The settled
+ * rate (`restTph`) is a decimal wherever the train count cannot hit the headway, and the round
+ * trip over a count still on its way is another; neither is shown there (T-3603). */
+export function restTphShown(id: LineId, st: LineStats, lev: number, n: number): number {
+  const trip = st.roundTripByLevel[lev];
+  const wk = weekendShown(id), auto = headwayShown(id);
+  if (n > 0 && wk) {
+    const given = wk.custom ? wk.headways?.[lev] ?? 0 : auto ? weekendHeadwayAt(auto[lev], wk.share) : 0;
+    if (given > 0) return 3600 / given;
+  }
+  const ran = st.weekend ? st.weekend[2 + lev] : st.trainsNeeded[lev];
+  if (!pendingWeekend.value.has(id) && n === ran && st.restTph) return st.restTph[lev];
+  return trip > 0 ? (n * 3600) / trip : 0;
+}
+
+/** The headway the weekends' row at level `lev` shows with `n` trains, to a whole minute (seconds); 0 none. */
+function shownRestHeadway(id: LineId, lev: number, n: number): number {
+  const st = world.value?.lineStats[id];
+  if (!st || !(n > 0)) return 0;
+  const tph = restTphShown(id, st, lev, n);
+  const h = tph > 0 ? 3600 / tph : 0;
+  return h >= 60 ? Math.round(h / 60) * 60 : Math.round(h);
+}
+
+/** Set a line's weekend trains at a level to `to` and the headway they run (seconds, 0 none): the
+ * weekends then run that headway (T-3557). False when that changes nothing. */
+function setWeekendHeadway(id: LineId, demand: Demand, to: number, h: number, most: number): boolean {
+  const cur = weekendShown(id);
+  if (!cur) return false;
+  const i = DEMAND_INDEX[demand], n = Math.max(0, Math.min(most, to)), sec = n > 0 ? Math.round(h) : 0;
+  if (cur.custom && n === cur.counts[i] && sec === (cur.headways?.[i] ?? 0)) return false;
+  const counts = [...cur.counts] as [number, number, number];
+  counts[i] = n;
+  // a level left alone keeps the headway it shows, in whole minutes, not the count's round trip share (T-3588)
+  const headways = [0, 1, 2].map((k) => cur.headways?.[k] || shownRestHeadway(id, k, cur.counts[k])) as [number, number, number];
+  headways[i] = sec;
+  sendWeekend(id, { share: cur.share, custom: true, counts, headways }, { op: "weekendCounts", line: num(id), counts, headways });
+  return true;
+}
+
+/** Step a line's weekend trains at a level by `by` steps (`trainStep`). */
+export function stepWeekendCount(id: LineId, demand: Demand, by: number, most: number): boolean {
+  const n = weekendShown(id)?.counts[DEMAND_INDEX[demand]];
+  return n !== undefined && setWeekendCount(id, demand, n + by * trainStep(id), most);
+}
+
+/** Step the headway a line's weekend count gives at a level (`dir` 1 longer, -1 shorter), by the
+ * weekdays' headway steps (`nextHeadway`), to the count that keeps it at the weekdays' round trip
+ * `trip` (`autoTrainsFor`), and sends the headway with them so the weekends run it (T-3557). A
+ * headway that needs the same count is stepped past. */
+export function stepWeekendHeadway(id: LineId, demand: Demand, dir: number, trip: number, limitS: number, loop: boolean, most: number, shown: number): boolean {
+  const n = weekendShown(id)?.counts[DEMAND_INDEX[demand]];
+  const step = n === undefined ? null : restHeadwayStep(n, dir, trip, limitS, loop, shown);
+  return step !== null && setWeekendHeadway(id, demand, step.to, step.h, most);
+}
+
+/** Where a weekend headway step (`stepWeekendHeadway`) goes from `n` trains: the count and the
+ * headway it was stepped to (0 none); null where it cannot step. `dir`'s size is minutes a step, as
+ * the weekdays' (Shift, Ctrl). It steps from `shown`, the headway the row shows (the rate settled
+ * for weekends, which a full track or held trains make longer than the round trip over the count):
+ * from the shorter one, + could land below what is shown and read backwards. */
+export function restHeadwayStep(n: number, dir: number, trip: number, limitS: number, loop: boolean, shown: number): { to: number; h: number } | null {
+  if (trip <= 0 || dir === 0) return null;
+  const up = dir > 0;
+  let h = shown > 0 ? shown : n > 0 ? trip / n : 0;
+  for (let i = 0; i < 60; i++) {
+    h = nextHeadway(h, Math.sign(dir), Math.abs(dir));
+    // the shortest headway's step down is no service, which is the wrong way for more trains
+    if (h <= 0) return up && n > 0 ? { to: 0, h: 0 } : null;
+    const to = autoTrainsFor(trip, h, limitS, loop);
+    if (up ? to < n : to > n) return { to, h };
+    if (h >= HEADWAY_MAX_S) return up && n > 0 ? { to: 0, h: 0 } : null;
+  }
+  return null;
+}
+
+/** Run every line's weekends at `share` percent of its weekdays, counts set by hand dropped: one
+ * undoable edit. */
+export function setWeekendShareAll(share: number): void {
+  const s = Math.max(WEEKEND_SHARE_MIN, Math.min(WEEKEND_SHARE_MAX, Math.round(share)));
+  void edit({ op: "weekendShareAll", share: s });
 }
 
 /** The most vehicles a count is raised to per level, when the track sets no lower limit (T-3152). */
@@ -323,6 +487,11 @@ export function setHeadway(id: LineId, demand: Demand, seconds: number) {
   queueHeadway(id, h);
 }
 
+/** All three levels' headways at once, as one edit (a line on counts is switched to Headway by it). */
+export function setHeadways(id: LineId, secs: [number, number, number]) {
+  queueHeadway(id, [...secs]);
+}
+
 const sendHeadway = folded(pendingHeadway, async (id, secs) => {
   const had = world.peek()?.lineStats[id]?.autoS;
   const a = await edit({ op: "setHeadway", line: num(id), seconds: secs }, false, true);
@@ -383,12 +552,18 @@ export function stepHeadway(id: LineId, demand: Demand, dir: number): boolean {
 /** Switch a line between counting its trains by hand and keeping a headway: it starts with the
  * headway its trains give now, so no train comes or goes. */
 export function setAutoTrains(id: LineId, on: boolean) {
-  const st = world.value?.lineStats[id];
-  if (!st) return;
   if (!on) {
     queueHeadway(id, null);
     return;
   }
+  const seconds = headwaysOfTrains(id);
+  if (seconds) queueHeadway(id, seconds);
+}
+
+/** The headways a line's trains give now, so a switch to Headway changes no train (T-3588 shares it). */
+export function headwaysOfTrains(id: LineId): [number, number, number] | null {
+  const st = world.value?.lineStats[id];
+  if (!st) return null;
   const n = trainsShown(id) ?? st.trainsNeeded;
   // the headway its trains give, rounded to the coarsest of 1 minute, 30, 10 or 5 seconds that keeps them
   const seconds = n.map((k, lev) => {
@@ -401,7 +576,7 @@ export function setAutoTrains(id: LineId, on: boolean) {
     }
     return exact;
   }) as [number, number, number];
-  queueHeadway(id, seconds);
+  return seconds;
 }
 
 /** The fare curve for the whole network (T-883, game/fareCurve.ts): its nodes, km and US$. */
@@ -427,6 +602,10 @@ export function setFareFerry(mul: number) {
 /** T-3028: the fare multiplier on bus lines. */
 export function setFareBus(mul: number) {
   return edit({ op: "fareBus", mul });
+}
+/** T-3567: line `line`'s own fare multiplier. */
+export function setLineFare(line: number, mul: number) {
+  return edit({ op: "fareLine", line, mul });
 }
 /** T-1801: the transfer fare, in the curve's units. */
 export function setFareTransfer(usd: number) {

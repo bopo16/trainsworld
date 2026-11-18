@@ -37,6 +37,7 @@ to 7 and 11 of `docs/adding-a-city-by-hand.md` for it, with the gate (its sectio
     venv\Scripts\python.exe -I trainworld\pipeline\world_run.py run --limit 20     the next 20 rows
     venv\Scripts\python.exe -I trainworld\pipeline\world_run.py status             rows by status, locks held
     venv\Scripts\python.exe -I trainworld\pipeline\world_run.py join               the joint solve for gated rows
+    venv\Scripts\python.exe -I trainworld\pipeline\world_run.py join --market-only the market and trips step of a failed join, again
 
 `--rows a,b` or `--countries GB,PT` instead of `--limit`; `--jobs N` the cores in all (default 2,
 up to 12 on an overnight run Anita approves). A run builds `--workers` rows at once (default N),
@@ -165,8 +166,16 @@ state's units, not geoBoundaries read afresh, T-1239); give a new country one wh
   T-1743, T-1986; reading all 2,000 market packs takes about 30 s), or the next `market_pack`
   refuses them. That heal runs after the registry lock is let go, so `market_zones.py` itself also adds every
   zone naming a place no registered zone holds to the zones it rewrites, under the lock (T-2776, a scan of
-  about 9 s): a register racing another region's unregister no longer parks. The browser check serves the main tree's app/, so whoever runs a batch
-  says who may rebuild app/ (its WASM) while it runs.
+  about 9 s): a register racing another region's unregister no longer parks. The browser check serves a copy of app/ made after the
+  registration (T-2298; `world_run.freeze_app`, a temp folder with node_modules and data as junctions, removed when the
+  gate's Vite stops), so a WASM or UI landing in the tree mid-gate changes nothing under it; the next chunk's copy takes
+  the new app. Nothing needs holding still for it.
+  **When the browser check breaks** (T-2399): after the first 3 rows (of more than 3) have failed the same way with none
+  passing (`pack_gate.BROWSER_SAME_FAIL`; the same way is the failed checks and the error's first line, ids and numbers
+  taken out), the rest of the chunk is not run; and a chunk of 3 or more rows all failing one way is a run fault, not
+  parks: the rows stay `built`. `checks/smoke.mjs` runs the same check on one small zone (`mcu`, Macau;
+  `SMOKE_ZONE`, `SMOKE_NO_ZONE`; `pack_gate.py <id> --browser-only` by hand, BASE the Vite), so run smoke after an app change
+  and before a world run.
 
 ### Joint gravity, freeze and clean up
 
@@ -184,7 +193,9 @@ state's units, not geoBoundaries read afresh, T-1239); give a new country one wh
   cut to the packs registered when that unit runs, so a unit that parked earlier takes no later
   unit with it, and the market step leaves out commutes naming packs that left (T-997). Then `register.py
   <shipped and changed> --market --trips` (its zone files over `--jobs` processes from 100 zones, T-2627) (or `market_zones.py --rows`
-  when only parks happened), and a check that every file `vite.config.ts` copies into a
+  when only parks happened). That step's time limit is 1800 s plus 2 s per registered zone, since the local trips
+  run over every registered zone whatever the ids (3,545 zones took 26 minutes on a busy machine, T-2595); a hung
+  step is told by the quiet-log stack dump, not the limit. Then a check that every file `vite.config.ts` copies into a
   production build exists for each shipped pack (it copies the registry's packs, so nothing more
   needs listing). Last, `zone_outlines.py` rewrites `data/packs/outlines.json`, the coarse outline of
   every registered zone with the sea off its coast (T-800, T-1145; over the run's `--jobs`, with its sea work kept in `data/work/zone_outlines_cache`, T-1977: about 4.5 minutes at 4 jobs from an empty cache, under a minute when a few zones changed; a failure only prints a warning and leaves the old file, so
@@ -195,6 +206,16 @@ state's units, not geoBoundaries read afresh, T-1239); give a new country one wh
   warning-only failure, so the new zones are found by their own name only until it is rerun).
   Status `shipped`; a shipped row's build hand-offs (`data/work/<id>.cells.*`, `walk_zone.u8*`) are deleted
   then, since nothing reads them after (T-2554).
+- **A join costs its groups** (T-2702): a join solves every solve unit a gated pack joined whole (a country's part of
+  a group, its neighbours fixed), so 4 rebuilt rows in Mexico cost all Mexico's solve (55 min of the 460 min of that
+  join). Batch small fixes in a big country with its next rebuild.
+- **The market step again** (T-2777): a join whose market step failed leaves the solves done and the packs shipped.
+  `join --market-only` redoes just that step, with the id list of the failed join's own `register ... --market
+  --trips` line (the last one in the newest `<batch>/join.market.log`; `--from-log <that file>` picks another,
+  `--ids a,b` names them; ids no longer registered are left out), under the `packs` lock after waiting for gates,
+  then the freeze the failed join skipped. Outlines, realms and aliases are not rerun (they ran in the failed
+  join, or `world_run.py step zone_outlines` etc.). It exits 2 on a failed step. Don't write the list by hand
+  from the rows: it also holds the fixed neighbours the join rewrote (T-2702's first retry missed tug).
 - **Freeze** (T-928): a join with no market failure and no other run live ends with
   `pipeline/freeze.py`, which hard-links every file a production build copies into
   `data/frozen/<stamp>/` (seconds, no space; the newest three kept). A publish during a later
@@ -245,7 +266,7 @@ Hand packs (the US metros, lon, par, tor, sao, the Japan metros) are not plan ro
   `app` junction is made again to this tree's and noted in the report's problems, T-779; checked
   at the start, before and after each gate, and before each joint solve), and a gate or re-gate
   that leaves a row with no result file (the gate itself died; a pack's own error is a FAIL in its
-  result). The rows stay `built`, the region's downloads stay on disk and a joint group is
+  result), and a browser check that failed the same way on 3 or more rows of a chunk. The rows stay `built`, the region's downloads stay on disk and a joint group is
   restored; fix the fault and run again. The
   runner exits with code 2 and the report's `fault` says what happened.
 - **A scratch tree** (`--root data/work/<task>/trainworld`, with `data/raw` a junction to this
@@ -324,7 +345,7 @@ sources. Each field comes from the row or a rule:
   the unit's own polygon when that is at least a tenth of it, and the build prints each such unit
   (T-610); a NUTS-3 unit's polygon may not ship (non-commercial terms), so its gap takes the
   geoBoundaries units lying mostly inside it instead, at the finest level with an open licence
-  (T-925, data-register.md). Units are clipped to the OSM coastline, holes filled, the outline cut along every
+  (T-925, data-register.md). Units are clipped to the OSM coastline, holes filled, coastal land within 3 km of the units that none of them covers (reclaimed after the polygons were drawn: Shenzhen's Houhai, 6 km2) joins the unit it borders longest when units and sea close it in (`osm_units.reclaimed`, T-3428), the outline cut along every
   existing pack, and pieces under 0.05 km2 or with nobody in them (GHSL 100 m) dropped, unless a piece with nobody
   in it holds 0.2 km2 of GHSL built surface (all buildings, 2020, `BUILT_KEEP_M2`; T-3375: Singapore's Jurong Island
   and Sentosa, which have no residents; an empty islet or a reserve has next to none). Units with

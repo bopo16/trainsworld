@@ -6,8 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { applyRowGuesses } from "./stopRowGuess";
 import { nearestStation } from "../../game/places";
 import { demandAt, lineSeconds } from "../../game/clock";
-import { Money } from "../MoneyText";
-import { count, distance, duration, forecast, headway, length, money, runCostLineFactor, speed, trainCostLine, trainKind } from "../../game/format";
+import { count, distance, duration, forecast, length, money, runCostLineFactor, speed, trainCostLine, trainKind } from "../../game/format";
 import { lineRunFactor } from "../../game/regionMoney";
 import { t as tr, tList, tNumber, tSeries } from "../../i18n";
 import { mobileDevice } from "../../workers/deviceMemory";
@@ -23,6 +22,7 @@ import { CROWD_LOAD_FROM, CROWD_LOAD_STRONG, FULL_FLOOR } from "../../map/render
 import { liveMoney, moneyState } from "../../game/money";
 import { fullParts, fullTip, fullTitle, heldText, heldTip, heldTrains } from "../../game/capacityKinds";
 import { toggleEditStops } from "../../game/lineActions";
+import { repeatedEdge } from "../../game/repeatTrack";
 import { noteHeadwayLimits, edit, linesAt, say, stationNames, stationsById, stationsByNum, stepLineCars, pendingCars, world, linesById, linesByNum, pairStats } from "../../game/world";
 import { live } from "../../map/live";
 import { setListHot } from "../../map/hovered";
@@ -35,16 +35,16 @@ import { locateStation } from "../locate";
 import { demandView } from "../../game/demand";
 import { useClockQuery } from "../useClockQuery";
 import type { Vehicle } from "../../game/vehicle";
-import { carsCap, copySchedule, pasteSchedule, scheduleCopy, scheduleOf, scheduleText, vehicleOf, wholeCopy } from "../../game/scheduleCopy";
 import { drawnReversed } from "../../game/northUp";
-import { turnedLine, type TurnRow } from "../../game/turnedLine";
+import { partwayReversals, turnedLine, type TurnRow } from "../../game/turnedLine";
 import { MareyButton } from "./MareyChart";
 import { ScheduleButton } from "./SchedulePanel";
 import { LineProfile } from "./LineProfile";
 import { LineTopSpeed } from "./LineTopSpeed";
+import { LineFare, LineMoney } from "./LineMoney";
 import type { EditOp } from "../../workers/protocol";
 import { hasUpgrade, UPGRADE } from "../../game/upgrades";
-import { AverageSpeed, carsBought, carsText, demandLabel, type Limit, NO_LIMITS, PastDay, Schedule, useLinePeriods } from "./schedule";
+import { AverageSpeed, carsBought, carsText, demandLabel, type Limit, NO_LIMITS, PastDay, Schedule, useLinePeriods, vehicleOf } from "./schedule";
 import { LineTitle, useLineTitle } from "./LineTitle";
 import { TRACK_SPECS } from "../../game/trackKinds";
 
@@ -54,7 +54,7 @@ const stationsNow = (): ReadonlyMap<number, StationInput> => (world.value ? stat
  * delay spent following slower trains on shared track (kind 11, T-1924); `waits`: standing at
  * passing tracks for faster trains (kind 13, T-2231), whose places come from `lineWaits`; the rest
  * is waiting at busy track. */
-interface Spot { text: string; s: number }
+interface Spot { text: string; s: number; single?: boolean }
 interface Spots { spots: Spot[]; behindSpots: Spot[]; behind: number; waits: number }
 function spotsFrom(d: Float64Array, v: Vehicle): Spots {
   const busy: Spot[] = [], following: Spot[] = [];
@@ -73,11 +73,13 @@ function spotsFrom(d: Float64Array, v: Vehicle): Spots {
         ? ahead ? tr("lineInspector.behindLine", { line: ahead, vehicle: v }) : tr("lineInspector.behindSlower", { vehicle: v })
         : (kind === 2 || kind === 3 || kind === 6 || kind === 8 || kind === 9 || kind === 10 || kind === 14) && at
           ? tr("lineInspector.spotAt", { name: at })
-          : tr("lineInspector.spotPlace", { kind: kind === 4 ? "junction" : kind === 5 ? "crossing" : kind === 12 ? "merge" : "track", hasNear: !!near, near: near ?? "" });
+          : kind === 1
+            ? tr("lineInspector.spotSingle", { hasNear: !!near, near: near ?? "" })
+            : tr("lineInspector.spotPlace", { kind: kind === 4 ? "junction" : kind === 5 ? "crossing" : kind === 12 ? "merge" : "track", hasNear: !!near, near: near ?? "" });
     const out = kind === 11 ? following : busy;
     const same = out.find((o) => o.text === text); // both directions, or two stretches by one station
     if (same) same.s += s;
-    else out.push({ text, s });
+    else out.push({ text, s, single: kind === 1 });
   }
   return { spots: busy, behindSpots: following, behind, waits };
 }
@@ -122,7 +124,8 @@ export function limitsFrom(v: Float64Array, vehicle: Vehicle): (Limit | null)[] 
     const [s, kind, node, x, y] = v.subarray(21 + 5 * lev, 26 + 5 * lev);
     if (!(s > 0)) return null;
     const name = ((node >= 0 ? st.get(node) : undefined) ?? nearestStation(x, y))?.name ?? "";
-    return { s, what: fullParts(kind, name, vehicle).head + name };
+    const capS = v[36 + lev];
+    return { s, what: fullParts(kind, name, vehicle).head + name, capS: capS > 0 ? capS : s };
   });
 }
 
@@ -168,9 +171,11 @@ export function RoundTrip({ num, st, lev, stops, spots: { spots: busy, behindSpo
   const reversals = st.reversals?.length ?? 0;
   // T-2919: a bus line gives its own standing time (its dwell is stood at train stations only)
   const dwell = standing ?? runs * Math.max(0, stops - 2 - reversals) * st.dwellS + (st.loop === "circle" ? st.dwellS : 0);
-  const turn = st.loop === "circle" ? 0 : st.loop === "balloon" ? st.turnaroundS : 2 * st.turnaroundS;
+  // T-3538: a loop run out and back turns at its far end as at an end of the line
+  const partway = partwayReversals(st).length;
+  const turn = (st.loop === "circle" ? 0 : st.loop === "balloon" ? st.turnaroundS : 2 * st.turnaroundS) + runs * (reversals - partway) * st.turnaroundS;
   // and so does a bare track end it reverses at (B3), which is no stop
-  const reversing = runs * (reversals + (st.endTurns?.length ?? 0)) * st.turnaroundS;
+  const reversing = runs * (partway + (st.endTurns?.length ?? 0)) * st.turnaroundS;
   const delay = (st.delayS[lev] ?? 0) / halves;
   // T-1924: following slower trains, apart from waiting at busy track
   const behind = Math.min(delay, behindAll / halves);
@@ -212,7 +217,7 @@ export function RoundTrip({ num, st, lev, stops, spots: { spots: busy, behindSpo
         {turn > 0 && <Row label={tr(st.loop ? "lineInspector.turnEnd" : "lineInspector.turnEnds")}>{duration(turn)}</Row>}
         {reversing > 0 && <Row label={tr("lineInspector.reversing")}>{duration(reversing)}</Row>}
       </ul>
-      {delayRow(tr("lineInspector.busyTrack"), waiting, busy)}
+      {delayRow(tr(busy.reduce((n, p) => n + (p.single ? p.s : -p.s), 0) > 0 ? "lineInspector.busySingleTrack" : "lineInspector.busyTrack"), waiting, busy)}
       {delayRow(tr("lineInspector.behindSlower", { vehicle: vehicleOf(st) }), behind, behindSpots)}
       {delayRow(tr("lineInspector.fasterTrains", { vehicle: vehicleOf(st) }), forFaster, waitSpots)}
     </>
@@ -622,26 +627,19 @@ function stretchTip(s: { reached: number; limit: number; why: number } | undefin
   const lim = speed(s.limit);
   // T-2927: on a tram line the track's cap is street tram track's 60 km/h or tram track's 80
   const track = !tram ? "track" : s.limit <= TRACK_SPECS.streetTram.vCapKmh + 0.5 ? "street" : "tram";
-  // i18n-ignore: select option names
-  const why = tr("lineInspector.why", { why: s.why === 0 ? "top" : s.why === 1 ? track : s.why === 2 ? "curve" : "crossover", speed: lim, vehicle });
+  // i18n-ignore: select option names; T-3405: 4 is a piece's own speed limit
+  const why = s.why === 4 ? tr("lineInspector.whyLimit", { speed: lim, vehicle }) : tr("lineInspector.why", { why: s.why === 0 ? "top" : s.why === 1 ? track : s.why === 2 ? "curve" : "crossover", speed: lim, vehicle });
   return tr("lineInspector.reach", { speed: speed(s.reached), vehicle }) + "\n" + why + (s.reached < s.limit - 1 ? "\n" + tr("lineInspector.tooClose") : "");
 }
 
-/** T-1293: copy the line's schedule settings, and paste the copy on it (game/scheduleCopy.ts).
- * T-2919: on a bus or ferry line too, where only the trains or headways are carried. */
-export function ScheduleCopyButtons({ l, st }: { l: LineInput; st: LineStats }) {
-  const c = scheduleCopy.value;
-  const whole = !!c && wholeCopy(c, st);
-  const fit = whole ? carsCap(l) : null;
-  const cut = c && fit && c.cars > fit.cap ? "\n" + tr("lineInspector.pasteCut", { name: fit.name, cars: carsText(c.cars), cap: carsText(fit.cap), vehicle: vehicleOf(st) }) : "";
+/** The chart and schedule panel buttons beside the Schedule heading (T-3543: the copy and paste buttons are gone;
+ * a default for new lines is set in the schedule panel). */
+export function ScheduleButtons({ l, st }: { l: LineInput; st: LineStats }) {
+  if (st.bus) return null;
   return (
     <span class="sched-copy">
-      <button class="btn icon mini" aria-label={tr("lineInspector.copySchedule")} data-tip={tr("lineInspector.copyScheduleTip", { text: scheduleText(scheduleOf(l, st), !st.bus) })}
-        onClick={() => copySchedule(l, st)}><Icon.copy /></button>
-      <button class="btn icon mini" aria-label={tr("lineInspector.pasteSchedule")} disabled={!c} data-tip={c ? tr("lineInspector.pasteScheduleTip", { from: c.from, text: scheduleText(c, whole, vehicleOf(st)) }) + cut : tr("lineInspector.pasteNone")}
-        onClick={() => void pasteSchedule(l, st)}><Icon.paste /></button>
-      {!st.bus && <MareyButton st={st} />}
-      {!st.bus && <ScheduleButton l={l} st={st} />}
+      <MareyButton st={st} />
+      <ScheduleButton l={l} st={st} />
     </span>
   );
 }
@@ -893,7 +891,7 @@ function RailLineInspector({ id }: { id: string }) {
             {name.get(s)}
           </span>
           {t !== undefined && <span class="t muted num" data-tip={stretchTip(st.stretches[above], st.tram)}>{duration(t)}</span>}
-          {st.reversals?.includes(i) && (
+          {partwayReversals(st).includes(i) && (
             <span class="rev-stop" data-tip={tr("lineInspector.reverseTip", { time: duration(st.turnaroundS), vehicle: vehicleOf(st) })}>
               <Icon.uturn />
             </span>
@@ -989,7 +987,7 @@ function RailLineInspector({ id }: { id: string }) {
     <>
       <LineTitle l={l} t={title} />
       <div class="sub muted flush">
-        {tr("lineInspector.sub", { fast: !!st.fast, count: turned ? turned.rows.length : l.stops.length - (st.loop ? 1 : 0), distance: distance(st.km * 1000) })}
+        {tr("lineInspector.sub", { kind: st.tram ? "tram" : st.fast ? "fast" : "train", count: turned ? turned.rows.length : l.stops.length - (st.loop ? 1 : 0), distance: distance(st.km * 1000) })}
       </div>
       {st.status === "planned" && l.stops.length >= 2 && (
         <div class="callout">
@@ -1001,6 +999,10 @@ function RailLineInspector({ id }: { id: string }) {
         <ul class="alerts"><Alert>{tr("lineInspector.broken")}</Alert></ul>
       )}
 
+      {st.status !== "broken" && repeatedEdge(st) !== null && (
+        <ul class="alerts"><Alert tip={tr("lineInspector.repeatTrackTip", { vehicle: vehicleOf(st) })}>{tr("lineInspector.repeatTrack")}</Alert></ul>
+      )}
+
       <div class="line-stop-actions">
         <button class={"btn text" + (editingStops ? " on" : "")} data-guide={editingStops ? undefined : "stops"} data-tip={tr(editingStops ? "lineInspector.finishTip" : "lineInspector.editTip")} onClick={() => toggleEditStops(l)}><Icon.pencil /><SwapLabel on={editingStops} off={tr("lineInspector.editStops")} onText={tr("lineInspector.stopEditing")} /></button>
         <button class="btn text" onClick={() => void copy()} disabled={copying}>{tr("busInspector.copy")}</button>
@@ -1008,7 +1010,7 @@ function RailLineInspector({ id }: { id: string }) {
       </div>
       {editingStops && stopsBlock}
 
-      <Schedule l={l} st={st} now={now} limits={limits} crowd={periods} canAuto={canAuto} copy={<ScheduleCopyButtons l={l} st={st} />} />
+      <Schedule l={l} st={st} now={now} limits={limits} crowd={periods} canAuto={canAuto} copy={<ScheduleButtons l={l} st={st} />} />
       {st.status !== "broken" && <TrainType l={l} st={st} lev={lev} />}
       {st.status !== "broken" && <TrainLength l={l} st={st} />}
       {st.status !== "broken" && <LinePairs l={l} st={st} />}
@@ -1033,6 +1035,8 @@ function RailLineInspector({ id }: { id: string }) {
       {st.status !== "broken" && l.stops.length >= 2 && <LineTopSpeed l={l} st={st} />}
       {st.status !== "broken" && l.stops.length >= 2 && <LineImprovements l={l} version={w.version} vehicle={vehicleOf(st)} />}
       {st.status !== "broken" && l.stops.length >= 2 && <LineProfile l={l} version={w.version} />}
+      {st.status !== "broken" && <LineFare l={l} />}
+      {st.status === "running" && <LineMoney num={l.num} />}
     </>
   );
 }

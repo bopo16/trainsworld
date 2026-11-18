@@ -8,7 +8,7 @@ import { h, render } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { HOME_CITY, isCity } from "../game/cities";
 import { choosing } from "../game/loading";
-import { dropMarket, keepMarket } from "../game/ui";
+import { display, dropMarket, keepMarket } from "../game/ui";
 import { failLists, listSlots, newGameName, StorageReadError, type SaveSlot } from "../workers/saveFile";
 import { backupChoice, CHOICE_PARAMS, fileChoice, type GameChoice } from "../workers/clockClient";
 import { groupHeads, groupVersions, type GameGroup, type Version } from "../workers/versions";
@@ -17,6 +17,7 @@ import { overBudget } from "../game/memoryEstimate";
 import { MemoryWarn } from "./MemoryWarn";
 import { blockKeysOutside } from "./keys";
 import { NewGameSheet } from "./NewGame";
+import { newGameEnd, setStartAt } from "./locate";
 import { StartLogo } from "./StartLogo";
 import { AboutLink } from "./Credits";
 import { AccountButton, startAccountUi } from "./AccountPanel";
@@ -26,7 +27,7 @@ import { Icon } from "./widgets";
 import { Changelog } from "./Changelog";
 import { CommunityButton } from "./Community";
 import { dismissUpdate, updateToShow } from "./updates";
-import { accountBackupFile, accountList, accountOnly, cardOf, deleteOwed, deleteVersions, downloadAccountGame, settleOnStart, slotsChanged, stopStartSettle } from "../game/accountGames";
+import { accountBackupFile, accountList, accountOnly, cardOf, damagedAccount, deleteOwed, deleteVersions, downloadAccountGame, downloadFailure, pinnedFile, settleOnStart, slotsChanged, stopStartSettle } from "../game/accountGames";
 import { t } from "../i18n";
 
 declare const __TW_VERSION__: string | undefined;
@@ -37,7 +38,8 @@ const VERSION = typeof __TW_VERSION__ === "string" ? __TW_VERSION__ : "dev";
  * normal in New York unless `&mode=sandbox` or `&city=<zone id>` say otherwise (T-728), `&side=left|right` its
  * running side (T-3297);
  * `?synth=1`, `?demandTest=1`, `?paused=1` and `?continue=1` the game opened last; `?slot=<key>` and
- * `?load=file|restore|new` the game the saves panel picked (T-1196). */
+ * `?load=file|restore|new` the game the saves panel picked (T-1196); `?next=new` the menu, which starts the
+ * saves panel's new game (T-3478). */
 export function choiceFromUrl(): GameChoice | null {
   const q = new URLSearchParams(location.search);
   const on = (k: string) => q.get(k) === "1";
@@ -48,8 +50,8 @@ export function choiceFromUrl(): GameChoice | null {
   }
   // T-1196: a page reloaded into the game picked in the saves panel; the switch leaves the address
   // bar, so a reload from there goes to the menu (or, `?paused=1`, the game opened last)
-  const slot = q.get("slot"), load = q.get("load");
-  if (slot || load) {
+  const slot = q.get("slot"), load = q.get("load"), next = q.get("next");
+  if (slot || load || next) {
     const u = new URL(location.href);
     for (const k of CHOICE_PARAMS) u.searchParams.delete(k);
     history.replaceState(history.state, "", u.href);
@@ -60,6 +62,12 @@ export function choiceFromUrl(): GameChoice | null {
     return { pending: true, newGame: !on("real"), game: { mode: q.get("mode") === "sandbox" ? "sandbox" : "normal", ...(isCity(city) ? { start: city! } : {}) } };
   }
   if (load) return { pending: true };
+  if (next === "new") {
+    const city = q.get("city");
+    const at = (q.get("at") ?? "").split(",").map(Number);
+    nextNew = { choice: { pending: true, newGame: !on("real"), game: { mode: q.get("mode") === "sandbox" ? "sandbox" : "normal", ...(isCity(city) ? { start: city! } : {}) } }, at: at.length === 3 && at.every(Number.isFinite) ? { center: [at[0], at[1]], zoom: at[2] } : null };
+    return null;
+  }
   if (on("synth") || on("demandTest") || on("paused") || on("continue")) return {};
   return null;
 }
@@ -131,7 +139,7 @@ function Menu({ slots: first0, unread: unread0, pick: pickGame, settling }: { sl
     const g = key.startsWith("account:") ? accountList.peek()?.games.find((x) => "account:" + x.id === key) : null;
     if (g) {
       const k = await downloadAccountGame(g);
-      if (!k) { setRefused(t("startMenu.downloadFailed")); return; }
+      if (!k) { setRefused(downloadFailure(g.id, t("startMenu.downloadFailed"))); return; }
       key = k;
     }
     const why = await saveRefusal({ key }, true);
@@ -160,7 +168,7 @@ function Menu({ slots: first0, unread: unread0, pick: pickGame, settling }: { sl
   const now = Date.now();
   // T-2037: one card per game, its version with the latest player change on top
   const backups = useBackups(slots.map((s) => s.key), slots.length);
-  const groups = groupVersions(slots, accountOnly(slots), backups, "", accountList.value?.games ?? []);
+  const groups = groupVersions(slots, accountOnly(slots), backups, "", accountList.value?.games ?? [], damagedAccount.value);
   const wait = () => Promise.race([settling, new Promise((r) => setTimeout(r, SETTLE_WAIT_MS))]);
   const chose = (c: GameChoice | string | { warn: string }) => { if (typeof c === "string") return c; if ("warn" in c) return c.warn; pick(c); return ""; };
   const actions = (g: GameGroup): VersionActions => ({
@@ -169,7 +177,12 @@ function Menu({ slots: first0, unread: unread0, pick: pickGame, settling }: { sl
       if (v.kind === "account") { await open("account:" + v.game.id); return ""; }
       await wait();
       if (v.kind === "backup") return chose(await backupChoice(v.backup.key, v.slot.key));
-      const file = await accountBackupFile(v.game.id, g.top.kind === "slot" ? g.top.slot.name : g.top.game.name, v.backup);
+      const name = g.top.kind === "slot" ? g.top.slot.name : g.top.game.name;
+      if (v.kind === "pinned") {
+        const pinned = await pinnedFile(v.game.id, name);
+        return pinned ? chose(await fileChoice(pinned, { origin: g.origin, edit: v.game.pinned!.savedAt * 1000 })) : t("startMenu.backupDownloadFailed");
+      }
+      const file = await accountBackupFile(v.game.id, name, v.backup);
       return file ? chose(await fileChoice(file, { origin: g.origin, edit: v.backup.savedAt * 1000 })) : t("startMenu.backupDownloadFailed");
     },
     remove: async (v) => { await remove([v]); return ""; },
@@ -182,7 +195,7 @@ function Menu({ slots: first0, unread: unread0, pick: pickGame, settling }: { sl
     <p class="start-version muted small">{t("startMenu.build", { version: VERSION })}<AboutLink class="start-about" /></p>
     {/* T-2753: the language on the card's first row at the right, so a new player (who lands on the sheet) sets it first */}
     {sheet ? <div class="start-box new-game-box">
-      <div class="start-titlebar"><h1 id="start-title" class="big">{t("startMenu.newGame")}</h1><LanguageSelect class="start-top" /></div>
+      <div class="start-titlebar"><h1 id="start-title" class="big">{t("startMenu.newGame")}</h1><div class="start-top"><LanguageSelect /><AccountButton kind="start" /></div></div>
       <NewGameSheet heading={false} onBack={() => setSheet(false)} onStart={(game) => pick({ newGame: true, newSlot: newGameName(slots, game), game })} />
     </div> : <div class="start-box">
       {!LOGO && <h1 id="start-title" class="big">{t("startMenu.welcome")}</h1>}
@@ -223,6 +236,9 @@ function Menu({ slots: first0, unread: unread0, pick: pickGame, settling }: { sl
 }
 
 /** Put up the menu; `onPick` gets the player's choice once, after the menu has gone. */
+/** T-3478: the new game the saves panel picked, which the menu starts as soon as it is up (`?next=new`) */
+let nextNew: { choice: GameChoice; at: { center: [number, number]; zoom: number } | null } | null = null;
+
 export function showStartMenu(onPick: (c: GameChoice) => void) {
   choosing.value = true;
   document.documentElement.classList.add("choosing");
@@ -243,6 +259,14 @@ export function showStartMenu(onPick: (c: GameChoice) => void) {
     choosing.value = false;
     onPick(c);
   };
+  // T-3478: as the new game sheet's Start does (NewGame.tsx), on this side of the reload
+  if (nextNew) {
+    const { choice, at } = nextNew;
+    nextNew = null;
+    setStartAt(at);
+    display.value = { ...display.peek(), commuters: true, commuterEnd: newGameEnd(choice.game?.mode) };
+    return pick(choice);
+  }
   // T-988: the slots settled against the account (signed in) while the menu is up
   const settling = settleOnStart().catch(() => {});
   // storage blocked (a private window): no saved games, New game alone; storage that kept failing to

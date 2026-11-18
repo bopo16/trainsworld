@@ -11,15 +11,17 @@ import { hasUpgrade, UPGRADE } from "../game/upgrades";
 import type { PreviewAnswer } from "../workers/clockClient";
 import type { ClockEdge, ClockState } from "../workers/protocol";
 import { anchor, kAtY, toLocal, type Anchor } from "./geo";
-import { M_BAD, M_CONVERGE, M_CROSSING, M_DIVERGE, M_JUNCTION, MARK_STRIDE, rampMarks } from "./markData";
+import { M_BAD, M_CONVERGE, M_CROSSING, M_DIVERGE, M_JUNCTION, M_REPEAT, MARK_STRIDE, rampMarks } from "./markData";
+import { repeatedEdge } from "../game/repeatTrack";
 import { placeFacilities } from "./facilityPlace";
 import { buildingsDrawn, type BuildingDraw } from "./buildingNet";
 import { BAND_M_RANGE, BAND_RANGE, BAND_STRIDE, bandKnots, KNOT, lineBands, profileAt, type BandProfile } from "./lineBands";
 import { BOX_TOUCH_M, DEMAND_MERGE_M, offsetsReach, polylineGap } from "../game/complexes";
 import { acrossAt, endClear, singleSplitEnds, splitValue, TURNBACK_M, type SplitEnd } from "./terminalBays";
-import { bridgeEnds, PASS_LEAD_M, passBow, PLATFORM_HALF_M, PLATFORM_POINTS, platformPoints, platformShape, reversed, ST_BUFFER, ST_BUILDING, ST_PARK, ST_ONE, ST_ONE_NEG, ST_PASSING, ST_ROOM, ST_TERMINAL, ST_TRAM, type PlatformShape } from "./stationGeometry";
+import { bridgeEnds, PASS_LEAD_M, passBow, PLATFORM_HALF_M, PLATFORM_POINTS, platformPoints, platformShape, reversed, ST_BUFFER, ST_BUILDING, ST_PARK, ST_ONE, ST_ONE_MID, ST_ONE_NEG, ST_PASSING, ST_SINGLE, ST_ROOM, ST_TERMINAL, ST_TRAM, type PlatformShape } from "./stationGeometry";
 import { planStrokes, strokesOfPieces, type StrokeKind, type StrokeMode, type StrokePiece } from "./strokePost";
 import { oneWayTrackChevrons, trainChevrons } from "./oneWayMarks";
+import { stationOutside } from "./stationSide";
 
 /** A bus line's `lineCars` (T-1464): one car of this share of a train car's 20 m (a bus is 12 m),
  * narrower than a train's (rendererShaders.ts); below 1, so it tells a bus from a train. */
@@ -227,6 +229,8 @@ export interface NetPatch {
    * (no arrays), or only the new segments, at `ranges` (start, count pairs; `mergeNet` makes them whole) */
   modes: Record<StrokeKind, StrokeMode>;
   ranges: Record<StrokeKind, Int32Array>;
+  /** patch: from, to, count triples of the runs of the last network's segments that moved (T-1509) */
+  moves?: Record<StrokeKind, Int32Array>;
 }
 
 /** T-2258: the shortest segment of built track and line strokes, plane m. The shader shifts a band
@@ -488,14 +492,14 @@ export function strokesFromPreview(pts: Float32Array, bad: boolean, speed?: Floa
   return strokes;
 }
 
-/** One stroke set from a preview of several alignments (`parts`), red when it cannot be built. */
-export function previewStrokes(a: PreviewAnswer): Strokes | null {
+/** One stroke set from a preview of several alignments (`parts`), red when it cannot be built; `hsr`: drawn as high-speed track (T-1949) */
+export function previewStrokes(a: PreviewAnswer, hsr = false): Strokes | null {
   const parts = a.parts ?? new Uint32Array([0, a.pts.length / 3]);
   const all: Strokes[] = [];
   for (let k = 0; k + 1 < parts.length; k++) {
     const pts = a.pts.subarray(parts[k] * 3, parts[k + 1] * 3);
     // the track model's crossings and junctions belong to the whole preview: given to the first part
-    if (pts.length >= 6) all.push(strokesFromPreview(pts, !a.ok, undefined, false, all.length ? undefined : a.marks, a.partLanes?.[k] ?? 255));
+    if (pts.length >= 6) all.push(strokesFromPreview(pts, !a.ok, undefined, false, all.length ? undefined : a.marks, a.partLanes?.[k] ?? 255, hsr));
   }
   if (!all.length) return null;
   if (all.length === 1) return all[0];
@@ -521,9 +525,9 @@ export function previewStrokes(a: PreviewAnswer): Strokes | null {
 }
 
 /** A crossover's two diagonals as the placement preview (T-338), red when it cannot be built. */
-export function strokesFromParts(parts: Float32Array[], bad: boolean, placement = true): Strokes {
+export function strokesFromParts(parts: Float32Array[], bad: boolean, placement = true, lane = 255): Strokes {
   const b = new StrokeBuilder();
-  for (const pts of parts) b.add(pts, TRACK, 0xffffffff, F_BLUEPRINT | (placement ? F_PLACEMENT : 0) | (bad ? F_BAD : 0));
+  for (const pts of parts) b.add(pts, TRACK, 0xffffffff, F_BLUEPRINT | (placement ? F_PLACEMENT : 0) | (bad ? F_BAD : 0), false, 0, undefined, lane);
   return b.build();
 }
 
@@ -536,12 +540,12 @@ export function strokesFromEdges(lines: Float32Array[]): Strokes {
 }
 
 /** A preview's marks (T-629): the ramps and portals of its track, then the crossings and flat
- * junctions the track model found (`sim`: x, y, 0 crossing or 1 junction), all in the blueprint
- * tier. */
+ * junctions the track model found (`sim`: x, y, then 1 for a junction or a crossing's packed level,
+ * which carries its tram tracks, T-3535), all in the blueprint tier. */
 export function previewMarks(pts: ArrayLike<number>, sim?: ArrayLike<number>): Float32Array | undefined {
   const m: number[] = [];
   rampMarks(pts, 1, m);
-  if (sim) for (let k = 0; k + 2 < sim.length; k += 3) m.push(sim[k], sim[k + 1], sim[k + 2] === 1 ? M_JUNCTION : M_CROSSING, 0, 1, 0);
+  if (sim) for (let k = 0; k + 2 < sim.length; k += 3) m.push(sim[k], sim[k + 1], sim[k + 2] === 1 ? M_JUNCTION : M_CROSSING, 0, 1, sim[k + 2] === 1 ? 0 : sim[k + 2]);
   return m.length ? new Float32Array(m) : undefined;
 }
 
@@ -717,6 +721,10 @@ function shiftedEnds(pts: Float32Array, shift: LegShift): { pts: Float32Array; s
   // how far off its line the end `end` holds the point (x, y), `d` along from that end
   const need = (end: number, x: number, y: number, d: number) => {
     if (!shift.sign[end] || d > reach) return 0;
+    // a piece shorter than the reach has its far end on the centre line too, or it jogs where the next piece meets it
+    // (T-3379): the hold fades out over its far half
+    const far = len < reach ? Math.max(0, Math.min(1, (d / len - 0.5) / 0.5)) : 0;
+    const kept = 1 - far * far * (3 - 2 * far);
     let m = 0;
     for (const o of shift.near[end]) m = Math.max(m, o.double ? h - distTo(o.pts, x, y) : h - distTo(o.pts, x, y) / 2);
     // fades out short of the reach, should the tracks still be close there
@@ -724,7 +732,7 @@ function shiftedEnds(pts: Float32Array, shift: LegShift): { pts: Float32Array; s
     // T-3191: and never back to the centre line faster than this, so a leg leaving just before the double ends (or at
     // its end) carries on from its track and eases off its line, not bends in the moment the other track is gone
     const e = Math.max(0, Math.min(1, d / (EASE_M * kk)));
-    return Math.max(Math.max(0, m) * t * t * (3 - 2 * t), h * (1 - e * e * (3 - 2 * e)));
+    return Math.max(Math.max(0, m) * t * t * (3 - 2 * t), h * (1 - e * e * (3 - 2 * e))) * kept;
   };
   const out: number[] = [], seg: number[] = [];
   const put = (k: number, f: number) => {
@@ -1452,7 +1460,7 @@ export function mergeNet(prev: NetworkBuffers | null, n: NetworkBuffers, service
     if (!v) return false;
     pts.set(id, v);
   }
-  const track = planStrokes("track", prev.track, n.track, p.modes.track, p.ranges.track), lines = planStrokes("lines", prev.lines, n.lines, p.modes.lines, p.ranges.lines);
+  const track = planStrokes("track", prev.track, n.track, p.modes.track, p.ranges.track, p.moves?.track), lines = planStrokes("lines", prev.lines, n.lines, p.modes.lines, p.ranges.lines, p.moves?.lines);
   if (!track || !lines) return false;
   // nothing is written into the last network's arrays unless the whole network can be merged
   track.write();
@@ -1747,7 +1755,8 @@ export function networkFromState(s: ClockState, cache: NetCache = newNetCache(),
       if (sm.band.length) sampleBand.set(sm.band, first * 2);
       if (passingAt.size && !l.bus) {
         // (a return run's own stops go on a scratch list: the outer tracks are drawn from its path's)
-        const mine = linePassing(back ? { ...l, path: path as number[], stops: l.stops.slice().reverse() } : l, passingAt, edgeEnds, lens, innerAt?.get(l.id), leadOf, back ? [] : passing);
+        // (T-3348: the return run stops at its own platforms where they differ)
+        const mine = linePassing(back ? { ...l, path: path as number[], stops: (l.backStops ?? l.stops).slice().reverse() } : l, passingAt, edgeEnds, lens, innerAt?.get(l.id), leadOf, back ? [] : passing);
         for (let k = 0; k < count && mine.length; k++) {
           let v = 1e9;
           for (let j = 0; j < mine.length; j += 4) {
@@ -1795,7 +1804,7 @@ export function networkFromState(s: ClockState, cache: NetCache = newNetCache(),
   }
   cache.edges = edgesSeen;
   const served = new Map<number, number>();
-  for (const l of s.lines) for (const st of new Set(l.stops)) served.set(st, (served.get(st) ?? 0) + 1);
+  for (const l of s.lines) for (const st of new Set([...l.stops, ...(l.backStops ?? [])])) served.set(st, (served.get(st) ?? 0) + 1);
   // whether a line runs through each node, so a station's box covers it (one line width since T-190)
   const lined = new Set<number>();
   for (const e of s.edges) if (onEdge.get(e.id)?.length) lined.add(e.a).add(e.b);
@@ -1820,7 +1829,6 @@ export function networkFromState(s: ClockState, cache: NetCache = newNetCache(),
     return !p || !e ? new Float32Array(0) : e.a === node ? p : reversed(p);
   };
   const turnbacks = turnbackStrokes(s, linesSeen, endCount, (b) => {
-    const ways = (n: number) => (waysAt.get(n) ?? []).map((id): [number, Float32Array] => [id, way(n, id)]);
     // a passing station's ways, carried on as far as `passWay` goes
     const waysOut = (n: number) => (waysAt.get(n) ?? []).map((id): [number, Float32Array] => {
       const parts: Float32Array[] = [];
@@ -1845,6 +1853,7 @@ export function networkFromState(s: ClockState, cache: NetCache = newNetCache(),
     nodeLocal.set(e.a, [p[0], p[1]]);
     nodeLocal.set(e.b, [p[b * 3], p[b * 3 + 1]]);
   }
+  const edgesOf = (node: number) => (waysAt.get(node) ?? []).map((id) => edgeEnds.get(id)!);
   const stationsSeen: NetCache["stations"] = new Map();
   st.forEach((n, i) => {
     const p = nodeLocal.get(n.id) ?? toLocal(n.lng, n.lat);
@@ -1861,11 +1870,17 @@ export function networkFromState(s: ClockState, cache: NetCache = newNetCache(),
     }
     // T-3332: a one-track station on double track: the half of the box on its track's side
     const oneSide = n.one === 1 && n.oneHeading !== undefined ? oneSideAlong(n.oneHeading, s.rightHand === false, c.ax, c.ay) : 0;
+    // T-3540: a station on single track with no passing loop has one platform, on its outside; one whose track
+    // splits round a loop keeps a platform each side, each way's trains stopping on their own track (T-3564)
+    const pe = edgeEnds.get(platformEdge.get(n.id) ?? -1);
+    const split = splits.stations.has(n.id);
+    const single = !oneSide && !split && !!pe && ids.every((id) => edgeEnds.get(id)?.tracks === 1 && !edgeEnds.get(id)?.crossover);
+    const side = oneSide || (single ? stationOutside(n.id, pe, edgesOf, way, c.ax, c.ay, s.rightHand === false) : 0);
     stationsSeen.set(n.id, c);
     stationAxis.set([c.ax, c.ay], i * 2);
     stationShape.set(c.shape, i * 4);
     stationLine.set(c.line, i * 2 * PLATFORM_POINTS);
-    stations.set([p[0], p[1], ((served.get(n.id) ?? 0) > 1 ? 1 : 0) | (n.stationBuilt ? 0 : 2) | (lined.has(n.id) ? 4 : 0) | (n.stationOff ? 8 : 0) | ((edgeEnds.get(platformEdge.get(n.id) ?? -1)?.tracks === 2 && !oneSide) || splits.stations.has(n.id) ? 16 : 0) | (oneSide ? ST_ONE | (oneSide < 0 ? ST_ONE_NEG : 0) : 0) | (n.kind ? ST_TRAM : 0) | (hasUpgrade(n.upgrades, UPGRADE.waitingRoom) ? ST_ROOM : 0) | (hasUpgrade(n.upgrades, UPGRADE.parkRide) ? ST_PARK : 0) | (hasUpgrade(n.upgrades, UPGRADE.terminal) ? ST_TERMINAL | (ids.length === 1 ? ST_BUFFER : 0) : 0) | (passingAt.has(n.id) ? ST_PASSING : 0)], i * 3);
+    stations.set([p[0], p[1], ((served.get(n.id) ?? 0) > 1 ? 1 : 0) | (n.stationBuilt ? 0 : 2) | (lined.has(n.id) ? 4 : 0) | (n.stationOff ? 8 : 0) | ((pe?.tracks === 2 && !oneSide) || split ? 16 : 0) | (side ? ST_ONE | (side < 0 ? ST_ONE_NEG : 0) : 0) | (single ? ST_SINGLE | ST_ONE_MID : 0) | (n.kind ? ST_TRAM : 0) | (hasUpgrade(n.upgrades, UPGRADE.waitingRoom) ? ST_ROOM : 0) | (hasUpgrade(n.upgrades, UPGRADE.parkRide) ? ST_PARK : 0) | (hasUpgrade(n.upgrades, UPGRADE.terminal) ? ST_TERMINAL | (ids.length === 1 ? ST_BUFFER : 0) : 0) | (passingAt.has(n.id) ? ST_PASSING : 0)], i * 3);
   });
   cache.stations = stationsSeen;
   // T-2219: the station buildings' members as drawn (their boxes join the floor), which car parks stay out of
@@ -1922,6 +1937,15 @@ export function networkFromState(s: ClockState, cache: NetCache = newNetCache(),
   }
   const cx = s.crossings;
   if (cx) for (let k = 0; k + 4 < cx.length; k += 5) marks.push(cx[k], cx[k + 1], cx[k + 2] === 1 ? M_BAD : M_CROSSING, 0, cx[k + 4] === 1 ? 0 : 1, cx[k + 3]);
+  // T-3562: a loop at the first piece a line's run goes over twice in the same direction, at the piece's middle
+  for (const l of s.lines) {
+    if (l.bus || l.twinOf !== undefined) continue;
+    const id = repeatedEdge(l), pts = id === null ? undefined : edgePts.get(id);
+    if (!pts || pts.length < 6) continue;
+    const k = Math.floor((pts.length / 3 - 1) / 2) * 3, f = ((pts.length / 3 - 1) % 2) / 2;
+    const z = pts[k + 2] + f * (pts[k + 5] - pts[k + 2]);
+    marks.push(pts[k] + f * (pts[k + 3] - pts[k]), pts[k + 1] + f * (pts[k + 4] - pts[k + 1]), M_REPEAT, 0, builtEdge.get(id!) === false ? 1 : 0, Math.max(-3, Math.min(3, Math.round(z / 8))));
+  }
   // T-3094: chevrons along one-way single track, clear of stations
   const oneWayTrack: number[] = [];
   if (s.edges.some((e) => e.oneWay)) {
@@ -2187,7 +2211,7 @@ function pointAt(n: NetworkBuffers, line: number, d: number, run = 0, shiftM = 0
 }
 
 /** A per-sample value of a line at offset `d` along run 0, between its samples. */
-function sampleValue(n: NetworkBuffers, v: Float32Array, line: number, d: number): number {
+export function sampleValue(n: NetworkBuffers, v: Float32Array, line: number, d: number): number {
   const first = n.lineTable[line * 4];
   if (n.lineTable[line * 4 + 1] < 2) return v[first] ?? 1e9;
   const [si, f] = sampleSegment(n, line, d);

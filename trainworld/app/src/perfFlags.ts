@@ -33,10 +33,12 @@
 //   selected the zone the city view shows waits its turn in the queues, and its figures wait for its cluster's final
 //   viewRound  the zone in view gets no figures from each round of a cluster solved ahead
 //   lengths0 the city view's trip lengths are asked of the shown round, not of round 0 ahead of it
+//   regional the bubbles count the zone's local trips alone, none with other places (T-3503)
 //
 // Loading and memory:
 //   close    packs no longer needed never close
 //   cap      the demand pool keeps its solving workers whatever their memory
+//   grow     a demand pool cut for memory never adds workers back (T-1366)
 //   cacheAhead  a loading save's cached demand result waits for its network, and the camera for its first state
 //   cacheCard   a loaded game showing its cached demand result keeps its card and held clock until the fresh final (T-347)
 //   splitAhead  the station bubbles' origins and transfers wait for the transfer pairs asked of the workers
@@ -78,10 +80,11 @@
 //
 // The network diagram:
 //   carryWasm  the carry on the rubber sheet solved in JavaScript, not WASM (the same drawing, slower; T-2589)
+//   msaa     the network's canvas without multisampling at any pixel ratio (T-3497, to measure its memory)
 
 const q = new URLSearchParams(location.search);
 const off = new Set((q.get("perfOff") ?? "").split(",").filter(Boolean));
 
-export const perfOff = (part: "labels" | "shadow" | "hover" | "clock" | "overlay" | "markers" | "clusters" | "periods" | "split" | "reach" | "chunks" | "farChunks" | "close" | "marks" | "fans" | "zoneZoom" | "moving" | "cap" | "rough" | "cacheAhead" | "cacheCard" | "estimate" | "splitAhead" | "strokeCache" | "strokeCull" | "strokeLod" | "strokeGather" | "bands" | "follow" | "crossWait" | "singleWait" | "bays" | "stillThrottle" | "share" | "noise" | "firm" | "alone" | "allSums" | "focus" | "muteThin" | "bandsSmooth" | "bandsOrder" | "bandsPlace" | "bandsHold" | "bandsAlign" | "bandGap" | "roads" | "selected" | "viewRound" | "lengths0" | "focusAhead" | "focusEnd" | "refineAside" | "inPlace" | "focusAux" | "cacheFocus" | "strays" | "keepFigures" | "settledHold" | "carryWasm" | "overviewCache" | "realZoom" | "fareHold") => off.has(part);
+export const perfOff = (part: "labels" | "shadow" | "hover" | "clock" | "overlay" | "markers" | "clusters" | "periods" | "split" | "reach" | "chunks" | "farChunks" | "close" | "marks" | "fans" | "zoneZoom" | "moving" | "cap" | "grow" | "rough" | "cacheAhead" | "cacheCard" | "estimate" | "splitAhead" | "strokeCache" | "strokeCull" | "strokeLod" | "strokeGather" | "bands" | "follow" | "crossWait" | "singleWait" | "bays" | "stillThrottle" | "share" | "noise" | "localKeep" | "localSkip" | "firm" | "alone" | "allSums" | "focus" | "muteThin" | "bandsSmooth" | "bandsOrder" | "bandsPlace" | "bandsHold" | "bandsAlign" | "bandGap" | "roads" | "selected" | "viewRound" | "lengths0" | "regional" | "focusAhead" | "focusEnd" | "refineAside" | "inPlace" | "focusAux" | "cacheFocus" | "strays" | "keepFigures" | "settledHold" | "carryWasm" | "overviewCache" | "realZoom" | "fareHold" | "msaa") => off.has(part);
 /** how lines side by side are worked out (map/lineBands.ts `setBandMode`) */
 export const bandTry = (): string => (perfOff("bandsSmooth") ? "" : (perfOff("bandsOrder") ? "smooth" : "smooth,order") + (perfOff("bandsPlace") ? "" : ",fit,snap") + (perfOff("bandsHold") ? "" : ",hold") + (perfOff("bandsAlign") ? "" : ",align"));

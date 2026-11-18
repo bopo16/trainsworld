@@ -10,7 +10,8 @@ import { removeThing } from "../../game/remove";
 import { describeIssues } from "../../game/issues";
 import { moneyState } from "../../game/money";
 import { edgeUpkeep } from "../../game/regionMoney";
-import { TRACK_SPECS } from "../../game/trackKinds";
+import { PieceLimit } from "./PieceLimit";
+import { PieceRebuild } from "./PieceRebuild";
 import { Actions, Built, Check, Chip, ConstructRemove, Icon, Row } from "../widgets";
 import { setOneWay } from "../../game/oneWay";
 import { useClockQuery } from "../useClockQuery";
@@ -57,10 +58,15 @@ export function TrackInspector({ edge }: { edge: number }) {
         {e.tracks === 2 && !e.crossover && <DoubleUp edge={e.id} version={w.version} />}
       </div>
       <div class="sub muted">
-        {tSeries([distance(e.lengthM), lv])}
+        {tSeries([distance(e.lengthM), t("trackInspector.kind", { kind: e.crossover ? "crossover" : e.kind ? (e.kind === 2 ? "streetTram" : "tram") : e.hsr ? "hsr" : e.tracks === 2 ? "double" : "single" }), lv])}
       </div>
-      <ConstructRemove built={e.built} construct={construct} constructLabel={t("trackInspector.construct", { price: money(cost) })} remove={remove}
-        removeLabel={t("trackInspector.remove", { kind: e.crossover ? "crossover" : e.built ? "track" : "blueprint" })} removeTip="" />
+      {/* T-3408: built track rebuilds here, Rebuild beside Remove */}
+      {e.built && !e.crossover ? (
+        <PieceRebuild key={e.id} e={e}><button class="btn text" onClick={remove}>{t("trackInspector.remove", { kind: "track" })}</button></PieceRebuild>
+      ) : (
+        <ConstructRemove built={e.built} construct={construct} constructLabel={t("trackInspector.construct", { price: money(cost) })} remove={remove}
+          removeLabel={t("trackInspector.remove", { kind: e.crossover ? "crossover" : e.built ? "track" : "blueprint" })} removeTip="" />
+      )}
       <Built built={e.built} />
       {!e.built && e.off && <p class="muted" data-tip={t("trackInspector.disabledTip")}>{t("trackInspector.disabled")}</p>}
       {e.tracks === 1 && !e.crossover && (
@@ -75,13 +81,8 @@ export function TrackInspector({ edge }: { edge: number }) {
           )}
         </Actions>
       )}
-      <ul class="rows">
-        {!e.crossover && (
-          <li data-tip={e.kind ? undefined : t(e.hsr ? "trackInspector.speedHsr" : "trackInspector.speedNormal")}>
-            <span class="grow">{t("trackInspector.speedLimit")}</span>
-            <span class="val">{speed(e.kind ? TRACK_SPECS[e.kind === 2 ? "streetTram" : "tram"].vCapKmh : e.hsr ? 320 : 160)}</span>
-          </li>
-        )}
+      <ul class="rows top-speed">
+        {!e.crossover && <PieceLimit key={e.id} e={e} />}
         <Row label={t("trackInspector.slowest")}>{speed(e.vminKmh)}</Row>
         <Row label={t("trackInspector.cost")}>{money(cost)}</Row>
         {!e.crossover && m && (

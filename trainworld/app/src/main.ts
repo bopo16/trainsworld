@@ -18,16 +18,19 @@ import { clock, startClock } from "./game/clock";
 import { getWorldFrame, HOME_CITY } from "./game/cities";
 import { ZONE_LOAD_ZOOM } from "./game/zones";
 import { packToLngLat, lngLatToPack } from "./game/coords";
-import { ask, buildLevel, display, isBuildTool, mapShade, selection, shade, snapRoads, snapStreets, stopEditing, tab, tool, tramTrack, VIDEO } from "./game/ui";
+import { ask, buildLevel, display, isBuildTool, mapShade, selection, shade, snapRealTram, snapRoads, snapStreets, stopEditing, tab, tool, tramTrack, VIDEO } from "./game/ui";
 import { groupHover, lineGroups } from "./game/lineGroups";
-import { complexOf, dotGroups, inComplexView } from "./game/complexView";
+import { complexOf, dotGroups, inComplexView, openAlone, singleStation } from "./game/complexView";
 import { hot, onHot } from "./map/hovered";
 import { cancelLink, linkPicked, linking } from "./game/links";
 import { ACTION_KEYS, DEMAND_KEY, levelOfKeyCode, pickTool, TAB_KEYS, TOOL_KEYS, TRIP_KEY } from "./ui/toolKeys";
 import { addAllPassedSelected, constructBlueprints, newLineKey, toggleEditStopsSelected } from "./game/lineActions";
 import { hideUiKey } from "./ui/hideUi";
+import { helpKey } from "./ui/HelpPanel";
 import { followCapsLock, keyIsTheirs, releaseSelectsAfterMousePick } from "./ui/keys";
 import { stopsById, world } from "./game/world";
+import { hiddenLevels, hiddenLines, hideBuses, levelBits } from "./game/lineVisibility";
+import { setHidden } from "./map/visibility";
 import "./game/capLoad";
 import { removeThing, setTrackHider } from "./game/remove";
 import { redo, undo } from "./game/fareUndo";
@@ -40,6 +43,7 @@ import { live } from "./map/live";
 import { setBasemapLabels, setBasemapShade, setSatellite, setBusRoadHint, setHillshade, setRailRoadHint, setTramRoadHint } from "./map/basemap";
 import { createMap } from "./map/mapView";
 import { startRealNetwork } from "./map/realNetwork";
+import { startRealStations } from "./map/realStations";
 import { startCityBoundaries } from "./map/cityBoundaries";
 import { startZoneLoading } from "./map/zoneLoading";
 import { startRealmOverlay } from "./map/realmOverlay";
@@ -101,8 +105,8 @@ import { guideNewGame } from "./game/guide";
 import { mountKeepDot } from "./ui/KeepDot";
 import { startTips } from "./ui/tip";
 import { setupDone, startLoadingGate } from "./ui/LoadingScreen";
-import { choosing, lastLoadDied, loadCannotFinish, loadNoSimd, loadNoWebgl2, startGameWait, waitKey } from "./game/loading";
-import { hasWebgl2 } from "./map/webgl2";
+import { choosing, lastLoadDied, loadCannotFinish, loadGraphicsGone, loadNoSimd, loadNoWebgl2, onGraphicsGone, startGameWait, waitKey } from "./game/loading";
+import { webgl2State } from "./map/webgl2";
 import { hasWasmSimd } from "./map/wasmSimd";
 import { outOfMemoryText } from "./game/loadText";
 import { startSaveSafety } from "./game/saveSafety";
@@ -144,8 +148,14 @@ if (params.get("paused") === "1") clock.setRunning(false);
 // T-149, T-172: the clock is held until the viewed city's demand has its first estimate
 startLoadingGate();
 // T-3307: MapLibre cannot start without WebGL2; say what to do, start nothing (the throw ends this module)
-if (!hasWebgl2()) {
-  loadNoWebgl2();
+// T-3582: a browser that has WebGL2 but refuses it has most likely blocked the page after its graphics were lost
+// (a restart brings them back; the screen also names hardware acceleration); one with no WebGL2 gets T-3307's advice
+const gl2 = webgl2State();
+if (gl2.state !== "ok") {
+  if (gl2.state === "refused") {
+    console.warn("WebGL2 context refused:", gl2.reason || "no reason given"); // i18n-ignore
+    loadGraphicsGone(gl2.reason);
+  } else loadNoWebgl2();
   throw new Error("WebGL2 is not available"); // i18n-ignore: stops the page's setup; the player reads the failure screen
 }
 // T-3315: the simulation needs WASM SIMD (Safari 16.4); an older browser gets its own sentence, not a compile error
@@ -191,6 +201,8 @@ render(h(MapTopLeft, null), demandSelectorRoot); // the demand buttons and the s
 const demandStoppedRoot = document.createElement("div");
 map.getContainer().appendChild(demandStoppedRoot);
 render(h(DemandStopped, { save: () => client.saveBeforeReload() }), demandStoppedRoot);
+// T-3582: the browser refused the page graphics mid-game: the game is saved before the player restarts the browser
+onGraphicsGone(() => { void client.saveBeforeReload(); });
 // T-2962: a file of this tab gone from the server after a publish: a notice with Reload, which saves first
 const newVersionRoot = document.createElement("div");
 map.getContainer().appendChild(newVersionRoot);
@@ -263,7 +275,6 @@ const overlay = new Overlay(map, renderer, () => {
       // the blueprint stations picked with the blueprint tool's box (T-333)
       ...(n ? bpPicked.value.stations.map((id) => stationIndexOf(n, String(id))) : []),
     ],
-    crowds: d.platformCrowds !== "off", // T-164, T-219
     flatMarks: d.flatMarks,
     rampMarks: d.rampMarks,
     groups: dotGroups.peek(), // zoomed out, the stations the distance rule groups are one dot (T-217, T-225)
@@ -428,9 +439,23 @@ effect(() => {
 });
 const demandOnTop = (x: number, y: number, add: boolean) => (onMark(x, y) || netFirst(x, y) ? undefined : demandClick?.(x, y, add));
 
+// T-3420: the lines and levels the player hid; a hidden line's twin with it (T-3333)
+const hiddenNums = computed(() => {
+  const ids = hiddenLines.value, w = world.value, out = new Set<number>();
+  for (const id of ids) out.add(Number(id));
+  if (hideBuses.value && w) for (const l of w.save.lines) if (w.lineStats[l.id]?.bus) out.add(l.num);
+  if (w && ids.size) for (const [twin, of] of w.twins) if (ids.has(of)) out.add(Number(twin));
+  return out;
+});
+effect(() => {
+  const w = world.value;
+  const stations = new Map((w?.save.stations ?? []).map((s) => [s.id, s.level]));
+  const changed = setHidden(hiddenNums.value, levelBits(hiddenLevels.value), (id) => stations.get(id), (id) => w?.nodes.get(id)?.level);
+  if (changed) overlay.invalidate();
+});
 // Bus lines are drawn from the world's routes (T-1464, map/busLayer.ts)
 effect(() => {
-  if (renderer.buses.set(world.value)) overlay.invalidate();
+  if (renderer.buses.set(world.value, hiddenNums.value)) overlay.invalidate();
 });
 // T-3084: while a bus line's route is redrawn, its current route is drawn muted under the draft
 effect(() => {
@@ -488,11 +513,12 @@ map.on("load", () => {
   effect(() => { shade.value; setBasemapShade(map, mapShade.value, contrast.value); });
   effect(() => setSatellite(map, display.value.satellite)); // T-3249
   effect(() => setHillshade(map, display.value.hillshade)); // T-1270
-  effect(() => setBusRoadHint(map, tool.value === "bus")); // T-2883
-  effect(() => setTramRoadHint(map, tool.value === "track" && tramTrack.value && snapStreets.value)); // T-2998
+  effect(() => setBusRoadHint(map, tool.value === "bus", display.value.busOneWay)); // T-2883
+  effect(() => setTramRoadHint(map, tool.value === "track" && tramTrack.value && snapStreets.value && !snapRealTram.value)); // T-2998
   effect(() => setRailRoadHint(map, tool.value === "track" && !tramTrack.value && snapRoads.value)); // T-3129
   startTerrainTint(map); // T-1270 stage 3
   startRealNetwork(map); // T-682
+  startRealStations(map); // T-3570
 });
 effect(() => client.setShade(shade.value)); // save thumbnails are drawn in it (T-543)
 // T-039: the network's casing and inks come from game/shades.ts at each draw
@@ -536,7 +562,18 @@ function selectAt(x: number, y: number, add: boolean) {
   // linking a station into a complex (T-197): the station clicked is the other end
   if (linking.peek() !== null) void linkPicked(pick(overlay, x, y, false, selection.peek()));
   // lines, stations and trains, then commuter bubbles while they are shown, then the rest (T-1515)
-  else selection.value = demandOnTop(x, y, add) ?? pick(overlay, x, y, display.peek().trains && !onMark(x, y), selection.peek(), true, (num, seg) => lineSizeAt(overlay, num, seg));
+  else {
+    const cur = selection.peek();
+    const hit = demandOnTop(x, y, add) ?? pick(overlay, x, y, display.peek().trains && !onMark(x, y), cur, true, (num, seg) => lineSizeAt(overlay, num, seg));
+    // a station of the selected complex, or another of a station opened alone from it: that station alone (T-3539);
+    // the same station again goes back to its complex
+    const alone = singleStation.peek();
+    if (hit?.kind === "station" && cur?.kind === "station" && hit.station !== alone) {
+      const members = complexOf(cur.station);
+      if (members.length > 1 && members.includes(hit.station)) { openAlone(hit.station); live.overlay?.invalidate(); return; }
+    }
+    selection.value = hit;
+  }
 }
 capacity.selectClick = selectAt;
 // Linking stops when its station is no longer the selection or a tool is picked.
@@ -566,6 +603,7 @@ if (!SYNTH && !perfOff("hover")) // ?perfOff=hover: T-045 measurement only
 releaseSelectsAfterMousePick();
 followCapsLock();
 hideUiKey(); // F2 hides the interface for screenshots (T-1491)
+helpKey(); // F1 opens the help panel (T-3527)
 // Ctrl+S saves the game now (T-1251), in any panel or field, instead of the browser saving the page
 window.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "s") {
@@ -819,7 +857,7 @@ if (DEBUG) {
   (window as any).tw = {
     failDemand: (why = "forced by ?debug=1") => loadCannotFinish(why), // T-2657: stop demand as if a worker died
     figures: { peaks: figuresPeaks, stopped: figuresStopped }, // T-3314: the longest quiet seen, and the notice's signal
-    soundLog, map, overlay, renderer, labels, capacity, clock, world, selection, display, shade, tools, client, checkPrecision, moneyState, incomeByDay, lastSaved, pick, tripAt, lineRunFactor,
+    soundLog, map, overlay, renderer, labels, capacity, clock, world, selection, singleStation, complexOf, display, shade, tools, client, checkPrecision, moneyState, incomeByDay, lastSaved, pick, tripAt, lineRunFactor,
     // the current draw anchor (T-307), mercator 0..1, and conversions with it
     get originMerc() { return anchor().merc; },
     anchor, toLocal, toLngLat,

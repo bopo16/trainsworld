@@ -15,7 +15,7 @@ import { moneyState } from "../../game/money";
 import { modeColours } from "../../game/palette";
 import { PERIODS } from "../../game/periods";
 import { eachCorridor, intercityDemand, intercityPlaceName } from "../../game/demand";
-import { peopleOf, tripPeriod, wholePeople, type MarketEnd, type MarketPeriod, type MarketShown, type TripRoute } from "../../game/trip";
+import { baseFareOf, peopleOf, routeTerms, tripPeriod, wholePeople, type MarketEnd, type MarketPeriod, type MarketShown, type TripRoute } from "../../game/trip";
 import { shownDayPhrase } from "../../game/ui";
 import { linesById, stationNames, world } from "../../game/world";
 import { lowerWord, t as tr, tRich, tSeries } from "../../i18n";
@@ -51,6 +51,24 @@ function carEquation(c: CarCost): string {
     ]),
   ];
   return `${equation(terms, c.total)}\n${tr("marketTrip.dollarWeight", { amount: smallMoney(1), w: num1(c.w) })}`;
+}
+
+/** The train's effective time as an equation (T-3404): the main route's terms in the order of the rows, with
+ * the walks as the felt minutes the market knows them by, and the model's figure, which pools every route
+ * the riders use, as the last term. */
+function trainEquation(t: MarketPeriod, r: TripRoute): string {
+  const felt = { ...t, pairs: t.pairs.map((p) => ({ ...p, accessMin: p.accessPerceived, egressMin: p.egressPerceived })) };
+  const terms: Term[] = routeTerms(felt, r).filter((x) => x.perceived !== 0 || x.unit === "usd").map((x) => ({
+    label: termLabel(x.id),
+    real: x.unit === "usd" ? usd(x.real) : x.real > 0 ? num1(x.real) : "",
+    weight: x.weight,
+    perceived: x.perceived,
+    ...(x.unit === "usd" ? { usd: true } : {}),
+  }));
+  const rest = t.railPerceived - terms.reduce((s, x) => s + x.perceived, 0);
+  // i18n-ignore: term id
+  if (Math.abs(rest) >= 0.05) terms.push({ label: termLabel("choice of routes"), real: "", weight: 1, perceived: rest });
+  return equation(terms, t.railPerceived) + (Math.abs(rest) >= 0.05 ? "\n" + tr("tripInspector.choiceOfRoutes") : "");
 }
 
 /** By car: the drive, its running costs, parking, any crossing, and the effective time. `parts`
@@ -398,7 +416,7 @@ export function MarketTrip({ m }: { m: MarketShown }) {
   // T-1277: the market prices the curve as set; a trip pays it times its starting country's scale
   const start = m.end === "work" ? one : ends.near;
   const sc = fareScale(start >= 0 ? marketRow(start)?.country : undefined, moneyState.value?.fares.scales);
-  const fare = main ? (sc * (t.baseFarePerceived + main.legs.reduce((s, l) => s + l.farePerceived, 0))) / t.minPerUsd : 0;
+  const fare = main ? (sc * (baseFareOf(t, main) + main.legs.reduce((s, l) => s + l.farePerceived, 0))) / t.minPerUsd : 0;
   const periodLow = lowerWord(period);
   // T-3374: the routes are the longer trips' while any ride, else every kind's (the sim's
   // `market_trip`); with commutes or outings beside them the period is the one with most trips of all
@@ -450,7 +468,7 @@ export function MarketTrip({ m }: { m: MarketShown }) {
         <>
           <Legs t={t} r={main} />
           <ul class="rows">
-            <li data-tip={tr("tripText.baseFare", { fare: usd((sc * t.baseFarePerceived) / t.minPerUsd), xfer: false, xferFare: "" })}>
+            <li data-tip={tr("tripText.baseFare", { fare: usd((sc * baseFareOf(t, main)) / t.minPerUsd), xfer: false, xferFare: "" })}>
               <span class="grow">{tr("tripText.fare")}</span>
               <span class="val">{usd(fare)}</span>
             </li>
@@ -465,7 +483,7 @@ export function MarketTrip({ m }: { m: MarketShown }) {
               </li>
             )}
             {Number.isFinite(t.railPerceived) && (
-              <li>
+              <li data-tip={trainEquation(t, main)}>
                 <span class="grow">{tr("tripText.effectiveTime")}</span>
                 <span class="val">{minText(t.railPerceived)}</span>
               </li>

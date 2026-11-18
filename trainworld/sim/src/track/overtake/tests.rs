@@ -15,7 +15,7 @@ fn shinkansen() -> (TrackWorld, Vec<u32>, u32, u32) {
     let n: Vec<u32> = (0..7).map(|k| node(&mut w, k as f64 * 30_000.0, 0.0, 0)).collect();
     for k in 0..6 {
         let id = w.net.alloc_edge();
-        w.apply(Op::Edge { id, data: Some(EdgeData { a: n[k], b: n[k + 1], tracks: 2, pis: vec![], built: true, off: false, thru: vec![], crossover: false, kind: crate::track::params::TrackKind::HighSpeed, sep: false, day: 0, oneway: 0, join: [0; 2] }) }).unwrap();
+        w.apply(Op::Edge { id, data: Some(EdgeData { a: n[k], b: n[k + 1], tracks: 2, pis: vec![], built: true, off: false, thru: vec![], crossover: false, kind: crate::track::params::TrackKind::HighSpeed, sep: false, day: 0, oneway: 0, join: [0; 2], limit: 0 }) }).unwrap();
     }
     for &x in &n {
         station(&mut w, x, 400);
@@ -208,13 +208,19 @@ fn passing_tracks_save_and_load() {
 /// 200 m ground station, US$45M for a 400 m one on high-speed track, twice over water.
 #[test]
 fn passing_tracks_price() {
-    assert!((upgrades::price(PASSING, 0, false, 200, false) - 22.5).abs() < 1e-9);
-    assert!((upgrades::price(PASSING, 0, false, 400, true) - 45.0).abs() < 1e-9);
-    assert!((upgrades::price(PASSING, 0, true, 200, false) - 45.0).abs() < 1e-9);
+    use crate::track::params::TrackKind::{HighSpeed, Regular, Tram};
+    assert!((upgrades::price(PASSING, 0, false, 200, Regular) - 22.5).abs() < 1e-9);
+    assert!((upgrades::price(PASSING, 0, false, 400, HighSpeed) - 45.0).abs() < 1e-9);
+    assert!((upgrades::price(PASSING, 0, true, 200, Regular) - 45.0).abs() < 1e-9);
+    // T-3574: a tram stop's terminal is 1 km of tram track (the same 0.5x as rail at ground, off street; 0.1x on a street), its passing tracks as rail's at that table
+    assert!((upgrades::price(upgrades::TERMINAL, 0, false, 200, Tram) - 37.5).abs() < 1e-9);
+    assert!((upgrades::price(PASSING, 0, false, 200, Tram) - 22.5).abs() < 1e-9);
+    assert!((upgrades::price(upgrades::TERMINAL, 0, false, 200, crate::track::params::TrackKind::StreetTram) - 7.5).abs() < 1e-9);
+    assert!((upgrades::price(upgrades::TERMINAL, 2, false, 200, Tram) - 82.5).abs() < 1e-9);
     let (w, n, _, _) = shinkansen();
     assert!((w.net.station_upgrades_price(n[2], PASSING, false) - 45.0).abs() < 1e-9);
     // the other upgrades keep their prices
-    assert!((upgrades::price(upgrades::TERMINAL, 0, false, 400, true) - 37.5).abs() < 1e-9);
+    assert!((upgrades::price(upgrades::TERMINAL, 0, false, 400, HighSpeed) - 37.5).abs() < 1e-9);
 }
 
 /// T-2231: the line button's stations: the local's stops strictly inside the shared stretch, from

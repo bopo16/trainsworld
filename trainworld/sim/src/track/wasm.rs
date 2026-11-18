@@ -15,7 +15,7 @@ use super::bridge;
 use super::cost::{BlockIndex, ClassGrid, GeoMask, MaskSet, NoWater, RunMask, TransformedMask, UnionMask, WaterMask, WorldWater};
 use super::frame::FrameKind;
 use super::geom::{self, design_radii, GeomIssue, Pi};
-use super::net::{CrossKind, EdgeData, GroupLook, Issue, LineData, LoopKind, Network, NodeData, StationData};
+use super::net::{CrossKind, EdgeData, GroupLook, Issue, LineData, LoopKind, Network, NodeData, StationData, Weekend};
 use super::params::*;
 use super::profile;
 use super::roads::{self, RoadTile, Roads};
@@ -230,9 +230,15 @@ fn pack_mask_in(frame: super::frame::Frame, mask: &Arc<RunMask>, lon: f64, lat: 
 /// Ordinary cars, then high-speed ones (T-817), then buses (T-1464), then boats (T-2193), then trams (T-2926).
 fn cars_needed(w: &TrackWorld) -> [u32; FLEETS] {
     let mut out = [0; FLEETS];
+    // T-3521: a train runs on whichever kind of day needs the most at any level
+    let mut weekend = vec![0u32; w.svc.lines.len()];
+    for (l, c) in w.weekend_own() {
+        if let Some(x) = weekend.get_mut(l) { *x = c.iter().copied().max().unwrap_or(0); }
+    }
     for (i, l) in w.svc.lines.iter().enumerate() {
         if l.running {
-            out[fleet_kind(&w.net, i)] += l.trains.iter().copied().max().unwrap_or(0) * l.cars;
+            let rest = weekend[i];
+            out[fleet_kind(&w.net, i)] += l.trains.iter().copied().max().unwrap_or(0).max(rest) * l.cars;
         }
     }
     out
@@ -423,6 +429,26 @@ impl TrackApi {
     pub fn set_line_holidays(&mut self, packed: Vec<f64>) {
         self.boarding.set_holidays(&packed);
     }
+    /// T-3521: each line's days whose kind is not the week's (`params::row_of_day`), so its weekend
+    /// trains (`LineData::weekend`) run on its country's weekends and public holidays: per line its
+    /// id, a count, then that many pairs of a local game day and its kind (0 weekdays, 1 weekends),
+    /// within `service::CAL_DAYS` of each other. Replaces the last list; a line left out follows the
+    /// week. Its departures read it (`service::Cal`).
+    pub fn set_line_rows(&mut self, packed: Vec<f64>) {
+        let mut cal = vec![crate::track::service::Cal::NONE; self.w.net.line_count()];
+        let mut i = 0;
+        while i + 1 < packed.len() {
+            let (id, n) = (packed[i] as usize, packed[i + 1] as usize);
+            i += 2;
+            let Some(days) = packed.get(i..i + 2 * n) else { break };
+            i += 2 * n;
+            let pairs: Vec<(i64, u8)> = days.chunks_exact(2).map(|d| (d[0] as i64, d[1] as u8)).collect();
+            if id < cal.len() {
+                cal[id] = crate::track::service::Cal::from_days(&pairs);
+            }
+        }
+        self.w.svc.set_cal(cal, self.w.net.rest_solved);
+    }
     /// A line's day in the boarding account for its panel (T-230, `Boarding::line_summary`), on
     /// a kind of day (T-260); empty before riders.
     pub fn line_account(&self, line: u32, day: u32) -> Vec<f64> {
@@ -543,7 +569,7 @@ impl TrackApi {
     pub fn append_water(&mut self, cell: f64, x0: f64, y0: f64, w: u32, h: u32, row: &[u32], xs: &[u16], offset_x: f64, offset_y: f64, scale_x: f64, scale_y: f64) {
         assert!(scale_x.is_finite() && scale_x > 0.0 && scale_y.is_finite() && scale_y > 0.0);
         let m = TransformedMask {
-            mask: Arc::new(RunMask { x0, y0, cell, w, h, row: row.to_vec(), xs: xs.to_vec() }),
+            mask: Arc::new(RunMask::pack(cell, x0, y0, w, h, row.to_vec(), xs.to_vec())),
             offset: [offset_x, offset_y], scale: [scale_x, scale_y],
         };
         let previous = std::mem::replace(&mut self.w.net.water_mask, Box::new(NoWater));
@@ -555,7 +581,7 @@ impl TrackApi {
     /// equirectangular frame, in which the raster's grid is laid out. The mask follows the loaded
     /// network's frame and is rebuilt when a save in another frame is loaded.
     pub fn add_pack_water(&mut self, cell: f64, x0: f64, y0: f64, w: u32, h: u32, row: &[u32], xs: &[u16], pack_lon: f64, pack_lat: f64) {
-        let mask = Arc::new(RunMask { x0, y0, cell, w, h, row: row.to_vec(), xs: xs.to_vec() });
+        let mask = Arc::new(RunMask::pack(cell, x0, y0, w, h, row.to_vec(), xs.to_vec()));
         let seen = pack_mask_in(self.w.net.frame(), &mask, pack_lon, pack_lat);
         let b = seen.1;
         self.rasters.push(PackWater { mask, lon: pack_lon, lat: pack_lat, seen });
@@ -710,7 +736,7 @@ impl TrackApi {
                 net.roads = self.w.net.roads.clone();
                 net.streets = self.w.net.streets.clone();
                 self.w = TrackWorld::new(net);
-                if stop_every_pass(&mut self.w.net) {
+                if stop_every_pass(&mut self.w.net) | legs::straighten_legs(&mut self.w.net) {
                     self.w.reload();
                 }
                 // T-2669: the last game's lines' prices are not this one's; the app sends them again
@@ -823,6 +849,7 @@ mod beside;
 mod crossings;
 mod links;
 mod oneway;
+mod limits;
 mod flip;
 mod rebuild;
 mod lines;
@@ -836,6 +863,7 @@ mod ferry;
 mod buildings;
 mod twin;
 mod onetrack;
+mod legs;
 
 /// What buying the cars the running lines need beyond `fleet` costs, US$M.
 fn trains_to_buy(w: &TrackWorld, fleet: [u32; FLEETS]) -> f64 {
@@ -910,6 +938,9 @@ type HopMemo = std::collections::HashMap<(u32, u32, u8, u8), Option<(Vec<u32>, u
 fn route_memo(net: &Network, stops: &[u32], memo: &mut HopMemo) -> Option<Vec<u32>> {
     if stops.iter().any(|&s| !net.node_ok(s) || net.node_platform[s as usize] == 0) {
         return None;
+    }
+    if let Some(p) = net.route_legs(stops) {
+        return Some(p);
     }
     let mut path = vec![];
     let mut side = None;
@@ -993,7 +1024,7 @@ fn turn_last(net: &Network, line: u32, stops: &[u32], path: &[u32], memo: &mut H
     let old = round_guess(net, line, stops, path);
     let nodes = nodes_of(net, path);
     let (_, k) = net.loop_back(path, true, nodes.len(), old + turn_allowance(old))?;
-    let at = super::net::match_stops(&nodes, stops, &net.stop_reversals(path))?;
+    let at = net.match_run(&nodes, stops, &net.stop_reversals(path))?.0;
     let branch = (0..n).rev().find(|&i| at[i] <= k)?;
     let mut new = stops.to_vec();
     new.extend((0..n - 1).rev().filter(|&i| at[i] <= k).map(|i| stops[i]));
@@ -1005,7 +1036,7 @@ fn turn_last(net: &Network, line: u32, stops: &[u32], path: &[u32], memo: &mut H
 fn turn_first(net: &Network, line: u32, stops: &[u32], path: &[u32], memo: &mut HopMemo) -> Option<Turn> {
     let n = stops.len();
     let nodes = nodes_of(net, path);
-    let at = super::net::match_stops(&nodes, stops, &net.stop_reversals(path))?;
+    let at = net.match_run(&nodes, stops, &net.stop_reversals(path))?.0;
     let old = round_guess(net, line, stops, path);
     let (_, k) = net.loop_back(path, false, at[open_prefix(stops)], old + turn_allowance(old))?;
     let mut new: Vec<u32> = (1..n).filter(|&i| at[i] > k).map(|i| stops[i]).collect();
@@ -1154,6 +1185,12 @@ fn best_insert(net: &Network, line: u32, station: u32, memo: &mut HopMemo) -> Op
     if !net.line_ok(line) {
         return None;
     }
+    // T-3565: a line with one-way stations served once orders them by the track
+    if !net.line_hand[line as usize] {
+        if let Some(r) = legs::insert(net, net.line_stops(line), station, memo) {
+            return Some(r);
+        }
+    }
     let (stops, path) = best_slot(net, net.line_stops(line), station, memo)?;
     Some((every_pass(net, &stops, &path), path))
 }
@@ -1172,13 +1209,20 @@ fn best_slot(net: &Network, old: &[u32], station: u32, memo: &mut HopMemo) -> Op
     // a loop takes new stops between its first stop and its closing one (T-798); a balloon also
     // past the stop it turns back at, which the new stop then is (T-3122: its stem grows)
     let slots = if closed(old) { 1..=old.len() - 1 } else { 0..=old.len() };
-    let mut tries: Vec<Vec<u32>> = slots.rev().map(|slot| {
-        let mut stops = old.to_vec();
-        stops.insert(slot, station);
-        stops
-    }).collect();
-    if closed(old) && route_memo(net, old, memo).is_some_and(|p| net.loop_kind(old, &p) == LoopKind::Balloon) {
-        tries.push(std::iter::once(station).chain(old.iter().copied()).chain(std::iter::once(station)).collect());
+    let balloon = closed(old) && route_memo(net, old, memo).is_some_and(|p| net.loop_kind(old, &p) == LoopKind::Balloon);
+    // T-3348: a station serving one way may go in as another of its group serving one way, which
+    // ever runs best (the clicked one first, so it wins a tie); the return run finds its own
+    let stations: Vec<u32> = std::iter::once(station).chain(net.way_others(station).into_iter().filter(|s| !old.contains(s))).collect();
+    let mut tries: Vec<Vec<u32>> = vec![];
+    for &station in &stations {
+        tries.extend(slots.clone().rev().map(|slot| {
+            let mut stops = old.to_vec();
+            stops.insert(slot, station);
+            stops
+        }));
+        if balloon {
+            tries.push(std::iter::once(station).chain(old.iter().copied()).chain(std::iter::once(station)).collect());
+        }
     }
     for stops in tries {
         if let Some(path) = route_memo(net, &stops, memo) {
@@ -1226,7 +1270,7 @@ fn straighten(net: &Network, stops: &[u32], path: &[u32]) -> Option<(Vec<u32>, V
 fn stop_spread(net: &Network, stops: &[u32], path: &[u32]) -> f64 {
     let Some(&first) = path.first() else { return 0.0 };
     let nodes: Vec<u32> = std::iter::once(net.path_nodes(first).0).chain(path.iter().map(|&p| net.path_nodes(p).1)).collect();
-    let Some(at) = super::net::match_stops(&nodes, stops, &net.stop_reversals(path)) else { return f64::INFINITY };
+    let Some((at, _)) = net.match_run(&nodes, stops, &net.stop_reversals(path)) else { return f64::INFINITY };
     let mut off = Vec::with_capacity(path.len() + 1);
     off.push(0.0);
     for &p in path {
@@ -1271,7 +1315,8 @@ fn reach_from(net: &Network, stops: &[u32]) -> (Vec<bool>, Vec<bool>) {
         seen_node[node as usize] = true;
         let p = &net.node_ports[node as usize];
         let arr = p.find(super::net::path_edge(st), 1 - super::net::path_dir(st));
-        let link = if net.bare_end(node) { 1 } else { arr.map_or(0, |i| net.node_moves[node as usize].link[i]) };
+        let on = arr.map_or(0, |i| net.node_moves[node as usize].link[i]);
+        let link = if net.turn_end(node) { on | 1 << arr.unwrap_or(0) } else { on };
         for k in super::lanes::ends_in(link) {
             let c = p.end[k];
             if !seen[c as usize] {
@@ -1943,14 +1988,14 @@ fn render_chainages(pieces: &[geom::Piece], vert: &[[f64; 2]]) -> Vec<f64> {
 }
 
 /// The crossings a trial edit added or removed (an accepted edit), or the ones a refusal names,
-/// as `preview_marks` rows (x, y, 0). The refusal's are the bad ones.
+/// as `preview_marks` rows (x, y, 0, tram tracks). The refusal's are the bad ones, with no trams.
 fn trial_crossings(r: &Result<EditResult, Vec<Issue>>) -> Vec<f64> {
     let mut out = vec![];
     match r {
-        Ok(r) => r.dirty.crossings.iter().for_each(|c| out.extend([c[0], c[1], 0.0])),
+        Ok(r) => r.dirty.crossings.iter().for_each(|c| out.extend([c[0], c[1], 0.0, c[2]])),
         Err(is) => is.iter().for_each(|i| {
             if let Issue::Crossing { x, y, overlap: false, .. } = i {
-                out.extend([*x, *y, 0.0]);
+                out.extend([*x, *y, 0.0, 0.0]);
             }
         }),
     }
@@ -2050,7 +2095,7 @@ impl TrackApi {
     /// The pack's water mask (notes/T-004.md): header `cell_m`, `origin_m`, `size`, and the
     /// `water_row` (u32) and `water_x` (u16) arrays.
     pub fn set_water(&mut self, cell: f64, x0: f64, y0: f64, w: u32, h: u32, row: &[u32], xs: &[u16]) {
-        let m = RunMask { x0, y0, cell, w, h, row: row.to_vec(), xs: xs.to_vec() };
+        let m = RunMask::pack(cell, x0, y0, w, h, row.to_vec(), xs.to_vec());
         self.rasters.clear();
         self.w.net.set_water_mask(Box::new(m));
         self.w.reload();
@@ -2067,7 +2112,7 @@ impl TrackApi {
         if self.w.net.edge_ok(id) && self.w.net.edge_built[id as usize] {
             return self.refuse(Issue::NoSuchEdge { edge: id });
         }
-        self.run(Op::Edge { id, data: Some(EdgeData { a, b, tracks, pis: pis_from(pis), built: false, off: false, thru: vec![], crossover: false, kind: TrackKind::Regular, sep: false, day: 0, oneway: 0, join: [0; 2] }) })
+        self.run(Op::Edge { id, data: Some(EdgeData { a, b, tracks, pis: pis_from(pis), built: false, off: false, thru: vec![], crossover: false, kind: TrackKind::Regular, sep: false, day: 0, oneway: 0, join: [0; 2], limit: 0 }) })
     }
     pub fn set_station(&mut self, node: u32, platform: u16, name: String) -> u32 {
         self.run(Op::Station { node, data: Some(StationData { platform, name, named: false, built: false, off: false, upgrades: 0, berth: None, day: 0, one: 0 }) })
@@ -2131,7 +2176,7 @@ impl TrackApi {
         let Some(path) = self.w.net.route(stops) else {
             return self.refuse(Issue::LinePath { line: id });
         };
-        self.run(Op::Line { id, data: Some(LineData { symbol: String::new(), trains: None, auto: None, name, colour, stops: stops.to_vec(), path, tph: [high, medium, low], dwell_s, turnaround_s, cars, fast: false, bus: None, ferry: None, group: 0, group_name: String::new(), group_look: Default::default(), day: 0, hand: false, one_way: false, limit: 0, twin: Default::default() }) })
+        self.run(Op::Line { id, data: Some(LineData { symbol: String::new(), trains: None, auto: None, name, colour, stops: stops.to_vec(), path, tph: [high, medium, low], dwell_s, turnaround_s, cars, fast: false, bus: None, ferry: None, group: 0, group_name: String::new(), group_look: Default::default(), day: 0, hand: false, one_way: false, limit: 0, twin: Default::default(), weekend: Default::default() }) })
     }
     pub(crate) fn set_schedule(&mut self, id: u32, high: f32, medium: f32, low: f32) -> u32 {
         self.run(Op::Schedule { id, tph: [high, medium, low] })
@@ -2146,6 +2191,8 @@ impl TrackApi {
 mod tests;
 #[cfg(test)]
 mod flip_tests;
+#[cfg(test)]
+mod realwater_tests;
 #[cfg(test)]
 mod bus_tests;
 #[cfg(test)]
@@ -2187,6 +2234,8 @@ mod stop_pass_tests;
 mod stop_order_tests;
 #[cfg(test)]
 mod oneway_tests;
+#[cfg(test)]
+mod limits_tests;
 /// T-3103, T-3092: flat-junction badges and real flyovers.
 #[cfg(test)]
 mod flyover_tests;
@@ -2220,6 +2269,10 @@ mod double_tests;
 mod onetrack_tests;
 #[cfg(test)]
 mod tram_tests;
+#[cfg(test)]
+mod perdir_tests;
+#[cfg(test)]
+mod oneleg_tests;
 #[cfg(test)]
 mod gap_tests;
 /// T-2414: close crossings, ends near water and islands.

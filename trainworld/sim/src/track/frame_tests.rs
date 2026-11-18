@@ -148,17 +148,17 @@ fn converting_a_save_between_frames_keeps_every_place_on_the_ground() {
 
 #[test]
 fn geo_mask_agrees_with_the_affine_mask_in_the_legacy_frame_and_follows_the_ground_in_the_world_frame() {
-    // A pack at Philadelphia: 100 x 100 cells of 100 m, every third column water.
+    // A pack at Philadelphia: 100 x 100 cells of 100 m, water in three columns of every six (a lone cell would read as land, T-3553).
     let (w, h, cell) = (100u32, 100u32, 100.0);
     let mut row = vec![0u32];
     let mut xs = vec![];
     for _ in 0..h {
-        for c in (0..w as u16).step_by(3) {
-            xs.extend([c, c + 1]);
+        for c in (0..w as u16).step_by(6) {
+            xs.extend([c, (c + 3).min(w as u16)]);
         }
         row.push(xs.len() as u32);
     }
-    let mask = Arc::new(RunMask { x0: -5000.0, y0: -5000.0, cell, w, h, row, xs });
+    let mask = Arc::new(RunMask::pack(cell, -5000.0, -5000.0, w, h, row, xs));
     let (plon, plat) = (-75.1636, 39.9526);
     let legacy = Frame::equirect(-73.985, 40.758);
     let world = Frame::lcc(-73.985, 40.758);

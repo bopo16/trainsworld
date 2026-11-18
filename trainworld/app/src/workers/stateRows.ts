@@ -49,6 +49,8 @@ interface Heavy {
   path: number[];
   /** T-3117: the return run's path where it is not `path` backward (`TrackApi.line_back_path`), else empty */
   back: number[];
+  /** T-3348: the return run's stations where one differs from `stops` (`TrackApi.line_back_stops`), else empty */
+  backStops: number[];
   fromStart: number[][];
   stopS: [number[], number[]];
   stretchSpeeds: number[];
@@ -84,6 +86,8 @@ interface LineRead {
   loopKind: number;
   oneWay: boolean;
   limit: number;
+  weekend: number[];
+  restTph: number[];
   shift: number;
   upkeep: number;
   busRow: ClockLine["bus"];
@@ -103,6 +107,12 @@ const hex = (c: number) => "#" + c.toString(16).padStart(6, "0");
 /** `TrackApi.line_auto`: a headway in seconds per level, or null for a line with counts by hand */
 function autoOf(v: ArrayLike<number>): [number, number, number] | null {
   return v.length === 3 ? [v[0], v[1], v[2]] : null;
+}
+
+/** T-3521: a line's weekends (`TrackApi.line_weekend`), empty where they are the weekdays' at 100%. */
+function weekendOf(a: TrackApi, id: number): number[] {
+  const w = a.line_weekend(id);
+  return w.length === 8 && (w[0] !== 100 || w[1] !== 0) ? [...w] : [];
 }
 
 function sameNumbers(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
@@ -209,18 +219,20 @@ export class StateRows {
     for (let k = 0; k + 1 < ow.length; k += 2) oneWays.set(ow[k], ow[k + 1] as 1 | 2);
     const jn = a.join_edges(), joins = new Map<number, number>();
     for (let k = 0; k + 1 < jn.length; k += 2) joins.set(jn[k], jn[k + 1]);
+    const lm = a.edge_limits(), limits = new Map<number, number>();
+    for (let k = 0; k + 1 < lm.length; k += 2) limits.set(lm[k], lm[k + 1]);
     const out: ClockEdge[] = [];
     const kept = this.edgeRows;
     const seen = new Set<number>();
     for (let i = 0; i < ei.length; i += 10) {
       const id = ei[i];
       const off = offEdges.has(id), hsr = hsrEdges.has(id), kind = a.edge_kind(id) >= 2 ? a.edge_kind(id) : 0 /* T-3078: 1 is high speed, which is rail */, crossover = crossovers.has(id), partner = crossovers.get(id) ?? -1;
-      const tracks = ei[i + 3] as 1 | 2, built = ei[i + 4] === 1, oneWay = oneWays.get(id) ?? 0, join = joins.get(id) ?? 0;
+      const tracks = ei[i + 3] as 1 | 2, built = ei[i + 4] === 1, oneWay = oneWays.get(id) ?? 0, join = joins.get(id) ?? 0, limit = limits.get(id) ?? 0;
       const setWay = (tracks === 1 ? a.edge_oneway(id) : 0) as 0 | 1 | 2 | 3, autoWay = (tracks === 1 ? a.edge_infer(id) : 0) as 0 | 1 | 2;
       let r = kept.get(id);
-      if (!r || r.a !== ei[i + 1] || r.b !== ei[i + 2] || r.tracks !== tracks || r.built !== built || r.off !== off || r.hsr !== hsr || r.kind !== kind || r.oneWay !== oneWay || r.join !== join || r.setWay !== setWay || r.autoWay !== autoWay || r.crossover !== crossover || r.partner !== partner
+      if (!r || r.a !== ei[i + 1] || r.b !== ei[i + 2] || r.tracks !== tracks || r.built !== built || r.off !== off || r.hsr !== hsr || r.kind !== kind || r.oneWay !== oneWay || r.join !== join || r.limit !== limit || r.setWay !== setWay || r.autoWay !== autoWay || r.crossover !== crossover || r.partner !== partner
         || !Object.is(r.lengthM, ei[i + 5]) || !Object.is(r.cost, ei[i + 6]) || !Object.is(r.vminKmh, ei[i + 7]) || r.levelMin !== ei[i + 8] || r.levelMax !== ei[i + 9]) {
-        r = { id, a: ei[i + 1], b: ei[i + 2], tracks, built, off, hsr, kind, oneWay, join, setWay, autoWay, crossover, partner, lengthM: ei[i + 5], cost: ei[i + 6], vminKmh: ei[i + 7], levelMin: ei[i + 8], levelMax: ei[i + 9] };
+        r = { id, a: ei[i + 1], b: ei[i + 2], tracks, built, off, hsr, kind, oneWay, join, setWay, autoWay, crossover, partner, lengthM: ei[i + 5], cost: ei[i + 6], vminKmh: ei[i + 7], limit, levelMin: ei[i + 8], levelMax: ei[i + 9] };
         kept.set(id, r);
       }
       seen.add(id);
@@ -333,17 +345,17 @@ export class StateRows {
       read.push({
         i, id, ok, running, bus, prev, fresh,
         heavy: fresh ? this.heavy(a, id, ok) : prev!.heavy,
-        auto: a.line_auto(id), fast: a.line_fast(id), tram: a.line_tram(id), loopKind: a.line_loop(id), oneWay: a.line_one_way(id), limit: a.line_limit(id), shift: a.line_shift(id), upkeep: upkeepOf.get(id) ?? 0,
+        auto: a.line_auto(id), fast: a.line_fast(id), tram: a.line_tram(id), loopKind: a.line_loop(id), oneWay: a.line_one_way(id), limit: a.line_limit(id), weekend: weekendOf(a, id), restTph: [...a.line_tph_rest(id)], shift: a.line_shift(id), upkeep: upkeepOf.get(id) ?? 0,
         busRow: bus ? env.busRow(a, id, nodes ?? []) : undefined,
         pairs: bus ? 0 : a.line_pairs(id), twinOf: bus ? -1 : a.line_twin_of(id),
       });
     }
     const out: ClockLine[] = [];
     for (const r of read) {
-      const { i, id, ok, running, prev, fresh, heavy, auto, fast, tram, loopKind, oneWay, limit, shift, upkeep, pairs, twinOf } = r;
+      const { i, id, ok, running, prev, fresh, heavy, auto, fast, tram, loopKind, oneWay, limit, weekend, restTph, shift, upkeep, pairs, twinOf } = r;
       // the numbers behind the cheap fields: when all are as kept (and the heavy parts are), the row is the kept one
       const raw = li.slice(i, i + 22);
-      const extra = [upkeep, fast ? 1 : 0, tram ? 1 : 0, loopKind, oneWay ? 1 : 0, limit, shift, pairs, twinOf, ...auto];
+      const extra = [upkeep, fast ? 1 : 0, tram ? 1 : 0, loopKind, oneWay ? 1 : 0, limit, shift, pairs, twinOf, ...auto, weekend.length, ...weekend, ...restTph];
       if (!fresh && prev && sameNumbers(raw, prev.raw) && sameNumbers(extra, prev.extra)) {
         out.push(prev.row);
         continue;
@@ -353,7 +365,7 @@ export class StateRows {
         upkeep,
         id, name: heavy.name, letter: heavy.letter, group: heavy.group, groupName: heavy.groupName, groupSymbol: heavy.groupSymbol, groupColour: heavy.groupColour, colour: hex(li[i + 1]), ok, running, broken: li[i + 4] === 1, tph: t3(5), cars: li[i + 21] || li[i + 8], carsSet: li[i + 8],
         lengthM: li[i + 9], roundTrip: t3(10), trains: t3(13), auto: autoOf(auto), delay: t3(16), dwell: li[i + 19], turnaround: li[i + 20],
-        stops: heavy.stops, path: heavy.path, ...(heavy.back.length ? { back: heavy.back } : {}),
+        stops: heavy.stops, path: heavy.path, ...(heavy.back.length ? { back: heavy.back } : {}), ...(heavy.backStops.length ? { backStops: heavy.backStops } : {}),
         fromStart: heavy.fromStart,
         stopS: heavy.stopS,
         fast,
@@ -368,6 +380,8 @@ export class StateRows {
         loopKind,
         oneWay,
         limit,
+        ...(weekend.length ? { weekend } : {}),
+        restTph,
         ...(pairs === 1 || pairs === 2 ? { pairs } : {}),
         ...(twinOf >= 0 ? { twinOf } : {}),
         ...(r.busRow ? { bus: r.busRow } : {}),
@@ -470,6 +484,7 @@ export class StateRows {
       stops: [...a.line_stops(id)],
       path: [...a.line_path(id)],
       back: [...a.line_back_path(id)],
+      backStops: [...a.line_back_stops(id)],
       fromStart: [0, 1, 2].map((lev) => [...a.stop_times(id, 0, lev)]),
       stopS: [[...a.line_stop_s(id, 0)], [...a.line_stop_s(id, 1)]],
       stretchSpeeds: ok ? [...a.line_stretch_speeds(id)] : [],

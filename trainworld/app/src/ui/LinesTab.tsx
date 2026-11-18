@@ -6,14 +6,15 @@ import { t } from "../i18n";
 import { tPlace } from "../i18n/places";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { COUNT_MS, countingRiders, openings } from "../game/openingDay";
-import { createLine, newBusLine, newFerryLine } from "../game/lineActions";
+import { createLine } from "../game/lineActions";
 import { boatsText, busesText, count, money } from "../game/format";
 import { DEMAND_INDEX, type Demand, type LineInput, type LineStats } from "../game/types";
 import { lineSort, selection, uiScale } from "../game/ui";
-import { listedLines, edit, pairStats, renameLine, stationsById } from "../game/world";
+import { listedLines, edit, renameLine, stationsById } from "../game/world";
 import { closedGroups, groupName, lineGroups, toggleGroup } from "../game/lineGroups";
 import { byHand, handOrder, setHandOrder } from "../game/handOrder";
 import { GroupPill } from "./GroupPill";
+import { trainsNowAt } from "../game/lineRunning";
 import type { WorldView } from "../game/types";
 import { cityById } from "../game/cities";
 import { listWorld, scopedLists, stationZone } from "../game/listScope";
@@ -29,6 +30,7 @@ import { lineMoneyTip, Money } from "./MoneyText";
 import { locateLine } from "./locate";
 import { byNear, natural, Near, ScopeToggle } from "./listParts";
 import { pendingLabel, type PendingKind } from "../game/lineFigures";
+import { hiddenLines, setLinesHidden, showAllLines, visToggles } from "../game/lineVisibility";
 
 /** the word for a line that is not running; nothing for a running one */
 const statusText = (s: string) => (s === "planned" ? t("linesTab.planned") : s === "broken" ? t("linesTab.broken") : "");
@@ -125,6 +127,17 @@ function GroupFigures({ ls, w, trains, period }: { ls: LineInput[]; w: WorldView
   );
 }
 
+/** T-3420: a row's box, ticked while its lines are drawn on the map; a group's is ticked while all are, and a click
+ * on it shows them all once any is hidden */
+function VisToggle({ ids, group }: { ids: string[]; group?: boolean }) {
+  const hid = hiddenLines.value, n = ids.filter((id) => hid.has(id)).length;
+  const label = group ? t("linesTab.showGroup") : t("linesTab.showLine");
+  return (
+    <input type="checkbox" class={"vis-check" + (n > 0 && n < ids.length ? " some" : "")} checked={n === 0} aria-label={label}
+      onClick={(e) => { e.stopPropagation(); setLinesHidden(ids, n === 0); }} onDblClick={(e) => e.stopPropagation()} />
+  );
+}
+
 /** A drag of a row (T-1791, T-1813): the line (or "g:" and the group), where it started, the row
  * it is over and which part of it. */
 interface Drag { id: string; x0: number; y0: number; x: number; y: number; on: boolean; over: string | null; part: "before" | "on" | "after" }
@@ -176,7 +189,8 @@ export function LinesTab() {
     try { await createLine(); } finally { setCreating(false); }
   };
   // a line that is not running has no train count and no riders: it sorts as zero
-  const trains = (id: string) => (w.lineStats[id]?.status === "running" ? pairStats(w, w.lineStats[id]).trainsNeeded[levOf(id)] : 0);
+  // T-3521: today's kind of day's trains
+  const trains = (id: string) => (w.lineStats[id]?.status === "running" ? trainsNowAt(id, levOf(id)) : 0);
   // T-1813: while the player's hand order holds, no sort
   const hand = handOrder.value.lines;
   const key = hand.length ? null : lineSort.value.key, dir = lineSort.value.dir;
@@ -336,13 +350,15 @@ export function LinesTab() {
     } else if (to) marks.set(drag.over!, drag.part === "before" ? " drop-before" : " drop-after");
   }
   const pick = (id: string) => { if (!dragged.current) selection.value = { kind: "line", line: id }; };
-  const lineRow = (l: LineInput, inGroup: boolean) => {
+  // T-3420: the lines hidden on the map, and whether the rows show their eyes
+  const hid = hiddenLines.value, eyes = visToggles.value;  const lineRow = (l: LineInput, inGroup: boolean) => {
     const st = w.lineStats[l.id];
     const on = (sel?.kind === "line" || sel?.kind === "train") && sel.line === l.id;
     const drop = "l:" + l.id;
     return (
-      <li class={(on ? "on" : "") + (inGroup ? " in-group" : "") + (marks.get(drop) ?? "") + (drag?.on && drag.id === l.id ? " dragged" : "")}
+      <li class={(on ? "on" : "") + (inGroup ? " in-group" : "") + (hid.has(l.id) ? " hidden-line" : "") + (marks.get(drop) ?? "") + (drag?.on && drag.id === l.id ? " dragged" : "")}
         data-drop={drop} onPointerDown={(e) => pointerDown(e, l.id)} onClick={() => pick(l.id)} onDblClick={() => locateLine(l.stops)}>
+        {eyes && <VisToggle ids={[l.id]} />}
         <Chip line={l} />
         {renamingLine === l.id ? (
           <input class="name-edit grow" value={l.name} aria-label={t("linesTab.lineName")} ref={(el) => { if (el && document.activeElement !== el) { el.focus(); el.select(); } }}
@@ -359,7 +375,7 @@ export function LinesTab() {
           <>
             <RidersToday l={l} />
             <MoneyToday l={l} st={st} />
-            <TrainsNow line={l.id} n={pairStats(w, st).trainsNeeded[levOf(l.id)]} period={periodOf(l)} at={periodAt(lineSeconds(st))} bus={!!st.bus} ferry={!!st.bus?.ferry} tram={!!st.tram} v={crowdOf(l)} lev={demandAt(lineSeconds(st))} stops={l.stops.length} flip={lineReversed(l, w, !!st.loop)} ends={endNames(l)} />
+            <TrainsNow line={l.id} n={trainsNowAt(l.id, levOf(l.id))} period={periodOf(l)} at={periodAt(lineSeconds(st))} bus={!!st.bus} ferry={!!st.bus?.ferry} tram={!!st.tram} v={crowdOf(l)} lev={demandAt(lineSeconds(st))} stops={l.stops.length} flip={lineReversed(l, w, !!st.loop)} ends={endNames(l)} />
           </>
         )}
         {key === "near" && <Near m={sc.lineDist.get(l.id)} />}
@@ -372,8 +388,9 @@ export function LinesTab() {
     const ls = isOpen ? membersOf(it) : [];
     return (
       <>
-        <li class={"group-row" + (on ? " on" : "") + (marks.get(drop) ?? "") + (drag?.on && drag.id === drop ? " dragged" : "")} data-drop={drop} onPointerDown={(e) => pointerDown(e, drop)}
+        <li class={"group-row" + (on ? " on" : "") + (it.ls.every((l) => hid.has(l.id)) ? " hidden-line" : "") + (marks.get(drop) ?? "") + (drag?.on && drag.id === drop ? " dragged" : "")} data-drop={drop} onPointerDown={(e) => pointerDown(e, drop)}
           onClick={() => { if (!dragged.current) selection.value = { kind: "group", group: it.g }; }} onDblClick={() => locateLine(it.ls.flatMap((l) => l.stops))}>
+          {eyes && <VisToggle ids={it.ls.map((l) => l.id)} group />}
           <button class={"btn icon mini chevron" + (isOpen ? " open" : "")} data-tip={isOpen ? t("linesTab.closeGroup") : t("linesTab.openGroup")} aria-label={isOpen ? t("linesTab.closeGroup") : t("linesTab.openGroup")}
             aria-expanded={isOpen} onClick={(e) => { e.stopPropagation(); toggleGroup(it.g); }} onDblClick={(e) => e.stopPropagation()}><Icon.chevron /></button>
           <GroupPill ls={it.ls} tip={it.ls.map((l) => l.name).join("\n")} />
@@ -404,13 +421,16 @@ export function LinesTab() {
       <div class="line-list-actions">
         <span style={{ display: "flex", gap: "6px" }}>
           <button class="btn text" data-guide="line" data-tip={t("linesTab.newLineTip", { key: "N" })} onClick={newLine} disabled={creating}><Icon.plus />{t("linesTab.newLine")}<span class="key muted">N</span></button>
-          <button class="btn icon new-bus" data-tip={t("linesTab.newBusTip", { key: "U" })} aria-label={t("linesTab.newBus")} onClick={() => newBusLine()}><Icon.bus /></button>
-          <button class="btn icon new-ferry" data-tip={t("linesTab.newFerryTip", { key: "O" })} aria-label={t("linesTab.newFerry")} onClick={() => newFerryLine()}><Icon.ferry /></button>
         </span>
-        <ScopeToggle />
+        <span class="list-vis">
+          {/* T-3420: hide mode; leaving it shows every line again */}
+          <button class={"btn icon" + (eyes ? " on" : "")} data-tip={eyes ? t("linesTab.showAllLines") : t("linesTab.hideLines")} aria-label={eyes ? t("linesTab.showAllLines") : t("linesTab.hideLines")} aria-pressed={eyes}
+            onClick={() => { if (visToggles.peek()) showAllLines(); visToggles.value = !visToggles.peek(); }}><Icon.eye /></button>
+          <ScopeToggle />
+        </span>
       </div>
       {items.length === 0 && <p class="muted">{listedLines(w).length === 0 ? t("linesTab.none") : t("linesTab.noneHere")}</p>}
-      <div class={"lines-box" + (showCity ? " with-city" : "") + (key === "near" ? " near-on" : "")}>
+      <div class={"lines-box" + (showCity ? " with-city" : "") + (key === "near" ? " near-on" : "") + (eyes ? " vis-on" : "")}>
       {listedLines(w).length > 0 && <SortHead sort={lineSort} hand={hand.length ? () => setHandOrder("lines", []) : undefined} cols={[
         { key: "name", label: t("linesTab.colName"), tip: t("linesTab.sortName"), first: 1 },
         ...(showCity ? [{ key: "city" as const, label: t("linesTab.colCity"), tip: t("linesTab.sortCity"), first: 1 as const, cls: "w-city", left: true }] : []),

@@ -3,7 +3,7 @@
 use super::capacity::ResKind;
 use super::cost::{RunMask, WaterMask};
 use super::geom::{self, GeomIssue, Pi};
-use super::net::{CrossKind, EdgeData, Issue, LineData, Network, NodeData, StationData};
+use super::net::{CrossKind, EdgeData, Issue, LineData, Network, NodeData, StationData, Weekend};
 use super::params::*;
 use super::service::level_stretches;
 use super::world::{Op, TrackWorld};
@@ -21,7 +21,7 @@ pub fn node(w: &mut TrackWorld, x: f64, y: f64, level: i8) -> u32 {
 pub fn edge(w: &mut TrackWorld, a: u32, b: u32, pis: &[(f64, f64)], level: i8) -> Result<u32, Vec<Issue>> {
     let id = w.net.alloc_edge();
     let pis = pis.iter().map(|&(x, y)| Pi::new(x, y, 0.0, level)).collect();
-    w.apply(Op::Edge { id, data: Some(EdgeData { a, b, tracks: 2, pis, built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::Regular, sep: false, day: 0, oneway: 0, join: [0; 2] }) })?;
+    w.apply(Op::Edge { id, data: Some(EdgeData { a, b, tracks: 2, pis, built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::Regular, sep: false, day: 0, oneway: 0, join: [0; 2], limit: 0 }) })?;
     Ok(id)
 }
 
@@ -45,7 +45,7 @@ pub fn terminals_at_dead_ends(w: &mut TrackWorld) {
 pub fn line(w: &mut TrackWorld, stops: &[u32], tph: [f32; 3]) -> u32 {
     let path = w.net.route(stops).expect("no route");
     let id = w.net.alloc_line();
-    let d = LineData { symbol: String::new(), trains: None, auto: None, name: format!("L{id}"), colour: 0, stops: stops.to_vec(), path, tph, dwell_s: 30.0, turnaround_s: 180.0, cars: 0, fast: false, bus: None, ferry: None, group: 0, group_name: String::new(), group_look: Default::default(), day: 0, hand: false, one_way: false, limit: 0, twin: Default::default() };
+    let d = LineData { symbol: String::new(), trains: None, auto: None, name: format!("L{id}"), colour: 0, stops: stops.to_vec(), path, tph, dwell_s: 30.0, turnaround_s: 180.0, cars: 0, fast: false, bus: None, ferry: None, group: 0, group_name: String::new(), group_look: Default::default(), day: 0, hand: false, one_way: false, limit: 0, twin: Default::default(), weekend: Default::default() };
     w.apply(Op::Line { id, data: Some(d) }).unwrap();
     id
 }
@@ -68,7 +68,7 @@ fn unused_blueprint_extension_preserves_running_service_but_planned_lines_previe
         let trips = w.svc.trips(&w.net, 28800.0, 32400.0);
         let blueprint = w.net.alloc_edge();
         w.apply(Op::Edge { id: blueprint, data: Some(EdgeData {
-            a: b, b: c, tracks: 2, pis: vec![], built: false, off: false, thru: vec![], crossover: false, kind: TrackKind::Regular, sep: false, day: 0, oneway: 0, join: [0; 2],
+            a: b, b: c, tracks: 2, pis: vec![], built: false, off: false, thru: vec![], crossover: false, kind: TrackKind::Regular, sep: false, day: 0, oneway: 0, join: [0; 2], limit: 0,
         }) }).unwrap();
         let check = |w: &TrackWorld| {
             let after = &w.svc.lines[l as usize];
@@ -1195,10 +1195,11 @@ fn a_line_reversing_at_a_bare_track_end_runs() {
     assert_eq!(back.net.line_path(l), w.net.line_path(l));
     assert_eq!(back.svc.lines[l as usize].round_trip, w.svc.lines[l as usize].round_trip);
     assert_eq!(back.svc.lines[l as usize].runs[0].ends, w.svc.lines[l as usize].runs[0].ends);
-    // a station on the stub is a stop like any other: X a station, the same path needs it as one
+    // T-3595: a station at the stub's end is turned at the same way, without stopping; listed, it is a stop
     let mut d = w.net.line_data(l).unwrap();
     station(&mut w, x, 200);
-    assert!(w.net.check_line(l).is_err());
+    assert!(w.net.check_line(l).is_ok());
+    assert_eq!(w.svc.lines[l as usize].runs[0].ends.len(), 1, "turned at, no stop");
     d.stops = vec![br, x, m];
     w.apply(Op::Line { id: l, data: Some(d) }).unwrap();
     assert!(w.svc.lines[l as usize].runs[0].ends.is_empty());
@@ -1256,7 +1257,8 @@ fn the_middle_of_a_long_line_changes_period_on_time() {
     }
 }
 
-/// T-2335: a Saturday and a Sunday run the same trains as a weekday, each level in its own hours.
+/// T-2335: a line with no trains of its own for them runs its weekday trains on a Saturday and a
+/// Sunday, each level in its own hours.
 #[test]
 fn weekends_run_the_weekday_timetable() {
     let (mut w, ns) = corridor(31);
@@ -1271,6 +1273,164 @@ fn weekends_run_the_weekday_timetable() {
         let d = day_of(&w, day);
         assert_eq!(d.len(), tue.len());
         assert!(d.iter().zip(&tue).all(|(a, b)| (a.0 - b.0).abs() < 1e-6 && a.1 == b.1), "a weekend's trains differ from a weekday's");
+    }
+}
+
+/// A line's departures on local game day `day` (whole days), as (seconds into the day, level).
+fn deps_on(w: &TrackWorld, id: u32, r: usize, day: i64) -> Vec<(f64, usize)> {
+    let d0 = day as f64 * 86400.0;
+    deps_of(w, id, r, d0 - 86400.0, d0 + 2.0 * 86400.0).iter().filter(|t| t.dep >= d0 && t.dep < d0 + 86400.0).map(|t| (t.dep - d0, t.level as usize)).collect()
+}
+
+/// The same departures, to a microsecond (days apart differ in the last bits).
+fn same_deps(a: &[(f64, usize)], b: &[(f64, usize)]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).all(|(x, y)| (x.0 - y.0).abs() < 1e-6 && x.1 == y.1)
+}
+
+/// T-3521: a line's weekend setting, as one edit.
+fn set_weekend(w: &mut TrackWorld, id: u32, share: u16, counts: Option<[u32; 3]>) {
+    w.apply(Op::Weekend { id, weekend: Weekend { share, counts, headways: [0; 3] } }).unwrap();
+}
+
+/// Weekend trains (`LineData::weekend`, T-3521, from PR 13): weekends run their own counts at the
+/// weekday's round trip, a change at midnight leaves no trains in pairs, a public holiday on the
+/// line's calendar runs the weekend's, a count above the weekday's runs more trains than the
+/// weekdays (settled on its own, the weekdays' left as they were), an undo puts every day back on
+/// the weekdays', and a save keeps the counts and their rates.
+#[test]
+fn weekends_and_holidays_run_their_own_trains() {
+    let (mut w, ns) = corridor(31);
+    let id = line(&mut w, &ns, [12.0, 6.0, 3.0]);
+    set_counts(&mut w, id, [12, 6, 3]);
+    let (tue, fri, sat, sun) = (2i64, 5i64, 6i64, 7i64);
+    let trains = w.net.line_trains[id as usize].unwrap();
+    let before: Vec<_> = (0..2).map(|r| deps_on(&w, id, r, tue)).collect();
+    // weekends: half the high and medium trains, no night
+    let half = |n: u32| n / 2;
+    let own = Some([half(trains[0]), half(trains[1]), 0]);
+    set_weekend(&mut w, id, 100, own);
+    let lat = w.svc.lattice(&w.net, id as usize).unwrap();
+    assert!(lat.rest_on);
+    for r in 0..2 {
+        assert!(same_deps(&deps_on(&w, id, r, tue), &before[r]), "run {r}: the weekday changed");
+        for day in [sat, sun] {
+            let dd = deps_on(&w, id, r, day);
+            // (the day before's evening leads into its midnight, T-835)
+            assert!(dd.iter().filter(|t| t.0 < 86400.0 - lat.lead - 1.0).all(|t| t.1 != LOW), "run {r} day {day}: a night train");
+            let peak: Vec<_> = dd.iter().filter(|t| t.0 >= 7.0 * 3600.0 && t.0 < 15.0 * 3600.0).collect();
+            assert!(peak.iter().all(|t| t.1 == HIGH), "run {r} day {day}");
+            let want = 8.0 * w.net.line_tph_on(id as usize, WEEKEND, HIGH) as f64;
+            assert!((peak.len() as f64 - want).abs() <= 1.0, "run {r} day {day}: {} high trains, want {want}", peak.len());
+        }
+        // no two departures closer than half a headway across Friday into the weekend
+        let all = deps_of(&w, id, r, fri as f64 * 86400.0, (sun + 2) as f64 * 86400.0);
+        for p in all.windows(2) {
+            assert!(p[1].dep - p[0].dep >= 0.5 * p[1].hw - 1e-6, "run {r}: {:?} then {:?}", p[0], p[1]);
+        }
+    }
+    assert!(w.net.line_tph_on(id as usize, WEEKEND, HIGH) < w.net.line_tph[id as usize][HIGH]);
+    // a public holiday on its line's calendar: Tuesday runs the weekend's trains
+    let mut cal = vec![super::service::Cal::NONE; w.net.line_count()];
+    cal[id as usize] = super::service::Cal::from_days(&[(tue - 1, WEEKDAYS as u8), (tue, WEEKEND as u8)]);
+    w.svc.set_cal(cal, true);
+    let hol = deps_on(&w, id, 0, tue);
+    let want = 14.0 * w.net.line_tph_on(id as usize, WEEKEND, HIGH) as f64;
+    let high = hol.iter().filter(|t| t.1 == HIGH && t.0 >= 6.0 * 3600.0).count() as f64;
+    assert!((high - want).abs() <= 2.0, "{high} high trains on the holiday, want {want}");
+    w.svc.set_cal(vec![], true);
+    // a count above the weekday's runs more trains, and the weekdays' stay as they were
+    let week = w.net.line_tph[id as usize];
+    set_weekend(&mut w, id, 100, Some([trains[0] * 2, trains[1], trains[2]]));
+    assert_eq!(w.net.line_tph[id as usize], week, "the weekdays' rates");
+    let busy = w.net.line_tph_on(id as usize, WEEKEND, HIGH);
+    assert!(busy > 1.5 * week[HIGH], "{busy} trains an hour on a weekend, {} on a weekday", week[HIGH]);
+    for r in 0..2 {
+        assert!(same_deps(&deps_on(&w, id, r, tue), &before[r]), "run {r}: the weekday changed");
+        let peak = deps_on(&w, id, r, sat).iter().filter(|t| t.1 == HIGH && t.0 >= 7.0 * 3600.0 && t.0 < 15.0 * 3600.0).count() as f64;
+        assert!((peak - 8.0 * busy as f64).abs() <= 1.0, "run {r}: {peak} high trains on Saturday");
+    }
+    let back = super::save::decode(&super::save::encode(&w.net)).unwrap();
+    assert!(back.rest_solved);
+    assert_eq!(back.line_tph_rest[id as usize], w.net.line_tph_rest[id as usize], "the rates, to the bit");
+    w.undo().unwrap().unwrap();
+    // a save keeps them; none writes nothing
+    let back = super::save::decode(&super::save::encode(&w.net)).unwrap();
+    assert_eq!(back.line_weekend[id as usize], Weekend { share: 100, counts: own, headways: [0; 3] });
+    w.undo().unwrap().unwrap();
+    assert_eq!(w.net.line_weekend[id as usize], Weekend::default());
+    assert!(!w.net.rest_solved);
+    for day in [sat, sun] {
+        assert!(same_deps(&deps_on(&w, id, 0, day), &before[0]), "day {day}: the weekend after undo");
+    }
+    assert!(!super::save::encode(&w.net).windows(4).any(|x| x == b"LWE1"), "no weekend trains, saved");
+}
+
+/// A weekend count settles as the same count would on a weekday: the track it shares holds no
+/// more trains on a weekend than on a weekday, so a count past what it lets run waits at the ends.
+#[test]
+fn a_weekend_count_settles_as_a_weekday_one() {
+    for busy in [24, 400] {
+        let (mut wk, ns) = corridor(31);
+        let a = line(&mut wk, &ns, [12.0, 6.0, 3.0]);
+        set_counts(&mut wk, a, [busy, 6, 3]);
+        let (mut we, ns) = corridor(31);
+        let b = line(&mut we, &ns, [12.0, 6.0, 3.0]);
+        set_counts(&mut we, b, [12, 6, 3]);
+        set_weekend(&mut we, b, 100, Some([busy, 6, 3]));
+        let (on_weekday, on_weekend) = (wk.net.line_tph[a as usize][HIGH], we.net.line_tph_on(b as usize, WEEKEND, HIGH));
+        assert!((on_weekday - on_weekend).abs() <= 1e-3 * on_weekday, "{busy} trains: {on_weekday} an hour on a weekday, {on_weekend} on a weekend");
+        assert!(we.net.rest_solved);
+    }
+}
+
+
+/// A weekend count takes effect on its own edit where the weekday trains fill the track: each kind
+/// of day settles on a service worked out with its own trains, not the weekdays' full track.
+#[test]
+fn a_weekend_count_takes_effect_where_the_weekdays_fill_the_track() {
+    let (mut w, ns) = corridor(31);
+    let id = line(&mut w, &ns, [12.0, 6.0, 3.0]);
+    set_counts(&mut w, id, [400, 6, 3]);
+    let mut last = 0.0;
+    for weekend in [6u32, 8, 10, 12] {
+        set_weekend(&mut w, id, 100, Some([weekend, 6, 3]));
+        let rate = w.net.line_tph_on(id as usize, WEEKEND, HIGH);
+        assert!(rate > last, "{weekend} weekend trains: {rate} an hour, {last} with fewer");
+        last = rate;
+    }
+}
+
+/// A loop's weekend count rounds up to even as its weekday count does (T-798), and the line keeps
+/// the even count, so its two directions run the same trains on a Saturday too.
+#[test]
+fn a_loops_odd_weekend_count_runs_even() {
+    let (mut w, ns) = ring_fixture();
+    let id = line(&mut w, &closed(&ns), [12.0, 6.0, 3.0]);
+    set_counts(&mut w, id, [12, 6, 4]);
+    set_weekend(&mut w, id, 100, Some([5, 3, 0]));
+    assert_eq!(w.net.line_weekend[id as usize].counts, Some([6, 4, 0]));
+    assert!(w.net.rest_solved);
+}
+
+/// A weekend count leaves the weekdays as they ran for every line on the track, not only its own:
+/// the service the rest of the game reads (round trips, holds) is put back on the weekdays' rates,
+/// including for a line whose rates the weekend settle left as they were.
+#[test]
+fn a_weekend_count_leaves_its_neighbours_weekdays() {
+    let (mut w, ns) = corridor(11);
+    let a = line(&mut w, &ns, [12.0, 6.0, 3.0]);
+    let b = line(&mut w, &ns[2..9], [12.0, 6.0, 3.0]);
+    set_counts(&mut w, a, [4, 6, 3]);
+    set_counts(&mut w, b, [4, 6, 3]);
+    let before: Vec<_> = [a, b].iter().map(|&l| (w.net.line_tph[l as usize], w.svc.lines[l as usize].round_trip)).collect();
+    let deps: Vec<_> = (0..2).map(|r| deps_on(&w, a, r, 2)).collect();
+    set_weekend(&mut w, b, 100, Some([12, 6, 3]));
+    assert!(w.net.rest_solved);
+    assert!(w.net.line_tph_on(b as usize, WEEKEND, HIGH) > 1.5 * w.net.line_tph[b as usize][HIGH], "the weekend runs more of b");
+    let after: Vec<_> = [a, b].iter().map(|&l| (w.net.line_tph[l as usize], w.svc.lines[l as usize].round_trip)).collect();
+    assert_eq!(after, before, "the weekdays' rates and round trips");
+    for r in 0..2 {
+        assert!(same_deps(&deps_on(&w, a, r, 2), &deps[r]), "run {r}: the neighbour's Tuesday changed");
     }
 }
 
@@ -1330,7 +1490,7 @@ fn hsr_world(hsr: [bool; 2], fast: bool) -> (TrackWorld, u32) {
     let c = node(&mut w, 80000.0, 0.0, 0);
     for (k, (p, q)) in [(a, b), (b, c)].into_iter().enumerate() {
         let id = w.net.alloc_edge();
-        w.apply(Op::Edge { id, data: Some(EdgeData { a: p, b: q, tracks: 2, pis: vec![], built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::from_hsr(hsr[k]), sep: false, day: 0, oneway: 0, join: [0; 2] }) }).unwrap();
+        w.apply(Op::Edge { id, data: Some(EdgeData { a: p, b: q, tracks: 2, pis: vec![], built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::from_hsr(hsr[k]), sep: false, day: 0, oneway: 0, join: [0; 2], limit: 0 }) }).unwrap();
     }
     station(&mut w, a, 200);
     station(&mut w, c, 200);
@@ -1406,7 +1566,7 @@ fn curves_cap_high_speed_trains_below_the_track_cap() {
     let id = w.net.alloc_edge();
     // one bend of 3,000 m radius in the middle: sqrt(1.1 x 3000) = 57.4 m/s, 207 km/h
     let pis = vec![Pi::new(40000.0, 0.0, 3000.0, 0)];
-    w.apply(Op::Edge { id, data: Some(EdgeData { a, b: c, tracks: 2, pis, built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::HighSpeed, sep: false, day: 0, oneway: 0, join: [0; 2] }) }).unwrap();
+    w.apply(Op::Edge { id, data: Some(EdgeData { a, b: c, tracks: 2, pis, built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::HighSpeed, sep: false, day: 0, oneway: 0, join: [0; 2], limit: 0 }) }).unwrap();
     station(&mut w, a, 200);
     station(&mut w, c, 200);
     let l = line(&mut w, &[a, c], [4.0, 2.0, 1.0]);

@@ -19,10 +19,11 @@ import { shadeColours } from "../game/shades";
 import { display } from "../game/ui";
 import { compileOptional, interp, PROJECT_GLSL, PROJECT_UNIFORMS, setCamera, uniforms, type LocalCamera } from "./gl";
 import type { Overlay } from "./overlay";
-import { crossTrams, M_BAD, M_CONVERGE, M_CROSSING, M_DIVERGE, M_JUNCTION, M_PORTAL, M_RAMP, MARK_STRIDE } from "./markData";
+import { crossTrams, M_BAD, M_CONVERGE, M_CROSSING, M_DIVERGE, M_JUNCTION, M_PORTAL, M_RAMP, M_REPEAT, MARK_STRIDE } from "./markData";
 import { quietBadgeRadius } from "./stationGeometry";
 import type { TipLine } from "./networkTips";
 import { elevationFact } from "./trackTagRows";
+import { hidden, LEVEL_FADE, levelHidden } from "./visibility";
 
 /** ?perfOff=marks (measurement only, src/perfFlags.ts) */
 const NO_MARKS = perfOff("marks");
@@ -50,18 +51,21 @@ uniform vec2 u_viewport;
 uniform vec3 u_r;            // radius in device px: loud badge, quiet badge, ramp mark
 uniform float u_ramps;       // 0: no marks on ramps and portals
 uniform float u_flat;        // 0: no marks on flat crossings and junctions
+uniform int u_level_hide;    // T-3420: the levels switched off (drawn faint, T-3560), a bit each from level -3
 in vec4 a_mark;              // x, y, shape, angle
 in vec2 a_style;             // tier (0 built, 1 blueprint), level
 out vec2 v_p;
 flat out vec4 v_m;
 flat out vec2 v_s;
 flat out float v_r;
+flat out float v_fade;
 void main() {
   int shape = int(a_mark.z + 0.5);
   bool ramp = shape == ${M_RAMP} || shape == ${M_PORTAL};
   float r = ramp ? u_r.z : (a_style.x > 0.5 ? u_r.x : u_r.y);
   if (u_ramps < 0.5 && ramp) r = 0.0;
   if (u_flat < 0.5 && (shape == ${M_CROSSING} || shape == ${M_JUNCTION})) r = 0.0;
+  v_fade = ((u_level_hide >> (clamp(int(round(a_style.y)), -3, 3) + 3)) & 1) != 0 ? ${LEVEL_FADE.toFixed(2)} : 1.0;
   if (r <= 0.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
   float rq = ramp ? 1.8 * r + 3.0 : r + 3.0;
   vec2 corner = vec2(float(gl_VertexID & 1), float(gl_VertexID >> 1)) * 2.0 - 1.0;
@@ -94,6 +98,7 @@ in vec2 v_p;
 flat in vec4 v_m;
 flat in vec2 v_s;
 flat in float v_r;
+flat in float v_fade;
 out vec4 o;
 float cov(float d) { return clamp(0.5 - d, 0.0, 1.0); }
 float seg(vec2 p, vec2 a, vec2 b) {
@@ -114,7 +119,7 @@ float quad(vec2 p, vec2 a, vec2 b, vec2 c, vec2 e) {
   }
   return s * sqrt(d);
 }
-void main() {
+void mark() {
   int shape = int(v_m.z + 0.5);
   bool blueprint = v_s.x > 0.5;
   float r = v_r;
@@ -143,6 +148,12 @@ void main() {
     // a fork: a stem below, two arms up
     vec2 hub = vec2(0.0, 0.1 * r);
     glyph = cov(min(seg(v_p, vec2(0.0, 0.55 * r), hub), min(seg(v_p, hub, vec2(-0.42 * r, -0.55 * r)), seg(v_p, hub, vec2(0.42 * r, -0.55 * r)))) - g);
+  } else if (shape == ${M_REPEAT}) {
+    // T-3562: a loop with its two ends crossing at the top and leaving it, up and to each side
+    vec2 c0 = vec2(0.0, 0.12 * r);
+    float lp = abs(length(v_p - c0) - 0.32 * r) - g;
+    float tails = min(seg(v_p, vec2(0.12 * r, -0.2 * r), vec2(0.62 * r, -0.55 * r)), seg(v_p, vec2(-0.12 * r, -0.2 * r), vec2(-0.62 * r, -0.55 * r)));
+    glyph = cov(min(lp, tails - g));
   } else if (shape == ${M_CONVERGE} || shape == ${M_DIVERGE}) {
     // T-3164: two arrows on one line, pointing at each other or apart; the right one, mirrored
     vec2 q = vec2(abs(v_p.x), v_p.y);
@@ -170,6 +181,10 @@ void main() {
   vec3 col = mix(u_fill, ink, max(ring, glyph));
   float a = cov(d) * (blueprint ? 1.0 : u_quiet);
   o = vec4(col * a, a);
+}
+void main() {
+  mark();
+  o *= v_fade;
 }`;
 
 interface Instances {
@@ -192,7 +207,7 @@ export class GradeMarks {
     // again after a lost context (T-953): the old buffers are gone, the renderer uploads anew
     this.built = this.drawing = null;
     this.prog = compileOptional(gl, VS, FS, "grade marks");
-    if (this.prog) this.u = uniforms(gl, this.prog, [...PROJECT_UNIFORMS, "u_viewport", "u_r", "u_ink", "u_bp", "u_fill", "u_bad", "u_dpr", "u_quiet", "u_level_colours", "u_flat", "u_ramps"]);
+    if (this.prog) this.u = uniforms(gl, this.prog, [...PROJECT_UNIFORMS, "u_viewport", "u_r", "u_ink", "u_bp", "u_fill", "u_bad", "u_dpr", "u_quiet", "u_level_colours", "u_flat", "u_ramps", "u_level_hide"]);
   }
 
   private upload(old: Instances | null, data: Float32Array | undefined): Instances | null {
@@ -260,6 +275,7 @@ export class GradeMarks {
     gl.uniform3fv(u.u_level_colours, levelColours);
     gl.uniform1f(u.u_flat, flat ? 1 : 0);
     gl.uniform1f(u.u_ramps, ramps ? 1 : 0);
+    gl.uniform1i(u.u_level_hide, hidden.levels);
     for (const s of [this.built, this.drawing]) {
       if (!s) continue;
       gl.bindVertexArray(s.vao);
@@ -280,6 +296,7 @@ export function markAt(ov: Overlay, marks: Float32Array, px: number, py: number,
     const shape = marks[i + 2], isRamp = shape === M_RAMP || shape === M_PORTAL;
     if (!flat && (shape === M_CROSSING || shape === M_JUNCTION)) continue;
     if (!ramps && isRamp) continue;
+    if (levelHidden(marks[i + 5])) continue;
     const r = isRamp ? ramp : marks[i + 4] > 0.5 ? loud : quiet;
     if (r <= 0) continue;
     ov.toScreenInto(marks[i], marks[i + 1], at);
@@ -298,6 +315,7 @@ export function markTip(marks: Float32Array, i: number): TipLine[] {
   else if (shape === M_BAD) out.push(t("gradeMarks.badCross"));
   else if (shape === M_CONVERGE) out.push(t("gradeMarks.converging"));
   else if (shape === M_DIVERGE) out.push(t("gradeMarks.diverging"));
+  else if (shape === M_REPEAT) out.push(t("gradeMarks.repeatTrack"));
   else {
     out.push(t(shape === M_JUNCTION ? "gradeMarks.junction" : "gradeMarks.crossing"));
     if (shape === M_CROSSING && crossTrams(marks[i + 5]) === 1) out.push(t("gradeMarks.tramYields"));

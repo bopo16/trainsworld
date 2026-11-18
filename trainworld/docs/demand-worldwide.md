@@ -611,7 +611,8 @@ notes/T-420.md has the tables.
   commutes between zones at the home end, inter-city trips at both ends with only a drop-off
   (`d_drop`) at the far end, which stands for a taxi or a pick-up; where taxis are cheap and common
   (much of Asia and Latin America) the far end is easier than this, and where long trips end at a
-  rental car or a long walk it is harder. The
+  rental car or a long walk it is harder. Its walks and rides count station by station at the
+  station choice's scale, as the local layers' do (T-3426); nothing in that is per country. The
   weights are fitted on New York only (T-372: 53-66% of commuter rail riders ride there). Check: the share of rail riders
   reaching the station by car or bus per sampler city (UK NTS for London, Metrolinx surveys for
   Toronto) against the model's home-end ride share (rail trips at the ride access entries, `Subzones::ride`).
@@ -633,7 +634,7 @@ notes/T-420.md has the tables.
   ownership and parking. Check: a country's travel survey walk shares by distance (NHTS,
   England's NTS, France's EMP, Japan's person-trip surveys) and its census walk-to-work share.
 
-- **Trams** (T-2926). A tram line is a rail line: it boards with no penalty (a bus pays 6 perceived
+- **Trams** (T-2926). A tram line is a rail line: it boards with no penalty (a bus pays 4 perceived
   minutes), each tram section counts as three quarters of a rail car in seats, rated and crush loads,
   and a cell keeps at most 3 stops served only by tram lines among its 6 nearest stations, so a street of
   close stops does not crowd out the metro a short walk away. A stop a metro or rail line also serves is
@@ -680,6 +681,20 @@ notes/T-420.md has the tables.
   a high-speed line a third of the riders 1.0 did (notes/T-3310.md). Why it may not carry
   over: where high-speed rail is priced near conventional rail (Spain's Avlo and other low-cost
   services) the default overcharges. Check: a country's high-speed fare a km against its ordinary one.
+  **A line's own fare multiple** (T-3567, T-3578): 0 to 3, default 1, set in the line's panel. It times that
+  line's multiplier above (high-speed, bus, ferry, else 1) on the fare above the base, by the trip's km on the
+  line, and it scales the base too: a trip pays one base, times the largest own multiple among the lines it
+  rides (Anita, 2026-11-17: "if a person's ride uses that line at all it gets charged the higher base"); the
+  high-speed, bus and ferry multipliers leave the base alone. It enters each station pair's route cost on its
+  strategy (`trip_base_mul`): where riders split between lines the pair takes the frequency-weighted mean of
+  each branch's largest, exact on a single route and a little under the riders' mean where a split follows a
+  line with a multiple. Mode choice, station choice, the market's income groups and the explain panel all read
+  that cost; choosing between routes inside a strategy does not see it, as with the curve's extra. Income
+  takes it as demand charged it: what the multiples add past one base (`base_extra`, below 0 under 1) goes into
+  the network's pool of base fares, which is shared between lines (T-2104) with each line's weights and its
+  cap of bases a boarding times its own multiple, and never below 0 (T-3578): a line at 0 takes no base, and no
+  line's fares go below 0. Which line's multiple set a trip's base is not traced; the pool's network-wide
+  shares stand in, as for the base itself.
   Ferry lines take the player's Ferry multiplier and bus lines the Bus multiplier (T-3028) the same way (default 1.00, T-2195; "Ferries as lines" below).
   **Transfer fare** (T-1801): the player's, $0 by default, paid on each change of line, times the
   country's scale and weighed at its `fare_w` like the curve; the regional market changes free. At
@@ -1043,9 +1058,9 @@ notes/T-420.md has the tables.
   A home within 300 m of a bus route walks its distance to the route plus 100 m and rides at the bus's run time (T-2904: a hop takes the
   car's time at 90% of its speed, never under 30 km/h for a bus lane, plus 28 s for the stop; about 19 km/h at
   400 m stops in a dense centre, 22 in open country), on the network's fare curve, bus kilometres included. Every boarding of a bus, a change
-  from a train or another bus onto it included, costs 6 perceived minutes on top of the wait
+  from a train or another bus onto it included, costs 4 perceived minutes on top of the wait
   (T-1576; unreliability, crowding at the stop, a stop not worth the wait for a short hop). Judgement
-  figures, not fitted; the 6 minutes and 300 m were chosen so a drawn route's riders per route-km
+  figures, not fitted; the 300 m and a 6 minute boarding cost (4 since T-3522) were chosen so a drawn route's riders per route-km
   land in the range of busy real routes (notes/T-1466.md). Why they may not carry over: bus speeds
   run from about 10 km/h in dense Asian and African centres to 25-30 in North American suburbs, and
   the model gives every dense centre a bus lane's speed (Seoul's median lanes, Anita 2026-11-09), so
@@ -1056,7 +1071,7 @@ notes/T-420.md has the tables.
   city's bus ridership per route-km against the model's on a similar drawn network.
 - **Ferries as lines** (T-2195, design notes/T-2177.md 3.6; docs/demand-kernel.md step 4). A ferry
   line is a line like any other: its ports are stations walked to as any station, the minutes aboard
-  are the boats' run (32 km/h in open water, 10 in narrow channels, 0.15 m/s² at each port), the
+  are the boats' run (45 km/h in open water, 10 in narrow channels, 0.15 m/s² at each port), the
   wait half the headway, a change to or from it a change like any other, and no boarding cost (a
   ferry is boarded from a waiting room, as a train is). A boat holds two train cars (480 at crush).
   Its kilometres pay the one fare curve, the part above the base times the player's Ferry multiple

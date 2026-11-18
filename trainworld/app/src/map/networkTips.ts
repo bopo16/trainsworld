@@ -73,7 +73,7 @@ export function trainTip(ov: Overlay, w: WorldView, line: string, profile: numbe
   // a train standing at a terminal for its next departure is drawn past its trip (T-206), and one
   // the guard holds behind its timetable (T-1965)
   const at = tripAt(net, profile, dep + r.tripLag(i), clock.now(), i >= 0 && r.board && r.tripEnds ? r.tripEnds[i] + r.tripsEpoch : -Infinity);
-  if (!at || !st || !display.peek().trainLoad) return [name];
+  if (!at || !st) return [name];
   const dv = demandView.peek();
   if (!dv) return [name, t("networkTips.calculating")];
   const n = l.stops.length, run = Math.floor(profile / 3) % 2;
@@ -110,7 +110,7 @@ function waitRow(bullet: HTMLElement | null, label: string, count: string, full:
  * count red while that platform side is full (T-559). */
 function crowdLines(ov: Overlay, w: WorldView, id: string, i: number): TipLine[] {
   const r = ov.renderer, b = r.board;
-  if (!b || display.peek().platformCrowds === "off" || !r.crowdsShown) return [];
+  if (!b || !r.crowdsShown) return [];
   // zoomed out, the dot's pie (T-228, T-553): everyone waiting at it and its fullest platform
   const dot = r.dotCrowd(i);
   if (dot) {
@@ -153,7 +153,7 @@ export function stationTip(ov: Overlay, w: WorldView, i: number): TipLine[] | nu
   const out: TipLine[] = [s.name];
   // T-305: the lines serving the station (zoomed out too, where every station is its own dot since
   // T-313), as bullets (T-559)
-  const serving = [...new Map(w.save.lines.filter((l) => l.stops.includes(id)).map((l) => [l.letter + l.colour + shapeOf(l.id), l])).values()];
+  const serving = [...new Map(w.save.lines.filter((l) => l.stops.includes(id) || w.lineStats[l.id]?.backStops?.includes(id)).map((l) => [l.letter + l.colour + shapeOf(l.id), l])).values()];
   if (serving.length) out.push(lineBullets(serving, (l) => stopHeading(ov, w, l, id)));
   if (!s.built) out.push(t("networkTips.blueprint"));
   else if (display.peek().stationUse !== "none") {
@@ -169,7 +169,7 @@ export function stationTip(ov: Overlay, w: WorldView, i: number): TipLine[] | nu
  * are each station's, so none). */
 export function complexTip(ov: Overlay, w: WorldView, ids: readonly string[], name: string): TipLine[] {
   const at = new Set(ids), out: TipLine[] = [name];
-  const serving = [...new Map(w.save.lines.filter((l) => l.stops.some((s) => at.has(s))).map((l) => [l.letter + l.colour + shapeOf(l.id), l])).values()];
+  const serving = [...new Map(w.save.lines.filter((l) => l.stops.some((s) => at.has(s)) || w.lineStats[l.id]?.backStops?.some((s) => at.has(s))).map((l) => [l.letter + l.colour + shapeOf(l.id), l])).values()];
   if (serving.length) out.push(lineBullets(serving));
   if (!w.save.stations.some((s) => at.has(s.id) && s.built)) out.push(t("networkTips.blueprint"));
   else if (display.peek().stationUse !== "none") {

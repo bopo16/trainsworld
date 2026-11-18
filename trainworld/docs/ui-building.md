@@ -113,14 +113,18 @@ the map's other controls', and the level buttons' numbers 15 px (also in the pho
   (0.6x of the type's price); quad can be high speed [T-3126]; picking single clears quad. Quad tram is off-street tram track, so
   picking it turns Snap to streets off, and turning that on picks Double again. A browser remembers the
   count picked (`build.tracks`). Double up (the track inspector's and the selection bar's) still adds the pair beside a run.
-  Then the **keep placing** switch, the **snap switch** (a magnet, "Snap to real world network") [T-727]:
+  Then the **keep placing** switch, the **snap switch** ("Snap to real world network") [T-727]:
   while it is on and the track tool is in hand, the real network is drawn at full strength
   ([ui-map.md](ui-map.md) "Real network"); what it does to drawing is [below](#snapping-to-the-real-network);
-  the **roads switch** (hover "Snap to roads", then "Hold Ctrl to draw straight"; rail only, off by default; excludes
-  the other two snaps) [T-3129]: [track-and-service.md](track-and-service.md) "Snap to roads";
+  with Tram picked it is tram track's own switch, off by default, and excludes Snap to streets [T-3069];
+  the **roads switch** (hover "Snap to roads", then "Hold Ctrl to draw by hand"; rail only, off by default; excludes
+  the other two snaps) [T-3129]: [track-and-service.md](track-and-service.md) "Snap to roads", with Tram in its
+  place **Snap to streets** (on by default) [T-2927];
   and the **beside switch** (two curving tracks; hover "Snap beside track", then "Hover over the blue
   region to draw track parallel to another track" [T-1811]), off by default [T-1685, T-1756]: what it
-  does is under [Drawing track](#drawing-track). Last, at the row's right end (not with Tram), the
+  does is under [Drawing track](#drawing-track). The snap switches' icons are one family [T-3069]: the same
+  magnet at the top left over what each snaps to, a line for the real network, a road for roads, a street
+  turning a corner for streets, two tracks for beside. Last, at the row's right end (not with Tram), the
   **Advanced** expander (a chevron that turns down when open) [T-3169]: it adds a third row, right
   aligned under it, of the two target speeds; whether it is open is remembered per browser
   (`build.advanced`), closed at first. **Target max speed** (hover "Attempt to draw
@@ -258,7 +262,7 @@ Track is drawn through points, double and quad alike [T-418, T-422, T-423]. The 
   flips it, whatever the lock's own light shows (the button shows the switch) [T-445, T-942]. A
   segment that joins track (a loose end or other node, or the middle of a piece of track or
   blueprint) ends the run whatever keep placing says; Shift held on that click still carries on from
-  the join [T-1811]. A double click, Escape or Enter ends the run (the first click of
+  the join [T-1811]. A double click, Escape, Enter or a right click on the map (T-3441; not after a right drag, nor by touch) ends the run (the first click of
   the double places the last segment); the button stays on. A click on the start (within 6 px, or
   on its node) does the same at any later time: it ends the run, or drops a start that has no
   segment yet [T-707]; a segment never ends where it starts, so no loop is lost. To carry on later, click the loose end
@@ -344,8 +348,7 @@ Track is drawn through points, double and quad alike [T-418, T-422, T-423]. The 
   real network or the roads or streets (with Snap to roads, Ctrl draws by hand, so straight; with Tram it
   flips the street snap as before, and straight only where that leaves the segment off the streets). Ramps
   over crossed track are unchanged (they change the level, not the line); as Ctrl joins nothing, it makes no
-  junction and so no flyover. While a segment is drawn on from track and Ctrl is not held, the tag's last line,
-  greyed, says "Hold Ctrl to draw straight" (not on touch).
+  junction and so no flyover. Nothing in the tag says so (dropped on purpose, Anita 2026-11-12).
 - **The ghost** is drawn as blueprint track (dark blue rails round a light blue middle) with a thin
   outline outside the rails (black; the map's ink, near white, in the dark theme; `ghost` in
   `game/shadeTable.ts`) [T-1054]. The middle is coloured
@@ -398,13 +401,13 @@ last or a lone point.
 ## Drawing a bus line
 
 [T-1464, T-1465, T-1514; `map/busDraw.ts`] The Build tab's Bus button (under the four tools, beside
-Ferry, key U), the Lines tab's bus button beside New line, or U from any tab starts the bus tool for a
+Ferry, key U) or U from any tab starts the bus tool for a
 new line; the Build tab's button again, while it is on, leaves it. Each click adds a
 point. Between two points the route takes the shortest path over the basemap's zoom 14 roads
 (`busRoads.ts`; trunk, primary, secondary, tertiary, minor and bus-only roads, and motorways, so the
-long bridges and tunnels most cities carry on them (T-2469); any direction, length as it is, no turn
+long bridges and tunnels most cities carry on them (T-2469); any direction, or with Settings > "Buses obey one-way streets" ticked only the way a one-way street runs (T-3480, Renkon's open-source PR 1), length as it is, no turn
 rules; service ways, tracks and paths are left out, except that a plain service road (no driveway, alley or parking aisle tag, open to all, at ground level) at most 60 m long with each end within 3 m of a street can be driven, and is never landed on (T-2882)), at most 3 times the straight line or 1 km more
-than it, whichever is longer. Roads join where a road's vertex comes within about 1 m of another road
+than it, whichever is longer. With that setting ticked (off by default, `display.busOneWay`; with it off a route is as it was) a one-way street is the basemap's `oneway`: 1 runs with the line as drawn, -1 against it, and a street with no `oneway` runs both ways (`RoadGraph.path`). The route goes round rather than back down a one-way street. While the bus tool is on and the setting is ticked, those one-way streets carry small arrows in the road hint's own colour, pointing the way traffic runs (turned round where `oneway` is -1), from zoom 15, drawn about 1.2 times the road hint's own stroke at each zoom (`bus_roads_oneway` in `basemap.ts`). A two-way street stays a plain line. A line set to both ways, and one that loops back, still runs that drawn road in reverse on the way back (open-source issue 8, a bus going the wrong way round a roundabout, is the same case). Roads join where a road's vertex comes within about 1 m of another road
 at its level, or where two ground-level roads cross, since the tiles drop the junction's vertex from a road
 running straight through it (T-2873; a motorway joins another motorway, and its own ends join any road).
 A click within 100 m of a road lands on the nearest one, a motorway
@@ -443,7 +446,7 @@ lighter; at most 16 of each.
   neighbours joined by a new leg (a click on the active end finishes instead, below). A press on any point dragged more than 3 px moves it (the map does not
   pan), and the legs either side are searched again on every move; Escape during the drag puts it
   back. Over a point the tag says what a click there does ("Click to delete", or finishing; nothing over a lone point),
-  "Drag to move", and what a right click does where it does something, and the network's hover is left out.
+  "Drag to move", and what a right click does where it does something, and the network's hover is left out, over the path as over a point (T-3370).
   A press on the route's path between points (within 7 px, 12 with a finger) dragged the same 3 px puts a new point
   there that follows the pointer (T-3366): the legs either side are searched again as for any point, Escape
   during the drag removes it, Ctrl+Z takes it out and a click on it deletes it. Over the path the tag leads with
@@ -451,7 +454,7 @@ lighter; at most 16 of each.
   With a finger (T-1517): a press within 18 px of a point drags it as the mouse does, the map does
   not pan, and a second finger puts it back; a press held still for 500 ms (moving up to 8 px)
   does a right click's work there (the phone buzzes) and the lift adds nothing; a tap on a point is a click on it.
-  A press that does not move and is lifted sooner is a tap, as in Building by touch.
+  A press that does not move and is lifted sooner is a tap, as in Building by touch. A finger within 12 px of the route's path drags a new point out of it, as the mouse does (T-3370).
 - **Loop** (T-2899): with three points or more, a right click on the other end joins the active end to it by road,
   adds a copy of the first point at the end, and makes the line or saves the route as a click on the active end does;
   the tag over that point says "Right click to close the loop". A road that does not reach is refused as a click's
@@ -497,8 +500,7 @@ lighter; at most 16 of each.
   (none for a constructed route). Ctrl+Z and Ctrl+Y (or Ctrl+Shift+Z) in the tool step the draft's
   points back and forward and leave the game's own undo alone.
 - **By touch**: a tap previews, a second tap or the check places it; a tap on the active end with
-  nothing waiting finishes, on the other end makes it active (or closes the loop, with three points). Dragging and deleting points take a
-  mouse.
+  nothing waiting finishes, on the other end makes it active (or closes the loop, with three points).
 - **Stop spacing** (T-2885, T-2937; `StopsHead` in `ui/inspector/BusInspector.tsx`): the bus panel's Stops heading
   carries two buttons, Auto and Manual, as the schedule's Buses and Headway pair does; not on a ferry. Under Auto
   (planned or constructed line) a Stop spacing row follows with a stepper from 400 m to 100 km. Its first step,
@@ -527,7 +529,7 @@ lighter; at most 16 of each.
 ## Drawing a ferry line
 
 [T-2194; `map/ferryDraw.ts`; design notes/T-2177.md 3.2] The Build tab's Ferry button (beside Bus,
-each half the row, key O), the Lines tab's ferry button beside the bus one, or O from any tab starts
+each half the row, key O) or O from any tab starts
 the ferry tool for a new line. The player places **ports only**; between two consecutive ports the
 route is found over the basemap's water (track-and-service.md 6.8), never drawn by hand.
 
@@ -585,6 +587,17 @@ route is found over the basemap's water (track-and-service.md 6.8), never drawn 
 [T-727d; `map/realSnap.ts`, `workers/realRoute.worker.ts`; design notes/T-727.md] With the snap
 switch on, the track tool follows the real network the layer draws.
 
+- **What each track type follows** [T-3069; `game/realFollow.ts`, one table for the router and the layer]:
+  train track follows rail, light rail, metro, monorail, funicular, narrow gauge and heritage, never tram
+  rail; tram track follows tram and light rail, and rail, metro, funicular, narrow gauge and heritage as
+  other families (tram-trains and street running share rail track), never a monorail. While a type
+  snaps, the layer draws only what it follows: under All, all of that, used or not; under Passenger the
+  passenger track, with every tram line added for tram track. Each kind is its own family but rail and light
+  rail (one for train track) and tram and light rail (one for tram track). For tram track the 60 degree turn
+  rule takes each chain's heading 10 m in, not 30, as a 12-15 m junction curve running on into the cross street
+  reads as a sharper turn over 30 m. Snapped tram track is off-street
+  tram track, its corners fitted with tram curves ([track-and-service.md](track-and-service.md) "Tram track").
+
 - **The ring**: within 12 px of a drawn real line (the layer's own rendered features), the ring
   sits on the line where a click would snap. A first click on open ground there starts on the line;
   a first click on the player's own track starts there as always, and the route begins from the
@@ -597,7 +610,7 @@ switch on, the track tool follows the real network the layer draws.
   either click, its distance from the click counted twice; where the two clicks' candidates share
   no family (one on the metro under a main-line station, the other on rail), each click also takes
   the other's family within 400 m [T-923]; no turn sharper than 60 degrees where
-  two chains meet; the other family (metro or rail) than the first click's nearest track at three
+  two chains meet; every other family than the first click's nearest track's at three
   times its length, so a subway click follows the subway and an intercity route keeps off it;
   high-speed track (flag 8 in the graph) at 0.8 times its length, so London to Paris keeps to HS1
   and the LGV by Lille (493 km) over the shorter classic line by Amiens [T-838]; otherwise a metre
@@ -713,7 +726,7 @@ switch on, the track tool follows the real network the layer draws.
 [T-338, T-733, T-1688; rules in [track-and-service.md](track-and-service.md) 6.1] The game adds no
 crossovers and there is no crossover tool: the player draws crossing track between two pairs where
 lines should change over. A crossover a save holds is selected, constructed and removed whole like
-other track (below). The clock worker's `previewCrossover` and `crossover` edit are for checks only.
+other track (below). Tram track takes crossing track and crossovers as rail does [T-3575]. The clock worker's `previewCrossover` and `crossover` edit are for checks only.
 
 ## Deleting
 
@@ -856,7 +869,8 @@ is the pan and Shift+drag is MapLibre's zoom box, so a box needs a mode.
   change."), or that none could. The phone bar's one button's hover is the level's name ("Viaduct"),
   or "Level of the selected track: mixed".
 - **Rebuild** [T-3059; `game/rebuild.ts`, `TrackApi::rebuild_quote` and `rebuild_pieces` in
-  `sim/src/track/wasm/rebuild.rs`; the preview of the new shape is T-3060]: a pick of built track and
+  `sim/src/track/wasm/rebuild.rs`; the preview of the new shape is T-3060; one piece also from the track inspector,
+  "Rebuild in the track inspector" below]: a pick of built track and
   stations has the same level buttons and Regular / High speed as a blueprint pick, plus **Tram** (T-3088, the
   track tool's word), but they only choose (the chosen ones are solid; nothing is chosen at first), and a
   **Rebuild** button (wrench icon and word) spends: it is greyed until a choice is made. The track and the
@@ -933,7 +947,7 @@ is the pan and Shift+drag is MapLibre's zoom box, so a box needs a mode.
   are not grabbed. A route being drawn
   from the dragged node is dropped when the drag lets go; a route from another point carries on.
 - **The track inspector** of a blueprint stretch has Construct, "Remove blueprint" (built track
-  says "Remove track") and the lines here [T-1669]. Its title carries **Add point** [T-2951], an
+  says "Remove track", beside Rebuild, below) and the lines here [T-1669]. Its title carries **Add point** [T-2951], an
   icon of track with a square on it and a plus, on blueprint track that is not a crossover: a point
   halfway along the piece, as a double click adds one (hover "Add a point halfway along"). On single rail track it has the
   **Run trains one way** switch, **Reverse direction** and **Use automatic way** ([track-and-service.md](track-and-service.md)
@@ -945,9 +959,26 @@ is the pan and Shift+drag is MapLibre's zoom box, so a box needs a mode.
   icon of two rails and a plus: a click adds the express pair beside its run as blueprint
   ([track-and-service.md](track-and-service.md) 6.1 "Doubling up"). Its hover gives the price, or
   why not, greyed (a pair beside already). The title names the track: Double track, Single track
-  or High-speed track [T-817]; high-speed track has no Double up. A **Speed limit** row above
-  Slowest curve gives the track's cap, 160 km/h or 320 on high-speed track, its hover saying which
-  trains run up to what [T-817]; the slowest curve on high-speed track counts up to 320.
+  or High-speed track [T-817]; high-speed track has no Double up. A **Top speed** row above
+  Slowest curve gives the track's cap, 160 km/h or 320 on high-speed track (the tram kinds' 60 and 80), its hover
+  saying which trains run up to what while no limit is set [T-817]; the slowest curve on high-speed track counts up
+  to 320. Beside the cap a mini **Limit** toggle, as on a line's Top speed row [T-3405; `ui/inspector/PieceLimit.tsx`]:
+  on, a **Speed limit** row with a stepper (steps of 10 km/h, 40 up to the cap, starting at the cap) holds trains on
+  this piece to it; free, one undoable edit a step ([track-and-service.md](track-and-service.md) "A piece's speed
+  limit"). One piece at a time: the Select tool's bar has no limit.
+- **Rebuild in the track inspector** [T-3408; `ui/inspector/PieceRebuild.tsx`]: built track that is not a crossover
+  has, under its header, the bar's level buttons, the track count buttons (1-line and 2-line icons) and the track
+  type (Regular / High speed on rail, Tram on tram track), the piece's own on; then **Rebuild** (wrench and word) on
+  the left of the row whose right is Remove track; then a grey line "Use the Select tool (4) to rebuild longer
+  stretches" (no key on a phone). A level, and the other family's kinds (Tram on rail, Regular and High speed on
+  tram), show only where the quote for this piece alone changes it and refuses nothing (`rebuildWhole`): the track
+  joined to a piece often ties its level (a piece with no corners between junctions) and its family (anything
+  joined to the other family), and then the buttons are left out, not greyed; with no other level open the level
+  buttons go, and so does a type group of only the piece's own kind. They are asked once a selection and after each
+  edit (Anita, 2026-11-17: "show level and tram as options, if they are options"). It is the Select bar's Rebuild
+  (below) for a pick of this one piece and no stations: the same choices (picking what the piece has drops the
+  choice), quote, hover, question, price and notice, through the same code (`rebuildPieces` in `game/rebuild.ts`),
+  and final like it. Greyed Rebuild has no hover.
 - **On a crossover's diagonal** [T-391] the track inspector is titled "Crossover" and drops the
   elevation controls; it shows the slowest curve, the price of both diagonals, Construct
   (builds both) and Remove crossover.

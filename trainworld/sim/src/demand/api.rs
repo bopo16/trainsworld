@@ -89,19 +89,28 @@ pub(crate) fn put_fare_curve(g: &mut Graph, knots: &[f32], hop_km: &[f32], fare_
 }
 
 /// Each ride edge's distance fare (`per_km` a fare km, perceived minutes) times its route node's
-/// multiplier in `mul` (T-1626; empty: all 1), and the fare curve (`put_fare_curve`).
+/// multiplier in `mul` (T-1626; empty: all 1), the fare curve (`put_fare_curve`), and the base's
+/// multiplier per route node in `base_mul` (T-3578, each line's own; empty: all 1).
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn put_fares(g: &mut Graph, knots: &[f32], hop_km: &[f32], mul: &[f32], fare_min: f32, per_km: f32, fare_w: f32) {
+pub(crate) fn put_fares(g: &mut Graph, knots: &[f32], hop_km: &[f32], mul: &[f32], base_mul: &[f32], fare_min: f32, per_km: f32, fare_w: f32) {
     let km = |r: usize| hop_km.get(r).copied().unwrap_or(0.0);
     let m = |r: usize| mul.get(r).copied().unwrap_or(1.0);
     for (r, fare) in g.rn_fare.iter_mut().enumerate() {
         *fare = km(r) * per_km * m(r);
     }
     put_fare_curve(g, knots, hop_km, fare_min, per_km, fare_w);
+    let n = g.rn_fare.len();
     if mul.iter().any(|&v| v != 1.0) {
-        let n = g.rn_fare.len();
         g.rn_fare_mul = (0..n).map(m).collect();
         g.rn_kmw = (0..n).map(|r| km(r) * m(r)).collect();
+    }
+    if base_mul.iter().any(|&v| v != 1.0) {
+        g.rn_base_mul = (0..n).map(|r| base_mul.get(r).copied().unwrap_or(1.0)).collect();
+        g.base_min = fare_min;
+        // the base's share goes on the km ridden, a straight curve's too (`board_base`)
+        if g.rn_km.is_empty() {
+            g.rn_km = (0..n).map(km).collect();
+        }
     }
 }
 
@@ -327,6 +336,9 @@ pub(crate) struct Service {
     pub(crate) st_bus: Vec<bool>,
     /// `Network::st_tram` (`set_tram_lines`, T-2926).
     pub(crate) st_tram: Vec<bool>,
+    /// `Network::back_stops` (`set_back_stops`, T-3348), demand stations; empty where every
+    /// reverse stop is the listed stop's.
+    pub(crate) back: Vec<u32>,
 }
 
 /// `span` if it is one per period and route node of `stops` stops, else empty (T-842).
@@ -356,6 +368,7 @@ impl Service {
             && self.catches == o.catches
             && self.st_bus == o.st_bus
             && self.st_tram == o.st_tram
+            && self.back == o.back
     }
     /// T-124: the periods (bit q) whose inputs are the same in `o`: the same layout, and the run
     /// times and trains an hour of the period's level. A period reads no other level's.
@@ -540,6 +553,8 @@ pub struct DemandApi {
     pub(crate) fare_km: Vec<f32>,
     /// T-1626: each route node's fare multiplier (`set_fare_mul`); empty: all 1.
     pub(crate) fare_mul: Vec<f32>,
+    /// T-3578: each route node's base multiplier (`set_base_mul`); empty: all 1.
+    pub(crate) base_mul: Vec<f32>,
     /// The fare curve's knots, km and US$ in pairs (T-883, `set_fare_curve`); empty for the straight line.
     pub(crate) fare_curve: Vec<f32>,
     open_ms: f64,
@@ -555,6 +570,8 @@ pub struct DemandApi {
     bus_in: (Vec<u32>, Vec<f32>),
     /// Per line of the network `set_network` is given, 1 if it runs on tram track (`set_tram_lines`).
     tram_in: Vec<u8>,
+    /// The reverse runs' stops of the next `set_network` (`set_back_stops`, T-3348).
+    back_in: Vec<u32>,
     /// T-124: the periods (bit q) whose inputs the last `set_network` and `set_fares` left as they
     /// were, so their results were kept; and whether the layout was, so access was kept.
     pub(crate) same: u32,
@@ -567,6 +584,56 @@ pub struct DemandApi {
     pub(crate) part: (u32, u32),
     /// T-2365: the day's commutes by length (`len_base`), worked out on first use.
     len_base: std::cell::OnceCell<LenBase>,
+}
+
+/// T-2496: heap bytes by structure (`demand::mem`).
+impl DemandApi {
+    /// Everything this population holds, under `at`; with `shared` the cells, zones, gravity and
+    /// parameters' tables it shares with its everyday layer too (counted once, with the commutes).
+    pub(crate) fn mem_into(&self, r: &mut super::mem::Report, at: &str, shared: bool) {
+        use super::mem::{self, vb};
+        if shared {
+            mem::city(&self.city, r, at);
+            r.add(format!("{at}zones"), mem::zones(&self.z));
+            mem::gravity(&self.gr, r, at);
+            r.add(format!("{at}no rail (NoRail)"), self.nr.heap_bytes());
+            let b = &self.base;
+            r.add(format!("{at}routes (walks, drives)"), b.routes.as_ref().map_or(0, |x| x.heap_bytes()));
+            r.add(format!("{at}home density, cordon"), b.home_dens.as_ref().map_or(0, |x| vb(x)) + b.cordon.as_ref().map_or(0, |x| vb(x)));
+            r.add(format!("{at}land parts"), b.parts.as_ref().map_or(0, |p| vb(&p.cell) + vb(&p.z_off) + vb(&p.s_part) + vb(&p.s_pop) + vb(&p.s_jobs) + vb(&p.cell_slot) + vb(&p.mixed)));
+        }
+        r.add(format!("{at}weights"), self.weights.as_ref().map_or(0, |(a, b)| vb(a) + vb(b)));
+        r.add(format!("{at}per zone (walk, unr, home_k, work_k)"), vb(&self.walk_home_zone) + vb(&self.walk_work_zone) + vb(&self.unr_home) + vb(&self.unr_work) + vb(&self.home_k) + vb(&self.work_k));
+        if let Some(s) = &self.svc {
+            r.add(format!("{at}service"), vb(&s.st_x) + vb(&s.st_y) + vb(&s.st_map) + vb(&s.line_off) + vb(&s.stops) + vb(&s.stop_xy) + vb(&s.times) + vb(&s.tph) + vb(&s.cars) + vb(&s.group) + vb(&s.span) + vb(&s.ups) + vb(&s.passages) + vb(&s.catches) + s.catches.iter().map(|c| vb(&c.pts)).sum::<usize>() + vb(&s.st_bus) + vb(&s.st_tram) + vb(&s.back));
+        }
+        if let Some(s) = &self.sz {
+            mem::subzones(s, r, at);
+        }
+        r.add(format!("{at}stations (want, od_st, od_at), fares, inputs"), vb(&self.want) + vb(&self.od_st) + vb(&self.od_at) + vb(&self.fare_km) + vb(&self.fare_mul) + vb(&self.base_mul) + vb(&self.fare_curve) + vb(&self.complex_in) + vb(&self.ups_in) + vb(&self.passages_in) + vb(&self.span_in) + vb(&self.bus_in.0) + vb(&self.bus_in.1) + vb(&self.tram_in) + vb(&self.back_in));
+        let (mut net, mut g, mut avg, mut od, mut sub, mut rest) = (0, 0, 0, 0, 0, 0);
+        for p in self.per.iter().flatten() {
+            net += mem::network(&p.net);
+            g += mem::graph(&p.g);
+            avg += mem::loads(&p.avg);
+            let s = &p.sub;
+            od += vb(&s.od);
+            sub += vb(&s.rail_home) + vb(&s.rail_work) + vb(&s.walk_lost_home) + vb(&s.walk_lost_work) + vb(&s.unr_lost_home) + vb(&s.unr_lost_work) + vb(&s.acc_home) + vb(&s.acc_work);
+            rest += vb(&p.fac) + vb(&p.seen) + mem::xfer(&p.xi) + vb(&p.xfer) + vb(&p.len.rail) + vb(&p.len.walk) + vb(&p.len.unr);
+        }
+        r.add(format!("{at}periods: network copies"), net);
+        r.add(format!("{at}periods: graphs"), g);
+        r.add(format!("{at}periods: loads"), avg);
+        r.add(format!("{at}periods: station OD (sub.od)"), od);
+        r.add(format!("{at}periods: by subzone and access entry (sub)"), sub);
+        r.add(format!("{at}periods: crowding, transfers, lengths"), rest);
+    }
+    /// `mem_into` of everything, as text (`bin/demand_mem.rs`).
+    pub fn mem_report(&self) -> String {
+        let mut r = super::mem::Report::default();
+        self.mem_into(&mut r, "", true);
+        r.text()
+    }
 }
 
 /// T-2365: a pack's commutes a day by length with no network: all, walking, and between two land
@@ -648,6 +715,7 @@ impl DemandApi {
             catches: svc.catches.clone(),
             st_bus: svc.st_bus.clone(),
             st_tram: svc.st_tram.clone(),
+            back_stops: svc.back.clone(),
         };
         for l in 0..nl {
             let (a, b) = (svc.line_off[l] as usize, svc.line_off[l + 1] as usize);
@@ -991,6 +1059,7 @@ impl DemandApi {
             fare_per_km: 0.0,
             fare_km: vec![],
             fare_mul: vec![],
+            base_mul: vec![],
             fare_curve: vec![],
             open_ms: 0.0,
             complex_in: vec![],
@@ -999,6 +1068,7 @@ impl DemandApi {
             span_in: vec![],
             bus_in: (vec![], vec![]),
             tram_in: vec![],
+            back_in: vec![],
             same: 0,
             layout_same: false,
             reusable: false,
@@ -1110,7 +1180,7 @@ impl DemandApi {
         let (home_k, work_k) = zone_trip_factors(&city, &z, &gr, gravity_from_pack);
         // read only above; z and gr hold what the solves need of it (T-1611)
         city.gravity = None;
-        Ok(DemandApi { city: Arc::new(city), z: Arc::new(z), gr: Arc::new(gr), weights: None, base, nr, walk_all, walk_home_zone: ns.walk_home, walk_work_zone: ns.walk_work, unr_all, unr_home: ns.unr_home, unr_work: ns.unr_work, home_k, work_k, svc: None, sz: None, want: vec![], od_st: vec![], od_at: vec![], per: (0..PERIODS).map(|_| None).collect(), fare_per_km: 0.0, fare_km: vec![], fare_mul: vec![], fare_curve: vec![], open_ms: now_ms() - t0, complex_in: vec![], ups_in: vec![], passages_in: vec![], span_in: vec![], bus_in: (vec![], vec![]), tram_in: vec![], same: 0, layout_same: false, reusable: false, lod: Lod::of(lod::FINE)?, part: (0, 1), len_base: std::cell::OnceCell::new() })
+        Ok(DemandApi { city: Arc::new(city), z: Arc::new(z), gr: Arc::new(gr), weights: None, base, nr, walk_all, walk_home_zone: ns.walk_home, walk_work_zone: ns.walk_work, unr_all, unr_home: ns.unr_home, unr_work: ns.unr_work, home_k, work_k, svc: None, sz: None, want: vec![], od_st: vec![], od_at: vec![], per: (0..PERIODS).map(|_| None).collect(), fare_per_km: 0.0, fare_km: vec![], fare_mul: vec![], base_mul: vec![], fare_curve: vec![], open_ms: now_ms() - t0, complex_in: vec![], ups_in: vec![], passages_in: vec![], span_in: vec![], bus_in: (vec![], vec![]), tram_in: vec![], back_in: vec![], same: 0, layout_same: false, reusable: false, lod: Lod::of(lod::FINE)?, part: (0, 1), len_base: std::cell::OnceCell::new() })
     }
 
     /// `new` at a level of detail (T-1222, `lod::FINE` or `lod::COARSE`): the commute chunks
@@ -1172,6 +1242,13 @@ impl DemandApi {
         self.tram_in = flags.to_vec();
     }
 
+    /// The reverse runs' stops of the networks `set_network` is given from now on (T-3348): per
+    /// stop (parallel to `stops`), the station the line's reverse run stops at, the stop's own
+    /// where it is the same. Empty or another length: every reverse stop is the listed stop.
+    pub fn set_back_stops(&mut self, back: &[u32]) {
+        self.back_in = back.to_vec();
+    }
+
     /// T-874: commute zone pairs under the level's chunk (`Lod::chunk`) trips a period dealt in
     /// chunks (`Params::commute_chunk`), or every pair solved (`?perfOff=chunks`).
     pub fn set_chunked(&mut self, on: bool) {
@@ -1220,6 +1297,7 @@ impl DemandApi {
             catches,
             st_bus,
             st_tram,
+            back: demand_back(&st_map, stops, &self.back_in),
             st_x,
             st_y,
             st_map: st_map.clone(),
@@ -1247,6 +1325,7 @@ impl DemandApi {
         if !self.layout_same {
             self.fare_km.clear();
             self.fare_mul.clear();
+            self.base_mul.clear();
             self.sz = None;
             self.want.clear();
             self.od_st.clear();
@@ -1301,6 +1380,20 @@ impl DemandApi {
         let mul = if mul.iter().all(|&v| v == 1.0) { &[][..] } else { mul };
         if !same_bits(mul, &self.fare_mul) {
             self.fare_mul = mul.to_vec();
+            self.per.iter_mut().for_each(|p| *p = None);
+            self.same = 0;
+        }
+        Ok(())
+    }
+
+    /// T-3578: each route node's base multiplier, in `set_fares`' layout (its line's own fare
+    /// multiplier, the high-speed, bus and ferry ones left out); empty when every one is 1. A trip
+    /// pays the base times the largest of the lines it rides.
+    pub fn set_base_mul(&mut self, mul: &[f32]) -> Result<(), String> {
+        check_fare_mul(mul, self.svc.as_ref().map_or(0, |s| 2 * s.stops.len()))?;
+        let mul = if mul.iter().all(|&v| v == 1.0) { &[][..] } else { mul };
+        if !same_bits(mul, &self.base_mul) {
+            self.base_mul = mul.to_vec();
             self.per.iter_mut().for_each(|p| *p = None);
             self.same = 0;
         }
@@ -1395,7 +1488,7 @@ impl DemandApi {
         let walk0 = self.walk_all * p.period_share as f64;
         let net = Self::period_net(svc, q);
         let mut g = build_graph(&net, &p);
-        put_fares(&mut g, &self.fare_curve, &self.fare_km, &self.fare_mul, self.base.fare_min, self.fare_per_km, self.base.fare_w);
+        put_fares(&mut g, &self.fare_curve, &self.fare_km, &self.fare_mul, &self.base_mul, self.base.fare_min, self.fare_per_km, self.base.fare_w);
         let no_crowding = vec![1.0; g.rn_ride.len()];
         set_crowding(&mut g, &no_crowding);
         let xi = xfer_index(&g);
@@ -1430,7 +1523,7 @@ impl DemandApi {
         if g.rn_ride.len() != src.g.rn_ride.len() || g.n != src.g.n {
             return false;
         }
-        put_fares(&mut g, &self.fare_curve, &self.fare_km, &self.fare_mul, self.base.fare_min, self.fare_per_km, self.base.fare_w);
+        put_fares(&mut g, &self.fare_curve, &self.fare_km, &self.fare_mul, &self.base_mul, self.base.fare_min, self.fare_per_km, self.base.fare_w);
         let no_crowding = vec![1.0; g.rn_ride.len()];
         set_crowding(&mut g, &no_crowding);
         let xi = xfer_index(&g);
@@ -1502,6 +1595,7 @@ impl DemandApi {
             msa(&mut st.avg.entry, &l.entry, r);
             msa(&mut st.avg.exit, &l.exit, r);
             msa(&mut st.avg.rn_fare_x, &l.rn_fare_x, r);
+            msa(&mut st.avg.rn_base_x, &l.rn_base_x, r);
             st.sub.msa(&sub, r);
             let w = 1.0 / (r as f64 + 1.0);
             st.rail += (rail - st.rail) * w;
@@ -1646,6 +1740,11 @@ impl DemandApi {
     /// the transfer fares (T-1801) at the route nodes riders board after changing.
     pub fn fare_extra(&self, q: usize) -> Vec<f32> {
         self.per.get(q).and_then(|p| p.as_ref()).map_or(vec![], |st| fare_extra_usd(&st.avg.rn_fare_x, &st.p, &st.g, &st.xi, &st.xfer))
+    }
+    /// T-3578: what the base's own multiples add past one base in period `q`, US$ (below 0 under 1), on the km
+    /// ridden from each route node; all 0 while no line has one. Income adds it to the base fares it shares out.
+    pub fn base_extra(&self, q: usize) -> Vec<f32> {
+        self.per.get(q).and_then(|p| p.as_ref()).map_or(vec![], |st| fare_x_usd(&st.avg.rn_base_x, st.p.fare_w))
     }
     /// Riders in period `q` boarding at each route node after changing lines (T-1530); empty when
     /// the period has no result.
@@ -2361,6 +2460,17 @@ mod bus_tests;
 mod tram_tests;
 #[cfg(test)]
 mod islands_tests;
+
+/// T-3348: `Service::back` from the snapshot's reverse stops `back` (parallel to `stops`), as demand
+/// stations; empty when it is not one per stop, names a station not in the list, or every reverse
+/// stop merges with its listed stop.
+pub(crate) fn demand_back(st_map: &[u32], stops: &[u32], back: &[u32]) -> Vec<u32> {
+    if back.len() != stops.len() || back.iter().any(|&s| s as usize >= st_map.len()) {
+        return vec![];
+    }
+    let out: Vec<u32> = back.iter().map(|&s| st_map[s as usize]).collect();
+    if out.iter().zip(stops).all(|(&b, &s)| b == st_map[s as usize]) { vec![] } else { out }
+}
 
 /// Per merged station, whether only tram lines serve it (`Service::st_tram`); empty with no tram lines.
 pub(crate) fn tram_stops(st_map: &[u32], n: usize, stops: &[u32], line_off: &[u32], tram_line: &[bool]) -> Vec<bool> {

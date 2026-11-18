@@ -7,23 +7,31 @@
 // `track` layer: k kind, r rank 0 main or 1 other, p confirmed by a passenger route, n no line runs over
 // it, x such track of a named line the model left out (T-3043), c colour; nm and w only from zoom 10). The tiles carry no line type, so the classes are what they
 // do carry: metro (subway), main line (rail, rank 0), other rail a line runs over (rank 1, T-3043), and light rail (S-Bahn, Stadtbahn, DLR; the tiles carry no usage, so all of it, T-3285). Trams, monorails, funiculars, narrow gauge, heritage and track no line runs over are
-// left out, unless Settings says All (T-3289). A region's source is added when the view first touches it, from zoom 6 up.
+// left out, unless Settings says All (T-3289). While the track tool snaps, the layer draws only what the router lets
+// that track type follow (game/realFollow.ts, T-3069): train track all but tram rail under All; tram track all but
+// monorail under All, and its tram rail too under Passenger. A region's source is added when the view first touches it, from zoom 6 up.
 //
 // Where the files are: beside the game at `../noritetsu/` when that answers with noritetsu's
 // regions.json (8800 serves it; the dev server proxies the path, vite.config.ts), else Cloudflare R2,
 // the way noritetsu's own page decides; the published page tries R2 first (T-941).
+//
+// Freight and abandoned rail (T-3464) are in a second archive per region, `<cc>_extra.pmtiles`, built by
+// pipeline/real_extra.py (`k` freight or abandoned). It is added only when Settings says All, only for
+// regions `extra.json` lists, and drawn under the region's passenger layer: freight thin, abandoned thinner
+// and dashed. `?realExtra=<url prefix>` reads the manifest and archives from there instead (tests).
 
 import * as maplibregl from "maplibre-gl";
 import { effect, signal } from "@preact/signals";
 import { Protocol } from "pmtiles";
 import { SHADES, type ShadeColours } from "../game/shadeTable";
-import { display, mapShade, snapping } from "../game/ui";
+import { display, mapShade, snapMode, snapping } from "../game/ui";
+import { followedKinds } from "../game/realFollow";
 import { firstSymbolId } from "./basemap";
 import { styleUp } from "./styleReady";
-import { noritetsuBases, ringBox } from "../game/rings";
-import { PUBLISHED } from "../game/dataBase";
+import { ringBox } from "../game/rings";
+import { regionsJson } from "./regionsJson";
 import { perfOff } from "../perfFlags";
-import { patientFetch } from "../workers/patientFetch";
+import { REAL_STATIONS_LAYER } from "./realStations";
 
 const OSM_ATTRIBUTION = '<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a> (ODbL)';
 /** below this the view spans too many regions and the lines are too small to follow; at 4 a view of
@@ -39,8 +47,18 @@ const kind = (k: string) => ["==", ["get", "k"], k];
 const METRO = kind("subway");
 const MAIN = ["all", kind("rail"), ["==", ["get", "r"], 0]];
 const PASSENGER = ["all", ["any", ["!=", ["get", "n"], 1], ["==", ["get", "x"], 1]], ["any", METRO, kind("rail"), kind("light_rail")]];
-/** "All" draws every feature the tiles carry: track no line runs over, trams, monorails, funiculars, narrow gauge, heritage (yards and freight-only track are not in the tiles) */
+/** "All" draws every feature the tiles carry: track no line runs over, trams, monorails, funiculars, narrow gauge, heritage; freight and abandoned rail come from the extra archives */
 const EVERYTHING = ["has", "k"];
+/** what a track type's snap follows (pipeline/realgraph.py keeps every kind, used or not; T-3495, T-3069) */
+const routable = (mode: "rail" | "tram") => ["in", ["get", "k"], ["literal", followedKinds(mode)]];
+/** tram track snapping under Passenger: the passenger track and every tram line, which Passenger leaves out */
+const PASSENGER_TRAM = ["any", PASSENGER, kind("tram")];
+
+const FREIGHT = ["==", ["get", "k"], "freight"];
+/** freight and abandoned are lesser than any passenger class: freight 0.45 of a main line, abandoned 0.35 and dashed */
+const extraWidth = ["interpolate", ["exponential", 1.4], ["zoom"], ...[0.6, 1, 1.5, 2.4, 4, 8].flatMap((v, i) => [WIDTH_ZOOM + [0, 4, 7, 10, 13, 16][i], ["case", FREIGHT, v * 0.45, v * 0.35]])];
+const extraColour = (c: ShadeColours) => ["case", FREIGHT, c.realFreight, c.realAbandoned];
+const EXTRA = "tw-realx-";
 
 /** line width (px) by zoom; main and metro the same, other rail thinner */
 const width = (...stops: number[]) => ["interpolate", ["exponential", 1.4], ["zoom"], ...stops.flatMap((v, i) => [WIDTH_ZOOM + [0, 4, 7, 10, 13, 16][i], ["case", ["any", METRO, MAIN], v, v * 0.7]])];
@@ -96,37 +114,59 @@ export function startRealNetwork(map: maplibregl.Map) {
   let painted: "light" | "dark" | null = null;
   let opacity = SHADES[mapShade.peek()].realOpacity;
   let filter: unknown = PASSENGER;
+  let extraOn = false;
+  let extraList: Promise<Record<string, number>> | null = null;
+  const extraAdded = new Set<string>();
 
-  /** regions.json (about 1.5 MB, outlines in it): which regions exist and where, and which base serves them */
+  /** which regions exist and where, and which base serves them */
   const load = () =>
     (index ??= (async () => {
-      for (const b of noritetsuBases(document.baseURI, PUBLISHED)) {
-        try {
-          const r = await patientFetch(b + "regions.json"); // T-3314: a held request gives up, and the next base is tried
-          const j = r.ok ? await r.json() : null;
-          if (!j?.regions) continue;
-          base = b;
-          regions = Object.entries(j.regions as Record<string, { parts: [number, number][][] }>).map(([cc, r]) => ({
-            cc,
-            parts: r.parts.map((ring) => ringBox(ring.flat())),
-          }));
-          return;
-        } catch {
-          // not there, or not JSON: try the next
-        }
-      }
-      console.warn("Real network: noritetsu's data is not reachable");
+      const j = await regionsJson();
+      if (!j) return void console.warn("Real network: noritetsu's data is not reachable");
+      base = j.base;
+      regions = Object.entries(j.regions).map(([cc, r]) => ({ cc, parts: r.parts.map((ring) => ringBox(ring.flat())) }));
     })());
 
   /** every region's layer ever added: a style restored after a lost context has them still (T-957), `added` starts over */
   const everAdded = new Set<string>();
   const layerIds = () => [...everAdded].map((cc) => ID + cc).filter((id) => map.getLayer(id));
 
+  const extraBase = () => new URLSearchParams(location.search).get("realExtra") ?? `${base}data/`;
+  /** the regions that have an extra archive; none when the manifest is missing, as before the rebuild */
+  const extraRegions = () =>
+    (extraList ??= fetch(`${extraBase()}extra.json`).then((r) => (r.ok ? r.json() : {}), () => ({})).catch(() => ({})));
+
+  /** adds the extra layer of every region in view's set that has one, under that region's passenger layer */
+  const ensureExtra = async () => {
+    if (!extraOn || !regions) return;
+    const list = await extraRegions();
+    if (!extraOn || !styleUp(map)) return;
+    const colours = extraColour(SHADES[mapShade.peek()]);
+    for (const cc of added) {
+      if (!(cc in list) || extraAdded.has(cc) || !map.getLayer(ID + cc)) continue;
+      extraAdded.add(cc);
+      if (!map.getSource(EXTRA + cc)) map.addSource(EXTRA + cc, { type: "vector", url: `pmtiles://${extraBase()}${cc}_extra.pmtiles`, attribution: OSM_ATTRIBUTION });
+      // line-dasharray cannot vary by feature, so abandoned is its own layer
+      for (const [id, filt, dash] of [[EXTRA + cc, FREIGHT, [1]], [EXTRA + "a-" + cc, ["!", FREIGHT], [3, 2]]] as const)
+        if (!map.getLayer(id))
+          map.addLayer(
+            {
+              id, type: "line", source: EXTRA + cc, "source-layer": "track", minzoom: MIN_ZOOM, filter: filt as never,
+              layout: { "line-cap": "butt", "line-join": "round" },
+              paint: { "line-color": colours as never, "line-width": extraWidth as never, "line-opacity": opacity, "line-dasharray": dash as never },
+            },
+            ID + cc,
+          );
+    }
+  };
+  const extraIds = () => [...extraAdded].flatMap((cc) => [EXTRA + cc, EXTRA + "a-" + cc]).filter((id) => map.getLayer(id));
+
   const setShade = () => {
     const s = mapShade.peek();
     if (s === painted || !styleUp(map)) return;
     painted = s;
     for (const id of layerIds()) map.setPaintProperty(id, "line-color", colour(SHADES[s]) as never);
+    for (const id of extraIds()) map.setPaintProperty(id, "line-color", extraColour(SHADES[s]) as never);
   };
 
   const ensure = async () => {
@@ -140,8 +180,9 @@ export function startRealNetwork(map: maplibregl.Map) {
       .filter((r) => !added.has(r.cc) && r.parts.some((p) => p[0] <= b.getEast() && p[2] >= b.getWest() && p[1] <= b.getNorth() && p[3] >= b.getSouth()))
       .sort((x, y) => dist(x) - dist(y))
       .slice(0, PER_PASS);
-    if (!hits.length) return;
-    const before = map.getLayer(REACH) ? REACH : firstSymbolId(map);
+    if (!hits.length) return void ensureExtra();
+    // under the real stations' rings (T-3570) and the reach
+    const before = map.getLayer(REAL_STATIONS_LAYER) ? REAL_STATIONS_LAYER : map.getLayer(REACH) ? REACH : firstSymbolId(map);
     const colours = colour(SHADES[mapShade.peek()]);
     for (const { cc } of hits) {
       added.add(cc);
@@ -166,6 +207,7 @@ export function startRealNetwork(map: maplibregl.Map) {
       );
     }
     painted = mapShade.peek();
+    void ensureExtra();
     if (hits.length === PER_PASS) map.once("idle", ensure);
   };
 
@@ -198,22 +240,32 @@ export function startRealNetwork(map: maplibregl.Map) {
         map.setFilter(id, filter as never);
         map.setPaintProperty(id, "line-opacity", opacity);
       }
+    if (styleUp(map))
+      for (const id of extraIds()) {
+        map.setLayoutProperty(id, "visibility", on && extraOn ? "visible" : "none");
+        map.setPaintProperty(id, "line-opacity", opacity);
+      }
+    void ensureExtra();
     showReach();
   };
   effect(() => {
     // snapping shows the layer even when Settings has it off: nothing unseen is snapped to
-    const snap = snapping.value;
+    const snap = snapping.value, mode = snapMode.value;
     const reach = snap && !!realReach.value;
     const shown = display.value.realNetwork;
-    // snapping goes only to passenger track, so while it is on only that is drawn
-    filter = shown === "all" && !snap ? EVERYTHING : PASSENGER;
+    // snapping goes only to track the router follows for the track type, so while it is on only that
+    // is drawn: all of it under All, the track lines run over under Passenger (T-3495), tram rail
+    // added for tram track (T-3069)
+    filter = shown === "all" ? (mode ? routable(mode) : EVERYTHING) : mode === "tram" ? PASSENGER_TRAM : PASSENGER;
     on = shown !== "none" || snap;
+    extraOn = shown === "all" && !snap;
     opacity = snap ? (reach ? OPACITY_DIM : OPACITY_SNAP) : SHADES[mapShade.value].realOpacity;
     apply();
   });
   map.on("moveend", ensure);
   map.on("style.load", () => {
     added.clear();
+    extraAdded.clear();
     painted = null;
     apply();
   });

@@ -29710,6 +29710,590 @@
       {
         "name": "Singapore",
         "regionName": "Singapore region"
+      },
+      {
+        "name": "Shenzhen",
+        "regionName": "Shenzhen region"
+      },
+      {
+        "name": "Guatemala City",
+        "regionName": "Guatemala City region"
+      },
+      {
+        "name": "Chichicastenango",
+        "regionName": "Chichicastenango region"
+      },
+      {
+        "name": "Malacatán",
+        "regionName": "Malacatán region"
+      },
+      {
+        "name": "Mazatenango",
+        "regionName": "Mazatenango region"
+      },
+      {
+        "name": "Cobán",
+        "regionName": "Cobán region"
+      },
+      {
+        "name": "Quetzaltenango",
+        "regionName": "Quetzaltenango region"
+      },
+      {
+        "name": "Sayaxché",
+        "regionName": "Sayaxché region"
+      },
+      {
+        "name": "San Pedro Carchá",
+        "regionName": "San Pedro Carchá region"
+      },
+      {
+        "name": "Chiantla",
+        "regionName": "Chiantla region"
+      },
+      {
+        "name": "Totonicapán",
+        "regionName": "Totonicapán region"
+      },
+      {
+        "name": "Caracas",
+        "regionName": "Caracas region"
+      },
+      {
+        "name": "Maracaibo",
+        "regionName": "Maracaibo region"
+      },
+      {
+        "name": "Valencia",
+        "regionName": "Valencia region"
+      },
+      {
+        "name": "Maracay",
+        "regionName": "Maracay region"
+      },
+      {
+        "name": "Iribarren",
+        "regionName": "Iribarren region"
+      },
+      {
+        "name": "Puerto Cabello",
+        "regionName": "Puerto Cabello region"
+      },
+      {
+        "name": "Zamora",
+        "regionName": "Zamora region"
+      },
+      {
+        "name": "Cabimas",
+        "regionName": "Cabimas region"
+      },
+      {
+        "name": "Simón Bolívar",
+        "regionName": "Simón Bolívar region"
+      },
+      {
+        "name": "Sucre",
+        "regionName": "Sucre region"
+      },
+      {
+        "name": "Jutiapa",
+        "regionName": "Jutiapa region"
+      },
+      {
+        "name": "Chiquimula",
+        "regionName": "Chiquimula region"
+      },
+      {
+        "name": "Santa Lucía Cotzumalguapa",
+        "regionName": "Santa Lucía Cotzumalguapa region"
+      },
+      {
+        "name": "Barillas",
+        "regionName": "Barillas region"
+      },
+      {
+        "name": "Morales",
+        "regionName": "Morales region"
+      },
+      {
+        "name": "Jalapa",
+        "regionName": "Jalapa region"
+      },
+      {
+        "name": "Antigua Guatemala",
+        "regionName": "Antigua Guatemala region"
+      },
+      {
+        "name": "Caroní",
+        "regionName": "Caroní region"
+      },
+      {
+        "name": "San Cristóbal",
+        "regionName": "San Cristóbal region"
+      },
+      {
+        "name": "Maturín",
+        "regionName": "Maturín region"
+      },
+      {
+        "name": "Barinas",
+        "regionName": "Barinas region"
+      },
+      {
+        "name": "Carirubana",
+        "regionName": "Carirubana region"
+      },
+      {
+        "name": "Sucre, Valera",
+        "regionName": "Sucre, Valera region"
+      },
+      {
+        "name": "Libertador",
+        "regionName": "Libertador region"
+      },
+      {
+        "name": "Simón Rodríguez",
+        "regionName": "Simón Rodríguez region"
+      },
+      {
+        "name": "Mariño",
+        "regionName": "Mariño region"
+      },
+      {
+        "name": "Araure",
+        "regionName": "Araure region"
+      },
+      {
+        "name": "Colón",
+        "regionName": "Colón region"
+      },
+      {
+        "name": "Francisco de Miranda",
+        "regionName": "Francisco de Miranda region"
+      },
+      {
+        "name": "Mara",
+        "regionName": "Mara region"
+      },
+      {
+        "name": "Antonio José de Sucre",
+        "regionName": "Antonio José de Sucre region"
+      },
+      {
+        "name": "Zamora, Juan Germán Roscio",
+        "regionName": "Zamora, Juan Germán Roscio region"
+      },
+      {
+        "name": "Leonardo Infante",
+        "regionName": "Leonardo Infante region"
+      },
+      {
+        "name": "San Carlos",
+        "regionName": "San Carlos region"
+      },
+      {
+        "name": "La Guaira",
+        "regionName": "La Guaira region"
+      },
+      {
+        "name": "Lander",
+        "regionName": "Lander region"
+      },
+      {
+        "name": "Torres",
+        "regionName": "Torres region"
+      },
+      {
+        "name": "Morán",
+        "regionName": "Morán region"
+      },
+      {
+        "name": "Cristóbal Rojas",
+        "regionName": "Cristóbal Rojas region"
+      },
+      {
+        "name": "Autónomo Atures",
+        "regionName": "Autónomo Atures region"
+      },
+      {
+        "name": "Cedeño",
+        "regionName": "Cedeño region"
+      },
+      {
+        "name": "San José",
+        "regionName": "San José region"
+      },
+      {
+        "name": "San Carlos",
+        "regionName": "San Carlos region"
+      },
+      {
+        "name": "Puntarenas",
+        "regionName": "Puntarenas region"
+      },
+      {
+        "name": "Pococi",
+        "regionName": "Pococi region"
+      },
+      {
+        "name": "Perez Zeledon",
+        "regionName": "Perez Zeledon region"
+      },
+      {
+        "name": "San Salvador",
+        "regionName": "San Salvador region"
+      },
+      {
+        "name": "Tegucigalpa",
+        "regionName": "Tegucigalpa region"
+      },
+      {
+        "name": "San Pedro Sula",
+        "regionName": "San Pedro Sula region"
+      },
+      {
+        "name": "San Miguel",
+        "regionName": "San Miguel region"
+      },
+      {
+        "name": "Ahuachpan",
+        "regionName": "Ahuachpan region"
+      },
+      {
+        "name": "Santa Ana",
+        "regionName": "Santa Ana region"
+      },
+      {
+        "name": "Juticalpa",
+        "regionName": "Juticalpa region"
+      },
+      {
+        "name": "Intibuca",
+        "regionName": "Intibuca region"
+      },
+      {
+        "name": "El Progreso",
+        "regionName": "El Progreso region"
+      },
+      {
+        "name": "Santa Rosa de Copan",
+        "regionName": "Santa Rosa de Copan region"
+      },
+      {
+        "name": "Heres",
+        "regionName": "Heres region"
+      },
+      {
+        "name": "Zacatecoluca",
+        "regionName": "Zacatecoluca region"
+      },
+      {
+        "name": "Comayagua",
+        "regionName": "Comayagua region"
+      },
+      {
+        "name": "Choluteca",
+        "regionName": "Choluteca region"
+      },
+      {
+        "name": "La Ceiba",
+        "regionName": "La Ceiba region"
+      },
+      {
+        "name": "Villanueva",
+        "regionName": "Villanueva region"
+      },
+      {
+        "name": "Tocoa",
+        "regionName": "Tocoa region"
+      },
+      {
+        "name": "Macuelizo",
+        "regionName": "Macuelizo region"
+      },
+      {
+        "name": "Danli",
+        "regionName": "Danli region"
+      },
+      {
+        "name": "Puerto Cortes",
+        "regionName": "Puerto Cortes region"
+      },
+      {
+        "name": "Roatan",
+        "regionName": "Roatan region"
+      },
+      {
+        "name": "Panama City",
+        "regionName": "Panama City region"
+      },
+      {
+        "name": "DAVID (CAB.)",
+        "regionName": "DAVID (CAB.) region"
+      },
+      {
+        "name": "PENONOMÉ",
+        "regionName": "PENONOMÉ region"
+      },
+      {
+        "name": "VISTA ALEGRE",
+        "regionName": "VISTA ALEGRE region"
+      },
+      {
+        "name": "CRISTOBAL",
+        "regionName": "CRISTOBAL region"
+      },
+      {
+        "name": "TORTÍ",
+        "regionName": "TORTÍ region"
+      },
+      {
+        "name": "Managua",
+        "regionName": "Managua region"
+      },
+      {
+        "name": "Masaya (Municipio)",
+        "regionName": "Masaya (Municipio) region"
+      },
+      {
+        "name": "Municipio de Jinotega",
+        "regionName": "Municipio de Jinotega region"
+      },
+      {
+        "name": "Municipio León",
+        "regionName": "Municipio León region"
+      },
+      {
+        "name": "Municipio Puerto Cabezas",
+        "regionName": "Municipio Puerto Cabezas region"
+      },
+      {
+        "name": "Municipio Matagalpa",
+        "regionName": "Municipio Matagalpa region"
+      },
+      {
+        "name": "Municipio Nueva Guinea",
+        "regionName": "Municipio Nueva Guinea region"
+      },
+      {
+        "name": "Tipitapa (Municipio)",
+        "regionName": "Tipitapa (Municipio) region"
+      },
+      {
+        "name": "Municipio Estelí",
+        "regionName": "Municipio Estelí region"
+      },
+      {
+        "name": "Stann Creek West",
+        "regionName": "Stann Creek West region"
+      },
+      {
+        "name": "Glasgow",
+        "regionName": "Glasgow region"
+      },
+      {
+        "name": "Lisbon",
+        "regionName": "Lisbon region"
+      },
+      {
+        "name": "Porto",
+        "regionName": "Porto region"
+      },
+      {
+        "name": "Istanbul",
+        "regionName": "Istanbul region"
+      },
+      {
+        "name": "Yalova merkez",
+        "regionName": "Yalova merkez region"
+      },
+      {
+        "name": "Kocaeli",
+        "regionName": "Kocaeli region"
+      },
+      {
+        "name": "Medellín",
+        "regionName": "Medellín region"
+      },
+      {
+        "name": "Cartagena De Indias",
+        "regionName": "Cartagena De Indias region"
+      },
+      {
+        "name": "Yopal",
+        "regionName": "Yopal region"
+      },
+      {
+        "name": "Sahagún",
+        "regionName": "Sahagún region"
+      },
+      {
+        "name": "Tunja",
+        "regionName": "Tunja region"
+      },
+      {
+        "name": "Cúcuta",
+        "regionName": "Cúcuta region"
+      },
+      {
+        "name": "Barrancabermeja",
+        "regionName": "Barrancabermeja region"
+      },
+      {
+        "name": "Valledupar",
+        "regionName": "Valledupar region"
+      },
+      {
+        "name": "Montería",
+        "regionName": "Montería region"
+      },
+      {
+        "name": "Manizales",
+        "regionName": "Manizales region"
+      },
+      {
+        "name": "Villavicencio",
+        "regionName": "Villavicencio region"
+      },
+      {
+        "name": "Caucasia",
+        "regionName": "Caucasia region"
+      },
+      {
+        "name": "Santa Marta",
+        "regionName": "Santa Marta region"
+      },
+      {
+        "name": "Sincelejo",
+        "regionName": "Sincelejo region"
+      },
+      {
+        "name": "Sabanalarga",
+        "regionName": "Sabanalarga region"
+      },
+      {
+        "name": "Apartadó",
+        "regionName": "Apartadó region"
+      },
+      {
+        "name": "Palmira",
+        "regionName": "Palmira region"
+      },
+      {
+        "name": "Santa Cruz (Guachavés)",
+        "regionName": "Santa Cruz (Guachavés) region"
+      },
+      {
+        "name": "Florencia",
+        "regionName": "Florencia region"
+      },
+      {
+        "name": "Jamundí",
+        "regionName": "Jamundí region"
+      },
+      {
+        "name": "Quibdó",
+        "regionName": "Quibdó region"
+      },
+      {
+        "name": "Rionegro",
+        "regionName": "Rionegro region"
+      },
+      {
+        "name": "Buenaventura",
+        "regionName": "Buenaventura region"
+      },
+      {
+        "name": "Tumaco",
+        "regionName": "Tumaco region"
+      },
+      {
+        "name": "Ocaña",
+        "regionName": "Ocaña region"
+      },
+      {
+        "name": "Zipaquira",
+        "regionName": "Zipaquira region"
+      },
+      {
+        "name": "Girardot",
+        "regionName": "Girardot region"
+      },
+      {
+        "name": "Fusagasugá",
+        "regionName": "Fusagasugá region"
+      },
+      {
+        "name": "Bucaramanga",
+        "regionName": "Bucaramanga region"
+      },
+      {
+        "name": "Caracas",
+        "regionName": "Caracas region"
+      },
+      {
+        "name": "Zamora",
+        "regionName": "Zamora region"
+      },
+      {
+        "name": "Cabimas",
+        "regionName": "Cabimas region"
+      },
+      {
+        "name": "Colón",
+        "regionName": "Colón region"
+      },
+      {
+        "name": "Mara",
+        "regionName": "Mara region"
+      },
+      {
+        "name": "Leonardo Infante",
+        "regionName": "Leonardo Infante region"
+      },
+      {
+        "name": "San Carlos",
+        "regionName": "San Carlos region"
+      },
+      {
+        "name": "Cristóbal Rojas",
+        "regionName": "Cristóbal Rojas region"
+      },
+      {
+        "name": "Autónomo Atures",
+        "regionName": "Autónomo Atures region"
+      },
+      {
+        "name": "Tegucigalpa",
+        "regionName": "Tegucigalpa region"
+      },
+      {
+        "name": "San Pedro Sula",
+        "regionName": "San Pedro Sula region"
+      },
+      {
+        "name": "Danli",
+        "regionName": "Danli region"
+      },
+      {
+        "name": "Roatan",
+        "regionName": "Roatan region"
+      },
+      {
+        "name": "Municipio de Jinotega",
+        "regionName": "Municipio de Jinotega region"
+      },
+      {
+        "name": "Municipio Matagalpa",
+        "regionName": "Municipio Matagalpa region"
+      },
+      {
+        "name": "Municipio Nueva Guinea",
+        "regionName": "Municipio Nueva Guinea region"
+      },
+      {
+        "name": "Municipio Estelí",
+        "regionName": "Municipio Estelí region"
       }
     ],
     "rule": {
@@ -29769,8 +30353,8 @@
         "lat": 40.758
       },
       "center": [
-        -73.985,
-        40.758
+        -74.00602,
+        40.71273
       ],
       "zoom": 11.2,
       "utcOffset": -5,
@@ -30000,7 +30584,7 @@
       "zoom": 11.2,
       "utcOffset": 0,
       "market": -1,
-      "localTrips": 42863396.0,
+      "localTrips": 42863410.0,
       "box": [
         -1.17,
         50.844,
@@ -30370,8 +30954,8 @@
         "lat": 6.5158
       },
       "center": [
-        3.3786,
-        6.5158
+        3.39418,
+        6.45506
       ],
       "zoom": 11.2,
       "utcOffset": 1,
@@ -31396,7 +31980,7 @@
         53.704
       ],
       "place": 68,
-      "localTrips": 8544521.0,
+      "localTrips": 8544525.0,
       "country": "GB",
       "realm": "uk-ie"
     },
@@ -31421,7 +32005,7 @@
         53.717
       ],
       "place": 69,
-      "localTrips": 3934205.0,
+      "localTrips": 3934207.0,
       "country": "GB",
       "realm": "uk-ie"
     },
@@ -31446,7 +32030,7 @@
         51.358
       ],
       "place": 70,
-      "localTrips": 3814634.0,
+      "localTrips": 3814565.0,
       "country": "GB",
       "realm": "uk-ie"
     },
@@ -31471,7 +32055,7 @@
         53.982
       ],
       "place": 73,
-      "localTrips": 7712931.0,
+      "localTrips": 7712935.0,
       "country": "GB",
       "realm": "uk-ie"
     },
@@ -31483,8 +32067,8 @@
         "lat": 52.9079
       },
       "center": [
-        -1.4851,
-        52.9079
+        -1.14965,
+        52.95342
       ],
       "zoom": 11.2,
       "utcOffset": 0,
@@ -31496,7 +32080,7 @@
         53.559
       ],
       "place": 74,
-      "localTrips": 4832759.0,
+      "localTrips": 4832762.0,
       "country": "GB",
       "realm": "uk-ie"
     },
@@ -31521,7 +32105,7 @@
         53.534
       ],
       "place": 75,
-      "localTrips": 2788671.0,
+      "localTrips": 2788673.0,
       "country": "GB",
       "realm": "uk-ie"
     },
@@ -31546,7 +32130,7 @@
         52.681
       ],
       "place": 76,
-      "localTrips": 6880692.0,
+      "localTrips": 6880698.0,
       "country": "GB",
       "realm": "uk-ie"
     },
@@ -31571,32 +32155,7 @@
         55.83
       ],
       "place": 77,
-      "localTrips": 5214636.0,
-      "country": "GB",
-      "realm": "uk-ie"
-    },
-    {
-      "id": "gla",
-      "name": "Glasgow",
-      "origin": {
-        "lon": -4.2605,
-        "lat": 55.8388
-      },
-      "center": [
-        -4.2605,
-        55.8388
-      ],
-      "zoom": 11.2,
-      "utcOffset": 0,
-      "market": -1,
-      "box": [
-        -4.931,
-        55.272,
-        -3.364,
-        56.05
-      ],
-      "place": 78,
-      "localTrips": 5246207.0,
+      "localTrips": 5214645.0,
       "country": "GB",
       "realm": "uk-ie"
     },
@@ -31621,7 +32180,7 @@
         55.075
       ],
       "place": 82,
-      "localTrips": 2948248.0,
+      "localTrips": 2948327.0,
       "country": "GB",
       "realm": "uk-ie"
     },
@@ -31646,7 +32205,7 @@
         52.002
       ],
       "place": 86,
-      "localTrips": 3113144.0,
+      "localTrips": 3113147.0,
       "country": "GB",
       "realm": "uk-ie"
     },
@@ -31658,8 +32217,8 @@
         "lat": 5.7905
       },
       "center": [
-        7.1416,
-        5.7905
+        7.0342,
+        5.48974
       ],
       "zoom": 11.2,
       "utcOffset": 1,
@@ -31708,8 +32267,8 @@
         "lat": 5.6203
       },
       "center": [
-        7.3505,
-        5.6203
+        7.27119,
+        5.47703
       ],
       "zoom": 11.2,
       "utcOffset": 1,
@@ -31933,8 +32492,8 @@
         "lat": 41.8625
       },
       "center": [
-        12.5537,
-        41.8625
+        12.48293,
+        41.89332
       ],
       "zoom": 11.2,
       "utcOffset": 1,
@@ -31983,8 +32542,8 @@
         "lat": 52.0798
       },
       "center": [
-        4.2807,
-        52.0798
+        4.47775,
+        51.92444
       ],
       "zoom": 11.2,
       "utcOffset": 1,
@@ -32283,8 +32842,8 @@
         "lat": 50.5937
       },
       "center": [
-        5.8635,
-        50.5937
+        5.57361,
+        50.64509
       ],
       "zoom": 11.2,
       "utcOffset": 1,
@@ -32308,8 +32867,8 @@
         "lat": 55.8188
       },
       "center": [
-        37.7596,
-        55.8188
+        37.61748,
+        55.75054
       ],
       "zoom": 11.2,
       "utcOffset": 3,
@@ -32358,8 +32917,8 @@
         "lat": 60.0078
       },
       "center": [
-        30.2637,
-        60.0078
+        30.31623,
+        59.93873
       ],
       "zoom": 11.2,
       "utcOffset": 3,
@@ -32483,8 +33042,8 @@
         "lat": 44.4319
       },
       "center": [
-        26.0183,
-        44.4319
+        26.10268,
+        44.43614
       ],
       "zoom": 11.2,
       "utcOffset": 2,
@@ -35075,7 +35634,7 @@
       ],
       "place": 718,
       "country": "PT",
-      "localTrips": 1288971.0,
+      "localTrips": 1288976.0,
       "realm": "iberia"
     },
     {
@@ -35621,7 +36180,7 @@
       ],
       "place": 907,
       "country": "GB",
-      "localTrips": 3437500.0,
+      "localTrips": 3437499.0,
       "realm": "uk-ie"
     },
     {
@@ -35647,7 +36206,7 @@
       ],
       "place": 908,
       "country": "GB",
-      "localTrips": 3006382.0,
+      "localTrips": 3006384.0,
       "realm": "uk-ie"
     },
     {
@@ -35673,7 +36232,7 @@
       ],
       "place": 909,
       "country": "GB",
-      "localTrips": 2030033.0,
+      "localTrips": 2030036.0,
       "realm": "uk-ie"
     },
     {
@@ -35699,7 +36258,7 @@
       ],
       "place": 910,
       "country": "GB",
-      "localTrips": 1345822.0,
+      "localTrips": 1345824.0,
       "realm": "uk-ie"
     },
     {
@@ -35725,7 +36284,7 @@
       ],
       "place": 911,
       "country": "GB",
-      "localTrips": 2469874.0,
+      "localTrips": 2469876.0,
       "realm": "uk-ie"
     },
     {
@@ -35751,7 +36310,7 @@
       ],
       "place": 912,
       "country": "GB",
-      "localTrips": 2207575.0,
+      "localTrips": 2207576.0,
       "realm": "uk-ie"
     },
     {
@@ -35829,7 +36388,7 @@
       ],
       "place": 921,
       "country": "GB",
-      "localTrips": 2129089.0,
+      "localTrips": 2129084.0,
       "realm": "uk-ie"
     },
     {
@@ -35855,7 +36414,7 @@
       ],
       "place": 923,
       "country": "GB",
-      "localTrips": 1997619.0,
+      "localTrips": 1997615.0,
       "realm": "uk-ie"
     },
     {
@@ -35907,7 +36466,7 @@
       ],
       "place": 926,
       "country": "GB",
-      "localTrips": 982934.0,
+      "localTrips": 982933.0,
       "realm": "uk-ie"
     },
     {
@@ -35933,7 +36492,7 @@
       ],
       "place": 927,
       "country": "GB",
-      "localTrips": 2105511.0,
+      "localTrips": 2105512.0,
       "realm": "uk-ie"
     },
     {
@@ -35959,7 +36518,7 @@
       ],
       "place": 929,
       "country": "GB",
-      "localTrips": 3072425.0,
+      "localTrips": 3072427.0,
       "realm": "uk-ie"
     },
     {
@@ -36063,7 +36622,7 @@
       ],
       "place": 938,
       "country": "GB",
-      "localTrips": 1466244.0,
+      "localTrips": 1466166.0,
       "realm": "uk-ie"
     },
     {
@@ -36115,7 +36674,7 @@
       ],
       "place": 946,
       "country": "GB",
-      "localTrips": 1920080.0,
+      "localTrips": 1920073.0,
       "realm": "uk-ie"
     },
     {
@@ -36141,7 +36700,7 @@
       ],
       "place": 947,
       "country": "GB",
-      "localTrips": 1930256.0,
+      "localTrips": 1930261.0,
       "realm": "uk-ie"
     },
     {
@@ -36167,7 +36726,7 @@
       ],
       "place": 949,
       "country": "GB",
-      "localTrips": 1183554.0,
+      "localTrips": 1183556.0,
       "realm": "uk-ie"
     },
     {
@@ -36193,7 +36752,7 @@
       ],
       "place": 959,
       "country": "GB",
-      "localTrips": 1638793.0,
+      "localTrips": 1639096.0,
       "realm": "uk-ie"
     },
     {
@@ -36323,7 +36882,7 @@
       ],
       "place": 968,
       "country": "GB",
-      "localTrips": 1575854.0,
+      "localTrips": 1575840.0,
       "realm": "uk-ie"
     },
     {
@@ -36349,7 +36908,7 @@
       ],
       "place": 969,
       "country": "GB",
-      "localTrips": 1351626.0,
+      "localTrips": 1351615.0,
       "realm": "uk-ie"
     },
     {
@@ -36375,7 +36934,7 @@
       ],
       "place": 970,
       "country": "GB",
-      "localTrips": 1561558.0,
+      "localTrips": 1561555.0,
       "realm": "uk-ie"
     },
     {
@@ -36401,7 +36960,7 @@
       ],
       "place": 982,
       "country": "GB",
-      "localTrips": 1386838.0,
+      "localTrips": 1386841.0,
       "realm": "uk-ie"
     },
     {
@@ -36427,7 +36986,7 @@
       ],
       "place": 983,
       "country": "GB",
-      "localTrips": 1461132.0,
+      "localTrips": 1461137.0,
       "realm": "uk-ie"
     },
     {
@@ -36453,7 +37012,7 @@
       ],
       "place": 998,
       "country": "GB",
-      "localTrips": 848838.0,
+      "localTrips": 848839.0,
       "realm": "uk-ie"
     },
     {
@@ -36479,7 +37038,7 @@
       ],
       "place": 1000,
       "country": "GB",
-      "localTrips": 844392.0,
+      "localTrips": 844393.0,
       "realm": "uk-ie"
     },
     {
@@ -36505,7 +37064,7 @@
       ],
       "place": 1003,
       "country": "GB",
-      "localTrips": 750836.0,
+      "localTrips": 750838.0,
       "realm": "uk-ie"
     },
     {
@@ -36531,7 +37090,7 @@
       ],
       "place": 1009,
       "country": "GB",
-      "localTrips": 368495.0,
+      "localTrips": 368494.0,
       "realm": "uk-ie"
     },
     {
@@ -38819,7 +39378,7 @@
       ],
       "place": 1265,
       "country": "GB",
-      "localTrips": 1378503.0,
+      "localTrips": 1375982.0,
       "realm": "uk-ie"
     },
     {
@@ -38830,8 +39389,8 @@
         "lat": 24.9931
       },
       "center": [
-        121.499,
-        24.9931
+        121.56368,
+        25.03752
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -38855,8 +39414,8 @@
         "lat": 24.1294
       },
       "center": [
-        120.6855,
-        24.1294
+        120.64783,
+        24.16316
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -39007,8 +39566,8 @@
         "lat": 33.8972
       },
       "center": [
-        -84.2137,
-        33.8972
+        -84.38982,
+        33.75447
       ],
       "zoom": 11.2,
       "utcOffset": -5,
@@ -39057,8 +39616,8 @@
         "lat": 28.0647
       },
       "center": [
-        -82.4373,
-        28.0647
+        -82.45134,
+        27.99201
       ],
       "zoom": 11.2,
       "utcOffset": -5,
@@ -39159,8 +39718,8 @@
         "lat": 28.4892
       },
       "center": [
-        -81.4095,
-        28.4892
+        -81.37905,
+        28.54212
       ],
       "zoom": 11.2,
       "utcOffset": -5,
@@ -39359,8 +39918,8 @@
         "lat": 29.997
       },
       "center": [
-        -90.1752,
-        29.997
+        -90.06295,
+        29.95747
       ],
       "zoom": 11.2,
       "utcOffset": -6,
@@ -39384,8 +39943,8 @@
         "lat": 32.8665
       },
       "center": [
-        -96.7566,
-        32.8665
+        -96.79686,
+        32.77627
       ],
       "zoom": 11.2,
       "utcOffset": -6,
@@ -39409,8 +39968,8 @@
         "lat": 29.5275
       },
       "center": [
-        -98.5807,
-        29.5275
+        -98.49514,
+        29.4246
       ],
       "zoom": 11.2,
       "utcOffset": -6,
@@ -39434,8 +39993,8 @@
         "lat": 35.2032
       },
       "center": [
-        -97.4482,
-        35.2032
+        -97.51705,
+        35.47299
       ],
       "zoom": 11.2,
       "utcOffset": -6,
@@ -39559,8 +40118,8 @@
         "lat": 39.831
       },
       "center": [
-        -86.0051,
-        39.831
+        -86.15835,
+        39.76833
       ],
       "zoom": 11.2,
       "utcOffset": -5,
@@ -39609,8 +40168,8 @@
         "lat": 41.4922
       },
       "center": [
-        -81.7801,
-        41.4922
+        -81.69368,
+        41.49966
       ],
       "zoom": 11.2,
       "utcOffset": -5,
@@ -39634,8 +40193,8 @@
         "lat": 38.1758
       },
       "center": [
-        -85.764,
-        38.1758
+        -85.75941,
+        38.25424
       ],
       "zoom": 11.2,
       "utcOffset": -5,
@@ -39685,8 +40244,8 @@
         "lat": 42.3968
       },
       "center": [
-        -83.0525,
-        42.3968
+        -83.0992,
+        42.35279
       ],
       "zoom": 11.2,
       "utcOffset": -5,
@@ -39838,8 +40397,8 @@
         "lat": 33.4116
       },
       "center": [
-        -111.9299,
-        33.4116
+        -112.07414,
+        33.44844
       ],
       "zoom": 11.2,
       "utcOffset": -7,
@@ -39863,8 +40422,8 @@
         "lat": 32.1417
       },
       "center": [
-        -110.9506,
-        32.1417
+        -110.97485,
+        32.22288
       ],
       "zoom": 11.2,
       "utcOffset": -7,
@@ -39888,8 +40447,8 @@
         "lat": 32.7542
       },
       "center": [
-        -117.0863,
-        32.7542
+        -117.16383,
+        32.71571
       ],
       "zoom": 11.2,
       "utcOffset": -8,
@@ -40094,8 +40653,8 @@
         "lat": 36.122
       },
       "center": [
-        -115.1456,
-        36.122
+        -115.14841,
+        36.16743
       ],
       "zoom": 11.2,
       "utcOffset": -8,
@@ -40170,8 +40729,8 @@
         "lat": 35.081
       },
       "center": [
-        -106.5543,
-        35.081
+        -106.65099,
+        35.0841
       ],
       "zoom": 11.2,
       "utcOffset": -7,
@@ -40297,8 +40856,8 @@
         "lat": 38.6993
       },
       "center": [
-        -121.3599,
-        38.6993
+        -121.4939,
+        38.58106
       ],
       "zoom": 11.2,
       "utcOffset": -8,
@@ -40679,8 +41238,8 @@
         "lat": 36.8689
       },
       "center": [
-        -76.3047,
-        36.8689
+        -75.97608,
+        36.84966
       ],
       "zoom": 11.2,
       "utcOffset": -5,
@@ -40899,7 +41458,7 @@
       ],
       "place": 2594,
       "country": "CN",
-      "localTrips": 49057992.0,
+      "localTrips": 49057888.0,
       "realm": "cn-south"
     },
     {
@@ -40924,7 +41483,7 @@
       ],
       "place": 2595,
       "country": "CN",
-      "localTrips": 34311945.0,
+      "localTrips": 34311866.0,
       "realm": "cn-south"
     },
     {
@@ -40935,8 +41494,8 @@
         "lat": 23.0674
       },
       "center": [
-        114.4189,
-        23.0674
+        114.4127,
+        23.11252
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -40949,32 +41508,7 @@
       ],
       "place": 2596,
       "country": "CN",
-      "localTrips": 5647260.0,
-      "realm": "cn-south"
-    },
-    {
-      "id": "shz",
-      "name": "Shenzhen",
-      "origin": {
-        "lon": 114.0957,
-        "lat": 22.5668
-      },
-      "center": [
-        114.0957,
-        22.5668
-      ],
-      "zoom": 11.2,
-      "utcOffset": 8,
-      "market": -1,
-      "box": [
-        113.727,
-        22.428,
-        114.643,
-        22.883
-      ],
-      "place": 2598,
-      "country": "CN",
-      "localTrips": 48815959.0,
+      "localTrips": 5647190.0,
       "realm": "cn-south"
     },
     {
@@ -40985,8 +41519,8 @@
         "lat": 22.8087
       },
       "center": [
-        113.8008,
-        22.8087
+        113.74523,
+        23.01836
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -40999,7 +41533,7 @@
       ],
       "place": 2599,
       "country": "CN",
-      "localTrips": 26002407.0,
+      "localTrips": 26000084.0,
       "realm": "cn-south"
     },
     {
@@ -41024,7 +41558,7 @@
       ],
       "place": 2600,
       "country": "CN",
-      "localTrips": 23489441.0,
+      "localTrips": 23489469.0,
       "realm": "cn-south"
     },
     {
@@ -41035,8 +41569,8 @@
         "lat": 22.5085
       },
       "center": [
-        113.458,
-        22.5085
+        113.38723,
+        22.51971
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -41049,7 +41583,7 @@
       ],
       "place": 2601,
       "country": "CN",
-      "localTrips": 11004555.0,
+      "localTrips": 11004364.0,
       "realm": "cn-south"
     },
     {
@@ -41060,8 +41594,8 @@
         "lat": 22.6419
       },
       "center": [
-        113.0962,
-        22.6419
+        113.07611,
+        22.58166
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -41074,7 +41608,7 @@
       ],
       "place": 2602,
       "country": "CN",
-      "localTrips": 6925072.0,
+      "localTrips": 6925061.0,
       "realm": "cn-south"
     },
     {
@@ -41085,8 +41619,8 @@
         "lat": 36.7105
       },
       "center": [
-        116.9847,
-        36.7105
+        117.11385,
+        36.65198
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -41310,8 +41844,8 @@
         "lat": 41.7992
       },
       "center": [
-        123.3213,
-        41.7992
+        123.42791,
+        41.80261
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -41335,8 +41869,8 @@
         "lat": 38.9393
       },
       "center": [
-        121.5459,
-        38.9393
+        121.6098,
+        38.91305
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -41560,8 +42094,8 @@
         "lat": 28.0478
       },
       "center": [
-        120.8922,
-        28.0478
+        120.981,
+        28.11641
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -41610,8 +42144,8 @@
         "lat": 24.9175
       },
       "center": [
-        118.6334,
-        24.9175
+        118.67236,
+        24.87555
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -41735,8 +42269,8 @@
         "lat": 37.8041
       },
       "center": [
-        112.5527,
-        37.8041
+        112.54371,
+        37.86999
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -41760,8 +42294,8 @@
         "lat": 40.0188
       },
       "center": [
-        113.2747,
-        40.0188
+        113.29527,
+        40.09232
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -41910,8 +42444,8 @@
         "lat": 27.8019
       },
       "center": [
-        114.3596,
-        27.8019
+        114.41125,
+        27.81697
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -42110,8 +42644,8 @@
         "lat": 40.6821
       },
       "center": [
-        109.815,
-        40.6821
+        109.94491,
+        40.61748
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -42185,8 +42719,8 @@
         "lat": 27.6917
       },
       "center": [
-        106.9293,
-        27.6917
+        106.8895,
+        27.64855
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -42210,8 +42744,8 @@
         "lat": 38.4773
       },
       "center": [
-        106.3036,
-        38.4773
+        106.22666,
+        38.48717
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -42285,8 +42819,8 @@
         "lat": 39.8668
       },
       "center": [
-        116.2456,
-        39.8668
+        116.3913,
+        39.90571
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -42360,8 +42894,8 @@
         "lat": 36.561
       },
       "center": [
-        114.4769,
-        36.561
+        114.48571,
+        36.61077
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -42510,8 +43044,8 @@
         "lat": 33.3943
       },
       "center": [
-        120.1511,
-        33.3943
+        120.1577,
+        33.34956
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -42560,8 +43094,8 @@
         "lat": 31.9178
       },
       "center": [
-        120.236,
-        31.9178
+        120.55146,
+        31.8783
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -42585,8 +43119,8 @@
         "lat": 39.1618
       },
       "center": [
-        117.193,
-        39.1618
+        117.19575,
+        39.08441
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -42660,8 +43194,8 @@
         "lat": 31.3331
       },
       "center": [
-        118.3586,
-        31.3331
+        118.42775,
+        31.35361
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -42760,8 +43294,8 @@
         "lat": 34.828
       },
       "center": [
-        113.612,
-        34.828
+        113.61932,
+        34.74725
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -42885,8 +43419,8 @@
         "lat": 34.6537
       },
       "center": [
-        112.3815,
-        34.6537
+        112.4477,
+        34.61965
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -48486,7 +49020,7 @@
       ],
       "place": 2962,
       "country": "CN",
-      "localTrips": 4211074.0,
+      "localTrips": 4211070.0,
       "realm": "cn-south"
     },
     {
@@ -48538,7 +49072,7 @@
       ],
       "place": 2964,
       "country": "CN",
-      "localTrips": 3439195.0,
+      "localTrips": 3439196.0,
       "realm": "cn-south"
     },
     {
@@ -48616,7 +49150,7 @@
       ],
       "place": 2967,
       "country": "CN",
-      "localTrips": 4170259.0,
+      "localTrips": 4170266.0,
       "realm": "cn-south"
     },
     {
@@ -48668,7 +49202,7 @@
       ],
       "place": 2969,
       "country": "CN",
-      "localTrips": 3890058.0,
+      "localTrips": 3890056.0,
       "realm": "cn-south"
     },
     {
@@ -48694,7 +49228,7 @@
       ],
       "place": 2970,
       "country": "CN",
-      "localTrips": 3546598.0,
+      "localTrips": 3546540.0,
       "realm": "cn-south"
     },
     {
@@ -48720,7 +49254,7 @@
       ],
       "place": 2971,
       "country": "CN",
-      "localTrips": 2126984.0,
+      "localTrips": 2126983.0,
       "realm": "cn-south"
     },
     {
@@ -48772,7 +49306,7 @@
       ],
       "place": 2973,
       "country": "CN",
-      "localTrips": 3188713.0,
+      "localTrips": 3188712.0,
       "realm": "cn-south"
     },
     {
@@ -48798,7 +49332,7 @@
       ],
       "place": 2974,
       "country": "CN",
-      "localTrips": 2769519.0,
+      "localTrips": 2769523.0,
       "realm": "cn-south"
     },
     {
@@ -48850,7 +49384,7 @@
       ],
       "place": 2978,
       "country": "CN",
-      "localTrips": 5431571.0,
+      "localTrips": 5431567.0,
       "realm": "cn-south"
     },
     {
@@ -48902,7 +49436,7 @@
       ],
       "place": 2980,
       "country": "CN",
-      "localTrips": 5293751.0,
+      "localTrips": 5293760.0,
       "realm": "cn-south"
     },
     {
@@ -48928,7 +49462,7 @@
       ],
       "place": 2982,
       "country": "CN",
-      "localTrips": 5485016.0,
+      "localTrips": 5485026.0,
       "realm": "cn-south"
     },
     {
@@ -49006,7 +49540,7 @@
       ],
       "place": 2985,
       "country": "CN",
-      "localTrips": 4514946.0,
+      "localTrips": 4514931.0,
       "realm": "cn-south"
     },
     {
@@ -49032,7 +49566,7 @@
       ],
       "place": 2986,
       "country": "CN",
-      "localTrips": 4048763.0,
+      "localTrips": 4048741.0,
       "realm": "cn-south"
     },
     {
@@ -49058,7 +49592,7 @@
       ],
       "place": 2987,
       "country": "CN",
-      "localTrips": 4278009.0,
+      "localTrips": 4278013.0,
       "realm": "cn-south"
     },
     {
@@ -49162,7 +49696,7 @@
       ],
       "place": 2992,
       "country": "CN",
-      "localTrips": 4945277.0,
+      "localTrips": 4945279.0,
       "realm": "cn-south"
     },
     {
@@ -49266,7 +49800,7 @@
       ],
       "place": 2996,
       "country": "CN",
-      "localTrips": 3533993.0,
+      "localTrips": 3533947.0,
       "realm": "cn-south"
     },
     {
@@ -49318,7 +49852,7 @@
       ],
       "place": 2998,
       "country": "CN",
-      "localTrips": 3887887.0,
+      "localTrips": 3887886.0,
       "realm": "cn-south"
     },
     {
@@ -49578,7 +50112,7 @@
       ],
       "place": 3012,
       "country": "CN",
-      "localTrips": 2444667.0,
+      "localTrips": 2444662.0,
       "realm": "cn-south"
     },
     {
@@ -49708,7 +50242,7 @@
       ],
       "place": 3019,
       "country": "CN",
-      "localTrips": 2746197.0,
+      "localTrips": 2746083.0,
       "realm": "cn-south"
     },
     {
@@ -49734,7 +50268,7 @@
       ],
       "place": 3020,
       "country": "CN",
-      "localTrips": 2568858.0,
+      "localTrips": 2568864.0,
       "realm": "cn-south"
     },
     {
@@ -49760,7 +50294,7 @@
       ],
       "place": 3021,
       "country": "CN",
-      "localTrips": 2285599.0,
+      "localTrips": 2285567.0,
       "realm": "cn-south"
     },
     {
@@ -49812,7 +50346,7 @@
       ],
       "place": 3023,
       "country": "CN",
-      "localTrips": 2331227.0,
+      "localTrips": 2331228.0,
       "realm": "cn-south"
     },
     {
@@ -49838,7 +50372,7 @@
       ],
       "place": 3026,
       "country": "CN",
-      "localTrips": 2166745.0,
+      "localTrips": 2166751.0,
       "realm": "cn-south"
     },
     {
@@ -49916,7 +50450,7 @@
       ],
       "place": 3029,
       "country": "CN",
-      "localTrips": 3165611.0,
+      "localTrips": 3164537.0,
       "realm": "cn-south"
     },
     {
@@ -49942,7 +50476,7 @@
       ],
       "place": 3030,
       "country": "CN",
-      "localTrips": 2907809.0,
+      "localTrips": 2907807.0,
       "realm": "cn-south"
     },
     {
@@ -49968,7 +50502,7 @@
       ],
       "place": 3031,
       "country": "CN",
-      "localTrips": 2695082.0,
+      "localTrips": 2695081.0,
       "realm": "cn-south"
     },
     {
@@ -59146,7 +59680,7 @@
       ],
       "place": 3627,
       "country": "CN",
-      "localTrips": 2527831.0,
+      "localTrips": 2527841.0,
       "realm": "cn-south"
     },
     {
@@ -59650,8 +60184,8 @@
         "lat": 22.3168
       },
       "center": [
-        114.2301,
-        22.3168
+        114.15828,
+        22.28183
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -59675,8 +60209,8 @@
         "lat": 45.5287
       },
       "center": [
-        -73.631,
-        45.5287
+        -73.56981,
+        45.50318
       ],
       "zoom": 11.2,
       "utcOffset": -5,
@@ -62865,8 +63399,8 @@
         "lat": 13.7226
       },
       "center": [
-        100.5365,
-        13.7226
+        100.49351,
+        13.75249
       ],
       "zoom": 11.2,
       "utcOffset": 7,
@@ -65275,56 +65809,6 @@
       "realm": "cn-northeast"
     },
     {
-      "id": "lis",
-      "name": "Lisbon",
-      "origin": {
-        "lon": -9.2991,
-        "lat": 38.7704
-      },
-      "center": [
-        -9.2991,
-        38.7704
-      ],
-      "zoom": 11.2,
-      "utcOffset": 0,
-      "market": -1,
-      "box": [
-        -9.524,
-        38.39,
-        -8.467,
-        39.083
-      ],
-      "place": 3960,
-      "country": "PT",
-      "localTrips": 8322357.0,
-      "realm": "iberia"
-    },
-    {
-      "id": "pot",
-      "name": "Porto",
-      "origin": {
-        "lon": -8.5568,
-        "lat": 41.2128
-      },
-      "center": [
-        -8.5568,
-        41.2128
-      ],
-      "zoom": 11.2,
-      "utcOffset": 0,
-      "market": -1,
-      "box": [
-        -8.81,
-        40.744,
-        -8.065,
-        41.49
-      ],
-      "place": 3961,
-      "country": "PT",
-      "localTrips": 4716130.0,
-      "realm": "iberia"
-    },
-    {
       "id": "les",
       "name": "Lesvos, Limnos",
       "kind": "zone",
@@ -65979,8 +66463,8 @@
         "lat": -31.7113
       },
       "center": [
-        115.8006,
-        -31.7113
+        115.86058,
+        -31.9559
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -66601,8 +67085,8 @@
         "lat": 1.5165
       },
       "center": [
-        103.6466,
-        1.5165
+        103.76491,
+        1.4582
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -67478,8 +67962,8 @@
         "lat": -6.8687
       },
       "center": [
-        109.0367,
-        -6.8687
+        109.13783,
+        -6.86745
       ],
       "zoom": 11.2,
       "utcOffset": 7,
@@ -68851,8 +69335,8 @@
         "lat": 1.1606
       },
       "center": [
-        104.0265,
-        1.1606
+        104.03837,
+        1.10308
       ],
       "zoom": 11.2,
       "utcOffset": 7,
@@ -75569,8 +76053,8 @@
         "lat": 18.4781
       },
       "center": [
-        73.8929,
-        18.4781
+        73.85451,
+        18.52137
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -75744,8 +76228,8 @@
         "lat": 12.9788
       },
       "center": [
-        77.5439,
-        12.9788
+        77.59008,
+        12.97679
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -75769,8 +76253,8 @@
         "lat": 13.0524
       },
       "center": [
-        80.1034,
-        13.0524
+        80.2808,
+        13.08009
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -75794,8 +76278,8 @@
         "lat": 17.3653
       },
       "center": [
-        78.5254,
-        17.3653
+        78.47406,
+        17.36059
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -75819,8 +76303,8 @@
         "lat": 9.6865
       },
       "center": [
-        76.3399,
-        9.6865
+        76.24444,
+        9.9679
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -75844,8 +76328,8 @@
         "lat": 10.5978
       },
       "center": [
-        76.0405,
-        10.5978
+        75.91893,
+        10.78007
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -75869,8 +76353,8 @@
         "lat": 8.6056
       },
       "center": [
-        77.0007,
-        8.6056
+        76.94755,
+        8.48823
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -75894,8 +76378,8 @@
         "lat": 21.0774
       },
       "center": [
-        78.9647,
-        21.0774
+        79.08206,
+        21.14981
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -75969,8 +76453,8 @@
         "lat": 25.4216
       },
       "center": [
-        81.915,
-        25.4216
+        81.8338,
+        25.43813
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -75994,8 +76478,8 @@
         "lat": 11.005
       },
       "center": [
-        77.0428,
-        11.005
+        76.96284,
+        11.00181
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -76544,8 +77028,8 @@
         "lat": 30.707
       },
       "center": [
-        76.6902,
-        30.707
+        76.77971,
+        30.73344
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -76719,8 +77203,8 @@
         "lat": 34.1317
       },
       "center": [
-        74.8117,
-        34.1317
+        74.82044,
+        34.07474
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -78297,8 +78781,8 @@
         "lat": 21.1854
       },
       "center": [
-        81.3862,
-        21.1854
+        81.28511,
+        21.18965
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -94285,8 +94769,8 @@
         "lat": 28.7101
       },
       "center": [
-        77.2738,
-        28.7101
+        77.20901,
+        28.6139
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -94310,8 +94794,8 @@
         "lat": 25.1443
       },
       "center": [
-        82.5629,
-        25.1443
+        82.46507,
+        25.33349
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -94802,8 +95286,8 @@
         "lat": 22.4834
       },
       "center": [
-        88.2993,
-        22.4834
+        88.3639,
+        22.57265
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -94827,8 +95311,8 @@
         "lat": 25.6066
       },
       "center": [
-        85.4822,
-        25.6066
+        85.20904,
+        25.69057
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -94952,8 +95436,8 @@
         "lat": 24.7748
       },
       "center": [
-        87.8959,
-        24.7748
+        87.95465,
+        24.67865
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -95002,8 +95486,8 @@
         "lat": 25.7834
       },
       "center": [
-        84.7518,
-        25.7834
+        84.8563,
+        25.96626
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -95545,8 +96029,8 @@
         "lat": 9.0605
       },
       "center": [
-        76.5365,
-        9.0605
+        76.59067,
+        8.88705
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -95595,8 +96079,8 @@
         "lat": 8.3051
       },
       "center": [
-        77.2248,
-        8.3051
+        77.25192,
+        8.17527
       ],
       "zoom": 11.2,
       "utcOffset": 5,
@@ -95977,31 +96461,6 @@
       "realm": "taiwan"
     },
     {
-      "id": "ist",
-      "name": "Istanbul",
-      "origin": {
-        "lon": 28.8675,
-        "lat": 41.0597
-      },
-      "center": [
-        28.8675,
-        41.0597
-      ],
-      "zoom": 11.2,
-      "utcOffset": 3,
-      "market": -1,
-      "box": [
-        28.046,
-        40.505,
-        29.778,
-        41.602
-      ],
-      "place": 5421,
-      "country": "TR",
-      "localTrips": 48668814.0,
-      "realm": "turkey"
-    },
-    {
       "id": "ank",
       "name": "Ankara",
       "origin": {
@@ -96023,7 +96482,7 @@
       ],
       "place": 5422,
       "country": "TR",
-      "localTrips": 12445328.0,
+      "localTrips": 12445007.0,
       "realm": "turkey"
     },
     {
@@ -96034,8 +96493,8 @@
         "lat": 38.362
       },
       "center": [
-        27.1485,
-        38.362
+        27.12847,
+        38.41925
       ],
       "zoom": 11.2,
       "utcOffset": 3,
@@ -96048,7 +96507,7 @@
       ],
       "place": 5423,
       "country": "TR",
-      "localTrips": 10572598.0,
+      "localTrips": 10574081.0,
       "realm": "turkey"
     },
     {
@@ -96073,7 +96532,7 @@
       ],
       "place": 5424,
       "country": "TR",
-      "localTrips": 7251763.0,
+      "localTrips": 7250491.0,
       "realm": "turkey"
     },
     {
@@ -96098,7 +96557,7 @@
       ],
       "place": 5427,
       "country": "TR",
-      "localTrips": 3241613.0,
+      "localTrips": 3241448.0,
       "realm": "turkey"
     },
     {
@@ -96124,7 +96583,7 @@
       ],
       "place": 5429,
       "country": "TR",
-      "localTrips": 3910510.0,
+      "localTrips": 3910460.0,
       "realm": "turkey"
     },
     {
@@ -96150,7 +96609,7 @@
       ],
       "place": 5430,
       "country": "TR",
-      "localTrips": 3250676.0,
+      "localTrips": 3250702.0,
       "realm": "turkey"
     },
     {
@@ -96176,7 +96635,7 @@
       ],
       "place": 5431,
       "country": "TR",
-      "localTrips": 3293334.0,
+      "localTrips": 3293359.0,
       "realm": "turkey"
     },
     {
@@ -96202,7 +96661,7 @@
       ],
       "place": 5432,
       "country": "TR",
-      "localTrips": 4729355.0,
+      "localTrips": 4729495.0,
       "realm": "turkey"
     },
     {
@@ -96228,7 +96687,7 @@
       ],
       "place": 5433,
       "country": "TR",
-      "localTrips": 3472101.0,
+      "localTrips": 3471989.0,
       "realm": "turkey"
     },
     {
@@ -96254,7 +96713,7 @@
       ],
       "place": 5434,
       "country": "TR",
-      "localTrips": 2874446.0,
+      "localTrips": 2875612.0,
       "realm": "turkey"
     },
     {
@@ -96280,7 +96739,7 @@
       ],
       "place": 5435,
       "country": "TR",
-      "localTrips": 5013883.0,
+      "localTrips": 5013758.0,
       "realm": "turkey"
     },
     {
@@ -96306,7 +96765,7 @@
       ],
       "place": 5436,
       "country": "TR",
-      "localTrips": 3202342.0,
+      "localTrips": 3200761.0,
       "realm": "turkey"
     },
     {
@@ -96332,7 +96791,7 @@
       ],
       "place": 5437,
       "country": "TR",
-      "localTrips": 3063210.0,
+      "localTrips": 3062850.0,
       "realm": "turkey"
     },
     {
@@ -96358,7 +96817,7 @@
       ],
       "place": 5438,
       "country": "TR",
-      "localTrips": 2935235.0,
+      "localTrips": 2935564.0,
       "realm": "turkey"
     },
     {
@@ -96384,7 +96843,7 @@
       ],
       "place": 5439,
       "country": "TR",
-      "localTrips": 2820517.0,
+      "localTrips": 2820508.0,
       "realm": "turkey"
     },
     {
@@ -96410,7 +96869,7 @@
       ],
       "place": 5440,
       "country": "TR",
-      "localTrips": 2956317.0,
+      "localTrips": 2958134.0,
       "realm": "turkey"
     },
     {
@@ -96436,7 +96895,7 @@
       ],
       "place": 5441,
       "country": "TR",
-      "localTrips": 2362542.0,
+      "localTrips": 2363438.0,
       "realm": "turkey"
     },
     {
@@ -96462,7 +96921,7 @@
       ],
       "place": 5442,
       "country": "TR",
-      "localTrips": 2497641.0,
+      "localTrips": 2497135.0,
       "realm": "turkey"
     },
     {
@@ -96488,7 +96947,7 @@
       ],
       "place": 5443,
       "country": "TR",
-      "localTrips": 2755479.0,
+      "localTrips": 2762795.0,
       "realm": "turkey"
     },
     {
@@ -96514,7 +96973,7 @@
       ],
       "place": 5444,
       "country": "TR",
-      "localTrips": 2439707.0,
+      "localTrips": 2439702.0,
       "realm": "turkey"
     },
     {
@@ -96540,7 +96999,7 @@
       ],
       "place": 5445,
       "country": "TR",
-      "localTrips": 2779026.0,
+      "localTrips": 2777894.0,
       "realm": "turkey"
     },
     {
@@ -96566,7 +97025,7 @@
       ],
       "place": 5447,
       "country": "TR",
-      "localTrips": 3331665.0,
+      "localTrips": 3331742.0,
       "realm": "turkey"
     },
     {
@@ -96592,7 +97051,7 @@
       ],
       "place": 5448,
       "country": "TR",
-      "localTrips": 2599557.0,
+      "localTrips": 2599546.0,
       "realm": "turkey"
     },
     {
@@ -96618,7 +97077,7 @@
       ],
       "place": 5449,
       "country": "TR",
-      "localTrips": 2127263.0,
+      "localTrips": 2127228.0,
       "realm": "turkey"
     },
     {
@@ -96644,7 +97103,7 @@
       ],
       "place": 5450,
       "country": "TR",
-      "localTrips": 2065898.0,
+      "localTrips": 2065827.0,
       "realm": "turkey"
     },
     {
@@ -96670,7 +97129,7 @@
       ],
       "place": 5452,
       "country": "TR",
-      "localTrips": 1796498.0,
+      "localTrips": 1796490.0,
       "realm": "turkey"
     },
     {
@@ -96696,7 +97155,7 @@
       ],
       "place": 5453,
       "country": "TR",
-      "localTrips": 2246640.0,
+      "localTrips": 2246973.0,
       "realm": "turkey"
     },
     {
@@ -96722,7 +97181,7 @@
       ],
       "place": 5454,
       "country": "TR",
-      "localTrips": 1802091.0,
+      "localTrips": 1802081.0,
       "realm": "turkey"
     },
     {
@@ -96748,7 +97207,7 @@
       ],
       "place": 5455,
       "country": "TR",
-      "localTrips": 1761940.0,
+      "localTrips": 1765220.0,
       "realm": "turkey"
     },
     {
@@ -96774,7 +97233,7 @@
       ],
       "place": 5456,
       "country": "TR",
-      "localTrips": 1756304.0,
+      "localTrips": 1755668.0,
       "realm": "turkey"
     },
     {
@@ -96800,7 +97259,7 @@
       ],
       "place": 5457,
       "country": "TR",
-      "localTrips": 1575011.0,
+      "localTrips": 1575001.0,
       "realm": "turkey"
     },
     {
@@ -96826,7 +97285,7 @@
       ],
       "place": 5458,
       "country": "TR",
-      "localTrips": 2058415.0,
+      "localTrips": 2058012.0,
       "realm": "turkey"
     },
     {
@@ -96852,7 +97311,7 @@
       ],
       "place": 5459,
       "country": "TR",
-      "localTrips": 1558862.0,
+      "localTrips": 1557640.0,
       "realm": "turkey"
     },
     {
@@ -96878,7 +97337,7 @@
       ],
       "place": 5460,
       "country": "TR",
-      "localTrips": 1396617.0,
+      "localTrips": 1398007.0,
       "realm": "turkey"
     },
     {
@@ -96904,7 +97363,7 @@
       ],
       "place": 5462,
       "country": "TR",
-      "localTrips": 1710368.0,
+      "localTrips": 1710391.0,
       "realm": "turkey"
     },
     {
@@ -96930,33 +97389,7 @@
       ],
       "place": 5464,
       "country": "TR",
-      "localTrips": 1349462.0,
-      "realm": "turkey"
-    },
-    {
-      "id": "yae",
-      "name": "Yalova merkez",
-      "kind": "zone",
-      "origin": {
-        "lon": 29.2786,
-        "lat": 40.6552
-      },
-      "center": [
-        29.2786,
-        40.6552
-      ],
-      "zoom": 10.5,
-      "utcOffset": 3,
-      "market": -1,
-      "box": [
-        28.755,
-        40.293,
-        29.55,
-        40.721
-      ],
-      "place": 5465,
-      "country": "TR",
-      "localTrips": 1184730.0,
+      "localTrips": 1350280.0,
       "realm": "turkey"
     },
     {
@@ -96982,7 +97415,7 @@
       ],
       "place": 5466,
       "country": "TR",
-      "localTrips": 1632197.0,
+      "localTrips": 1632216.0,
       "realm": "turkey"
     },
     {
@@ -97008,7 +97441,7 @@
       ],
       "place": 5467,
       "country": "TR",
-      "localTrips": 964180.0,
+      "localTrips": 964167.0,
       "realm": "turkey"
     },
     {
@@ -97034,7 +97467,7 @@
       ],
       "place": 5468,
       "country": "TR",
-      "localTrips": 1133003.0,
+      "localTrips": 1132834.0,
       "realm": "turkey"
     },
     {
@@ -97060,7 +97493,7 @@
       ],
       "place": 5470,
       "country": "TR",
-      "localTrips": 1030223.0,
+      "localTrips": 1030564.0,
       "realm": "turkey"
     },
     {
@@ -97086,7 +97519,7 @@
       ],
       "place": 5471,
       "country": "TR",
-      "localTrips": 1129328.0,
+      "localTrips": 1129478.0,
       "realm": "turkey"
     },
     {
@@ -97112,7 +97545,7 @@
       ],
       "place": 5475,
       "country": "TR",
-      "localTrips": 357303.0,
+      "localTrips": 357239.0,
       "realm": "turkey"
     },
     {
@@ -97138,7 +97571,7 @@
       ],
       "place": 5476,
       "country": "TR",
-      "localTrips": 3939542.0,
+      "localTrips": 3942676.0,
       "realm": "turkey"
     },
     {
@@ -97164,7 +97597,7 @@
       ],
       "place": 5477,
       "country": "TR",
-      "localTrips": 4137004.0,
+      "localTrips": 4136994.0,
       "realm": "turkey"
     },
     {
@@ -97190,33 +97623,7 @@
       ],
       "place": 5478,
       "country": "TR",
-      "localTrips": 3462640.0,
-      "realm": "turkey"
-    },
-    {
-      "id": "kce",
-      "name": "Kocaeli",
-      "kind": "zone",
-      "origin": {
-        "lon": 29.7495,
-        "lat": 40.7719
-      },
-      "center": [
-        29.7495,
-        40.7719
-      ],
-      "zoom": 10.5,
-      "utcOffset": 3,
-      "market": -1,
-      "box": [
-        29.297,
-        40.511,
-        30.392,
-        41.236
-      ],
-      "place": 5479,
-      "country": "TR",
-      "localTrips": 3497523.0,
+      "localTrips": 3462625.0,
       "realm": "turkey"
     },
     {
@@ -97242,7 +97649,7 @@
       ],
       "place": 5480,
       "country": "TR",
-      "localTrips": 3089222.0,
+      "localTrips": 3089192.0,
       "realm": "turkey"
     },
     {
@@ -97268,7 +97675,7 @@
       ],
       "place": 5481,
       "country": "TR",
-      "localTrips": 2412897.0,
+      "localTrips": 2412883.0,
       "realm": "turkey"
     },
     {
@@ -97294,7 +97701,7 @@
       ],
       "place": 5482,
       "country": "TR",
-      "localTrips": 3459228.0,
+      "localTrips": 3459216.0,
       "realm": "turkey"
     },
     {
@@ -97320,7 +97727,7 @@
       ],
       "place": 5483,
       "country": "TR",
-      "localTrips": 3280695.0,
+      "localTrips": 3280681.0,
       "realm": "turkey"
     },
     {
@@ -97346,7 +97753,7 @@
       ],
       "place": 5484,
       "country": "TR",
-      "localTrips": 1974016.0,
+      "localTrips": 1974437.0,
       "realm": "turkey"
     },
     {
@@ -97372,7 +97779,7 @@
       ],
       "place": 5486,
       "country": "TR",
-      "localTrips": 1573274.0,
+      "localTrips": 1573265.0,
       "realm": "turkey"
     },
     {
@@ -97398,7 +97805,7 @@
       ],
       "place": 5487,
       "country": "TR",
-      "localTrips": 1177192.0,
+      "localTrips": 1177126.0,
       "realm": "turkey"
     },
     {
@@ -97424,7 +97831,7 @@
       ],
       "place": 5488,
       "country": "TR",
-      "localTrips": 1420123.0,
+      "localTrips": 1420010.0,
       "realm": "turkey"
     },
     {
@@ -97450,7 +97857,7 @@
       ],
       "place": 5489,
       "country": "TR",
-      "localTrips": 1177623.0,
+      "localTrips": 1177046.0,
       "realm": "turkey"
     },
     {
@@ -97476,7 +97883,7 @@
       ],
       "place": 5490,
       "country": "TR",
-      "localTrips": 988853.0,
+      "localTrips": 988932.0,
       "realm": "turkey"
     },
     {
@@ -97502,7 +97909,7 @@
       ],
       "place": 5491,
       "country": "TR",
-      "localTrips": 653086.0,
+      "localTrips": 654431.0,
       "realm": "turkey"
     },
     {
@@ -97528,7 +97935,7 @@
       ],
       "place": 5492,
       "country": "TR",
-      "localTrips": 638363.0,
+      "localTrips": 638331.0,
       "realm": "turkey"
     },
     {
@@ -97554,7 +97961,7 @@
       ],
       "place": 5493,
       "country": "TR",
-      "localTrips": 749903.0,
+      "localTrips": 750001.0,
       "realm": "turkey"
     },
     {
@@ -97580,7 +97987,7 @@
       ],
       "place": 5494,
       "country": "TR",
-      "localTrips": 434115.0,
+      "localTrips": 434105.0,
       "realm": "turkey"
     },
     {
@@ -97605,7 +98012,7 @@
       ],
       "place": 5495,
       "country": "TR",
-      "localTrips": 7256496.0,
+      "localTrips": 7256481.0,
       "realm": "turkey"
     },
     {
@@ -97616,8 +98023,8 @@
         "lat": 36.9393
       },
       "center": [
-        30.7126,
-        36.9393
+        30.70302,
+        36.88657
       ],
       "zoom": 11.2,
       "utcOffset": 3,
@@ -97630,7 +98037,7 @@
       ],
       "place": 5496,
       "country": "TR",
-      "localTrips": 5118870.0,
+      "localTrips": 5119130.0,
       "realm": "turkey"
     },
     {
@@ -97656,7 +98063,7 @@
       ],
       "place": 5497,
       "country": "TR",
-      "localTrips": 6491160.0,
+      "localTrips": 6491107.0,
       "realm": "turkey"
     },
     {
@@ -97682,7 +98089,7 @@
       ],
       "place": 5498,
       "country": "TR",
-      "localTrips": 1358546.0,
+      "localTrips": 1358510.0,
       "realm": "turkey"
     },
     {
@@ -97708,7 +98115,7 @@
       ],
       "place": 5499,
       "country": "TR",
-      "localTrips": 541163.0,
+      "localTrips": 541164.0,
       "realm": "turkey"
     },
     {
@@ -97734,7 +98141,7 @@
       ],
       "place": 5500,
       "country": "TR",
-      "localTrips": 902772.0,
+      "localTrips": 902771.0,
       "realm": "turkey"
     },
     {
@@ -97760,33 +98167,7 @@
       ],
       "place": 5501,
       "country": "TR",
-      "localTrips": 1038151.0,
-      "realm": "turkey"
-    },
-    {
-      "id": "arv",
-      "name": "Arnavutköy",
-      "kind": "zone",
-      "origin": {
-        "lon": 28.7474,
-        "lat": 41.1857
-      },
-      "center": [
-        28.7474,
-        41.1857
-      ],
-      "zoom": 10.5,
-      "utcOffset": 3,
-      "market": -1,
-      "box": [
-        28.465,
-        41.07,
-        28.846,
-        41.427
-      ],
-      "place": 5502,
-      "country": "TR",
-      "localTrips": 728041.0,
+      "localTrips": 1038089.0,
       "realm": "turkey"
     },
     {
@@ -97812,7 +98193,7 @@
       ],
       "place": 5503,
       "country": "TR",
-      "localTrips": 566767.0,
+      "localTrips": 566765.0,
       "realm": "turkey"
     },
     {
@@ -97838,7 +98219,7 @@
       ],
       "place": 5504,
       "country": "TR",
-      "localTrips": 1623325.0,
+      "localTrips": 1623327.0,
       "realm": "turkey"
     },
     {
@@ -97864,7 +98245,7 @@
       ],
       "place": 5506,
       "country": "TR",
-      "localTrips": 1912542.0,
+      "localTrips": 1912571.0,
       "realm": "turkey"
     },
     {
@@ -97889,7 +98270,7 @@
       ],
       "place": 5507,
       "country": "TR",
-      "localTrips": 5469386.0,
+      "localTrips": 5469249.0,
       "realm": "turkey"
     },
     {
@@ -99926,8 +100307,8 @@
         "lat": 42.8873
       },
       "center": [
-        47.6375,
-        42.8873
+        47.50487,
+        42.98302
       ],
       "zoom": 11.2,
       "utcOffset": 3,
@@ -101634,8 +102015,8 @@
         "lat": 48.7741
       },
       "center": [
-        44.7976,
-        48.7741
+        44.51534,
+        48.70819
       ],
       "zoom": 11.2,
       "utcOffset": 3,
@@ -106803,8 +107184,8 @@
         "lat": 50.4115
       },
       "center": [
-        30.6343,
-        50.4115
+        30.53125,
+        50.40203
       ],
       "zoom": 11.2,
       "utcOffset": 2,
@@ -110351,7 +110732,7 @@
       ],
       "place": 6115,
       "country": "GB",
-      "localTrips": 3410295.0,
+      "localTrips": 3410292.0,
       "realm": "uk-ie"
     },
     {
@@ -110377,7 +110758,7 @@
       ],
       "place": 6116,
       "country": "GB",
-      "localTrips": 1515385.0,
+      "localTrips": 1515386.0,
       "realm": "uk-ie"
     },
     {
@@ -110403,7 +110784,7 @@
       ],
       "place": 6117,
       "country": "GB",
-      "localTrips": 3125112.0,
+      "localTrips": 3123746.0,
       "realm": "uk-ie"
     },
     {
@@ -110429,7 +110810,7 @@
       ],
       "place": 6118,
       "country": "GB",
-      "localTrips": 2074371.0,
+      "localTrips": 2074138.0,
       "realm": "uk-ie"
     },
     {
@@ -110455,7 +110836,7 @@
       ],
       "place": 6119,
       "country": "GB",
-      "localTrips": 1179395.0,
+      "localTrips": 1179336.0,
       "realm": "uk-ie"
     },
     {
@@ -110481,7 +110862,7 @@
       ],
       "place": 6120,
       "country": "GB",
-      "localTrips": 1034657.0,
+      "localTrips": 1033612.0,
       "realm": "uk-ie"
     },
     {
@@ -110507,7 +110888,7 @@
       ],
       "place": 6121,
       "country": "GB",
-      "localTrips": 2567538.0,
+      "localTrips": 2567539.0,
       "realm": "uk-ie"
     },
     {
@@ -110533,7 +110914,7 @@
       ],
       "place": 6122,
       "country": "GB",
-      "localTrips": 2754584.0,
+      "localTrips": 2754585.0,
       "realm": "uk-ie"
     },
     {
@@ -110559,7 +110940,7 @@
       ],
       "place": 6123,
       "country": "GB",
-      "localTrips": 2637052.0,
+      "localTrips": 2637087.0,
       "realm": "uk-ie"
     },
     {
@@ -110585,7 +110966,7 @@
       ],
       "place": 6124,
       "country": "GB",
-      "localTrips": 2591351.0,
+      "localTrips": 2591354.0,
       "realm": "uk-ie"
     },
     {
@@ -110611,7 +110992,7 @@
       ],
       "place": 6125,
       "country": "GB",
-      "localTrips": 2482093.0,
+      "localTrips": 2482091.0,
       "realm": "uk-ie"
     },
     {
@@ -110637,7 +111018,7 @@
       ],
       "place": 6126,
       "country": "GB",
-      "localTrips": 1215057.0,
+      "localTrips": 1215053.0,
       "realm": "uk-ie"
     },
     {
@@ -110663,7 +111044,7 @@
       ],
       "place": 6127,
       "country": "GB",
-      "localTrips": 2280307.0,
+      "localTrips": 2280306.0,
       "realm": "uk-ie"
     },
     {
@@ -110689,7 +111070,7 @@
       ],
       "place": 6128,
       "country": "GB",
-      "localTrips": 2199115.0,
+      "localTrips": 2199116.0,
       "realm": "uk-ie"
     },
     {
@@ -110715,7 +111096,7 @@
       ],
       "place": 6129,
       "country": "GB",
-      "localTrips": 2050075.0,
+      "localTrips": 2050077.0,
       "realm": "uk-ie"
     },
     {
@@ -110741,7 +111122,7 @@
       ],
       "place": 6130,
       "country": "GB",
-      "localTrips": 1573366.0,
+      "localTrips": 1573283.0,
       "realm": "uk-ie"
     },
     {
@@ -110767,7 +111148,7 @@
       ],
       "place": 6131,
       "country": "GB",
-      "localTrips": 800588.0,
+      "localTrips": 800583.0,
       "realm": "uk-ie"
     },
     {
@@ -110793,7 +111174,7 @@
       ],
       "place": 6132,
       "country": "GB",
-      "localTrips": 1337001.0,
+      "localTrips": 1337007.0,
       "realm": "uk-ie"
     },
     {
@@ -110819,7 +111200,7 @@
       ],
       "place": 6134,
       "country": "GB",
-      "localTrips": 499802.0,
+      "localTrips": 499861.0,
       "realm": "uk-ie"
     },
     {
@@ -110845,7 +111226,7 @@
       ],
       "place": 6135,
       "country": "GB",
-      "localTrips": 410649.0,
+      "localTrips": 410648.0,
       "realm": "uk-ie"
     },
     {
@@ -112873,7 +113254,7 @@
       ],
       "place": 6215,
       "country": "PT",
-      "localTrips": 3927078.0,
+      "localTrips": 3926257.0,
       "realm": "iberia"
     },
     {
@@ -112899,7 +113280,7 @@
       ],
       "place": 6216,
       "country": "PT",
-      "localTrips": 2822016.0,
+      "localTrips": 2819330.0,
       "realm": "iberia"
     },
     {
@@ -112925,7 +113306,7 @@
       ],
       "place": 6217,
       "country": "PT",
-      "localTrips": 2036036.0,
+      "localTrips": 2035633.0,
       "realm": "iberia"
     },
     {
@@ -112951,7 +113332,7 @@
       ],
       "place": 6218,
       "country": "PT",
-      "localTrips": 1405099.0,
+      "localTrips": 1403743.0,
       "realm": "iberia"
     },
     {
@@ -113663,8 +114044,8 @@
         "lat": 20.6292
       },
       "center": [
-        -103.2783,
-        20.6292
+        -103.3384,
+        20.67204
       ],
       "zoom": 11.2,
       "utcOffset": -6,
@@ -113688,8 +114069,8 @@
         "lat": 25.6319
       },
       "center": [
-        -100.291,
-        25.6319
+        -100.31526,
+        25.6802
       ],
       "zoom": 11.2,
       "utcOffset": -6,
@@ -113713,8 +114094,8 @@
         "lat": 18.9901
       },
       "center": [
-        -98.2422,
-        18.9901
+        -98.19815,
+        19.0438
       ],
       "zoom": 11.2,
       "utcOffset": -6,
@@ -113738,8 +114119,8 @@
         "lat": 19.2628
       },
       "center": [
-        -99.5937,
-        19.2628
+        -99.6569,
+        19.29255
       ],
       "zoom": 11.2,
       "utcOffset": -6,
@@ -113763,8 +114144,8 @@
         "lat": 32.5038
       },
       "center": [
-        -116.8604,
-        32.5038
+        -117.03712,
+        32.53648
       ],
       "zoom": 11.2,
       "utcOffset": -8,
@@ -113788,8 +114169,8 @@
         "lat": 25.4973
       },
       "center": [
-        -103.4104,
-        25.4973
+        -103.41051,
+        25.5427
       ],
       "zoom": 11.2,
       "utcOffset": -6,
@@ -113813,8 +114194,8 @@
         "lat": 21.0774
       },
       "center": [
-        -101.6361,
-        21.0774
+        -101.68298,
+        21.12197
       ],
       "zoom": 11.2,
       "utcOffset": -6,
@@ -113838,8 +114219,8 @@
         "lat": 31.6511
       },
       "center": [
-        -106.3939,
-        31.6511
+        -106.48321,
+        31.73897
       ],
       "zoom": 11.2,
       "utcOffset": -7,
@@ -113863,8 +114244,8 @@
         "lat": 22.1169
       },
       "center": [
-        -100.9386,
-        22.1169
+        -100.9764,
+        22.15165
       ],
       "zoom": 11.2,
       "utcOffset": -6,
@@ -114148,8 +114529,8 @@
         "lat": 19.3786
       },
       "center": [
-        -99.2132,
-        19.3786
+        -99.14503,
+        19.41082
       ],
       "zoom": 11.2,
       "utcOffset": -6,
@@ -116305,8 +116686,8 @@
         "lat": -22.9756
       },
       "center": [
-        -43.332,
-        -22.9756
+        -43.20937,
+        -22.91101
       ],
       "zoom": 11.2,
       "utcOffset": -3,
@@ -116330,8 +116711,8 @@
         "lat": -19.9496
       },
       "center": [
-        -44.0014,
-        -19.9496
+        -43.94509,
+        -19.92273
       ],
       "zoom": 11.2,
       "utcOffset": -3,
@@ -116405,8 +116786,8 @@
         "lat": -15.8363
       },
       "center": [
-        -48.0142,
-        -15.8363
+        -47.8828,
+        -15.79399
       ],
       "zoom": 11.2,
       "utcOffset": -3,
@@ -116430,8 +116811,8 @@
         "lat": -12.9298
       },
       "center": [
-        -38.4961,
-        -12.9298
+        -38.48128,
+        -12.98225
       ],
       "zoom": 11.2,
       "utcOffset": -3,
@@ -116480,8 +116861,8 @@
         "lat": -30.0226
       },
       "center": [
-        -51.103,
-        -30.0226
+        -51.23038,
+        -30.0325
       ],
       "zoom": 11.2,
       "utcOffset": -3,
@@ -116555,8 +116936,8 @@
         "lat": -3.1022
       },
       "center": [
-        -60.0556,
-        -3.1022
+        -59.9825,
+        -3.13163
       ],
       "zoom": 11.2,
       "utcOffset": -4,
@@ -116630,8 +117011,8 @@
         "lat": -20.2561
       },
       "center": [
-        -40.2664,
-        -20.2561
+        -40.33767,
+        -20.32009
       ],
       "zoom": 11.2,
       "utcOffset": -3,
@@ -116655,8 +117036,8 @@
         "lat": -5.831
       },
       "center": [
-        -35.2494,
-        -5.831
+        -35.20809,
+        -5.8054
       ],
       "zoom": 11.2,
       "utcOffset": -3,
@@ -120392,8 +120773,8 @@
         "lat": -26.1034
       },
       "center": [
-        28.0956,
-        -26.1034
+        28.04972,
+        -26.205
       ],
       "zoom": 11.2,
       "utcOffset": 2,
@@ -120417,8 +120798,8 @@
         "lat": -34.0188
       },
       "center": [
-        18.658,
-        -34.0188
+        18.41722,
+        -33.92883
       ],
       "zoom": 11.2,
       "utcOffset": 2,
@@ -121144,8 +121525,8 @@
         "lat": 24.6909
       },
       "center": [
-        46.6849,
-        24.6909
+        46.71601,
+        24.63892
       ],
       "zoom": 11.2,
       "utcOffset": 3,
@@ -121169,8 +121550,8 @@
         "lat": 25.3375
       },
       "center": [
-        55.399,
-        25.3375
+        55.29241,
+        25.26472
       ],
       "zoom": 11.2,
       "utcOffset": 4,
@@ -121194,8 +121575,8 @@
         "lat": 21.4845
       },
       "center": [
-        39.1876,
-        21.4845
+        39.17424,
+        21.55044
       ],
       "zoom": 11.2,
       "utcOffset": 3,
@@ -121219,8 +121600,8 @@
         "lat": 29.3315
       },
       "center": [
-        48.0174,
-        29.3315
+        47.97342,
+        29.37965
       ],
       "zoom": 11.2,
       "utcOffset": 3,
@@ -121320,8 +121701,8 @@
         "lat": -29.7408
       },
       "center": [
-        30.9978,
-        -29.7408
+        31.00991,
+        -29.86181
       ],
       "zoom": 11.2,
       "utcOffset": 2,
@@ -121604,8 +121985,8 @@
         "lat": -16.4523
       },
       "center": [
-        -71.5534,
-        -16.4523
+        -71.53696,
+        -16.39887
       ],
       "zoom": 11.2,
       "utcOffset": -5,
@@ -123033,8 +123414,8 @@
         "lat": 4.7212
       },
       "center": [
-        -74.0355,
-        4.7212
+        -74.08363,
+        4.65338
       ],
       "zoom": 11.2,
       "utcOffset": -5,
@@ -123048,32 +123429,7 @@
       "place": 6880,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 32317638.0
-    },
-    {
-      "id": "mee",
-      "name": "Medellín",
-      "origin": {
-        "lon": -75.5485,
-        "lat": 6.293
-      },
-      "center": [
-        -75.5485,
-        6.293
-      ],
-      "zoom": 11.2,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -75.876,
-        5.944,
-        -75.198,
-        6.548
-      ],
-      "place": 6881,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 10794189.0
+      "localTrips": 32275149.0
     },
     {
       "id": "cal",
@@ -123098,7 +123454,7 @@
       "place": 6882,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 8147445.0
+      "localTrips": 8113956.0
     },
     {
       "id": "baa",
@@ -123108,8 +123464,8 @@
         "lat": 10.9154
       },
       "center": [
-        -74.7883,
-        10.9154
+        -74.79261,
+        10.99386
       ],
       "zoom": 11.2,
       "utcOffset": -5,
@@ -123123,137 +123479,7 @@
       "place": 6883,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 6943013.0
-    },
-    {
-      "id": "crs",
-      "name": "Cartagena De Indias",
-      "kind": "zone",
-      "origin": {
-        "lon": -75.5068,
-        "lat": 10.4025
-      },
-      "center": [
-        -75.5068,
-        10.4025
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -76.209,
-        9.359,
-        -74.767,
-        10.82
-      ],
-      "place": 6884,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 4229030.0
-    },
-    {
-      "id": "bug",
-      "name": "Bucaramanga",
-      "kind": "zone",
-      "origin": {
-        "lon": -73.1113,
-        "lat": 7.1201
-      },
-      "center": [
-        -73.1113,
-        7.1201
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -73.564,
-        6.866,
-        -72.983,
-        7.448
-      ],
-      "place": 6885,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 3483673.0
-    },
-    {
-      "id": "sux",
-      "name": "Sahagún",
-      "kind": "zone",
-      "origin": {
-        "lon": -75.447,
-        "lat": 8.9549
-      },
-      "center": [
-        -75.447,
-        8.9549
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -76.534,
-        7.339,
-        -74.766,
-        9.305
-      ],
-      "place": 6887,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 2616874.0
-    },
-    {
-      "id": "tuj",
-      "name": "Tunja",
-      "kind": "zone",
-      "origin": {
-        "lon": -73.363,
-        "lat": 5.5312
-      },
-      "center": [
-        -73.363,
-        5.5312
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -74.684,
-        4.637,
-        -71.925,
-        7.073
-      ],
-      "place": 6888,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 3165633.0
-    },
-    {
-      "id": "ccu",
-      "name": "Cúcuta",
-      "kind": "zone",
-      "origin": {
-        "lon": -72.5071,
-        "lat": 7.8748
-      },
-      "center": [
-        -72.5071,
-        7.8748
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -73.093,
-        6.854,
-        -72.031,
-        9.159
-      ],
-      "place": 6889,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 3184392.0
+      "localTrips": 6927822.0
     },
     {
       "id": "adw",
@@ -123802,214 +124028,6 @@
       "localTrips": 2847325.0
     },
     {
-      "id": "yop",
-      "name": "Yopal",
-      "kind": "zone",
-      "origin": {
-        "lon": -72.3985,
-        "lat": 5.3449
-      },
-      "center": [
-        -72.3985,
-        5.3449
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -73.093,
-        4.267,
-        -69.417,
-        7.123
-      ],
-      "place": 6916,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 2771476.0
-    },
-    {
-      "id": "brc",
-      "name": "Barrancabermeja",
-      "kind": "zone",
-      "origin": {
-        "lon": -73.8576,
-        "lat": 7.0634
-      },
-      "center": [
-        -73.8576,
-        7.0634
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -74.545,
-        5.688,
-        -72.458,
-        8.162
-      ],
-      "place": 6917,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 2770924.0
-    },
-    {
-      "id": "viv",
-      "name": "Villavicencio",
-      "kind": "zone",
-      "origin": {
-        "lon": -73.6402,
-        "lat": 4.1463
-      },
-      "center": [
-        -73.6402,
-        4.1463
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -74.953,
-        0.876,
-        -69.976,
-        4.944
-      ],
-      "place": 6918,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 2921700.0
-    },
-    {
-      "id": "ccs",
-      "name": "Caucasia",
-      "kind": "zone",
-      "origin": {
-        "lon": -75.1987,
-        "lat": 7.9803
-      },
-      "center": [
-        -75.1987,
-        7.9803
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -76.941,
-        6.191,
-        -73.861,
-        8.218
-      ],
-      "place": 6919,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 2421278.0
-    },
-    {
-      "id": "mnr",
-      "name": "Montería",
-      "kind": "zone",
-      "origin": {
-        "lon": -75.8836,
-        "lat": 8.7518
-      },
-      "center": [
-        -75.8836,
-        8.7518
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -76.435,
-        8.245,
-        -75.561,
-        9.467
-      ],
-      "place": 6920,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 2455814.0
-    },
-    {
-      "id": "miz",
-      "name": "Manizales",
-      "kind": "zone",
-      "origin": {
-        "lon": -75.4884,
-        "lat": 5.0533
-      },
-      "center": [
-        -75.4884,
-        5.0533
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -75.941,
-        4.784,
-        -74.606,
-        5.798
-      ],
-      "place": 6921,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 2440968.0
-    },
-    {
-      "id": "sbo",
-      "name": "Santa Marta",
-      "kind": "zone",
-      "origin": {
-        "lon": -74.1922,
-        "lat": 11.2331
-      },
-      "center": [
-        -74.1922,
-        11.2331
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -74.504,
-        10.033,
-        -73.523,
-        11.368
-      ],
-      "place": 6922,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 2457700.0
-    },
-    {
-      "id": "scl",
-      "name": "Sincelejo",
-      "kind": "zone",
-      "origin": {
-        "lon": -75.4032,
-        "lat": 9.3125
-      },
-      "center": [
-        -75.4032,
-        9.3125
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -75.723,
-        8.258,
-        -74.514,
-        10.167
-      ],
-      "place": 6923,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 2222375.0
-    },
-    {
       "id": "pst",
       "name": "Pasto",
       "kind": "zone",
@@ -124033,33 +124051,7 @@
       "place": 6924,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 2097538.0
-    },
-    {
-      "id": "slg",
-      "name": "Sabanalarga",
-      "kind": "zone",
-      "origin": {
-        "lon": -74.9261,
-        "lat": 10.6304
-      },
-      "center": [
-        -74.9261,
-        10.6304
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -75.269,
-        8.898,
-        -73.779,
-        10.905
-      ],
-      "place": 6926,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 1694914.0
+      "localTrips": 2099628.0
     },
     {
       "id": "tlu",
@@ -124085,33 +124077,7 @@
       "place": 6927,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 1904468.0
-    },
-    {
-      "id": "apr",
-      "name": "Apartadó",
-      "kind": "zone",
-      "origin": {
-        "lon": -76.6329,
-        "lat": 7.8829
-      },
-      "center": [
-        -76.6329,
-        7.8829
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -77.146,
-        7.114,
-        -76.171,
-        8.908
-      ],
-      "place": 6929,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 1745999.0
+      "localTrips": 1903849.0
     },
     {
       "id": "uri",
@@ -124137,7 +124103,7 @@
       "place": 6930,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 1506471.0
+      "localTrips": 1505859.0
     },
     {
       "id": "arn",
@@ -124163,7 +124129,7 @@
       "place": 6931,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 1674929.0
+      "localTrips": 1675160.0
     },
     {
       "id": "pit",
@@ -124189,7 +124155,7 @@
       "place": 6932,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 1621176.0
+      "localTrips": 1621645.0
     },
     {
       "id": "nei",
@@ -124215,33 +124181,7 @@
       "place": 6934,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 1618533.0
-    },
-    {
-      "id": "plm",
-      "name": "Palmira",
-      "kind": "zone",
-      "origin": {
-        "lon": -76.2942,
-        "lat": 3.523
-      },
-      "center": [
-        -76.2942,
-        3.523
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -76.631,
-        3.193,
-        -75.931,
-        4.086
-      ],
-      "place": 6935,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 1290244.0
+      "localTrips": 1618247.0
     },
     {
       "id": "pop",
@@ -124267,137 +124207,7 @@
       "place": 6936,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 1425707.0
-    },
-    {
-      "id": "snv",
-      "name": "Santa Cruz (Guachavés)",
-      "kind": "zone",
-      "origin": {
-        "lon": -77.673,
-        "lat": 1.2253
-      },
-      "center": [
-        -77.673,
-        1.2253
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -78.228,
-        0.342,
-        -77.069,
-        1.483
-      ],
-      "place": 6937,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 1225153.0
-    },
-    {
-      "id": "jmu",
-      "name": "Jamundí",
-      "kind": "zone",
-      "origin": {
-        "lon": -76.5409,
-        "lat": 3.256
-      },
-      "center": [
-        -76.5409,
-        3.256
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -76.802,
-        2.686,
-        -76.033,
-        3.377
-      ],
-      "place": 6939,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 1202810.0
-    },
-    {
-      "id": "qub",
-      "name": "Quibdó",
-      "kind": "zone",
-      "origin": {
-        "lon": -76.6576,
-        "lat": 5.6852
-      },
-      "center": [
-        -76.6576,
-        5.6852
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -77.912,
-        3.946,
-        -75.984,
-        8.696
-      ],
-      "place": 6941,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 1263534.0
-    },
-    {
-      "id": "roe",
-      "name": "Rionegro",
-      "kind": "zone",
-      "origin": {
-        "lon": -75.3761,
-        "lat": 6.1552
-      },
-      "center": [
-        -75.3761,
-        6.1552
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -75.529,
-        5.4,
-        -74.516,
-        6.357
-      ],
-      "place": 6942,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 1185744.0
-    },
-    {
-      "id": "bna",
-      "name": "Buenaventura",
-      "kind": "zone",
-      "origin": {
-        "lon": -77.0026,
-        "lat": 3.8792
-      },
-      "center": [
-        -77.0026,
-        3.8792
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -77.568,
-        3.089,
-        -76.669,
-        4.253
-      ],
-      "place": 6943,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 1251025.0
+      "localTrips": 1423656.0
     },
     {
       "id": "vle",
@@ -124423,33 +124233,7 @@
       "place": 6945,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 1111883.0
-    },
-    {
-      "id": "oca",
-      "name": "Ocaña",
-      "kind": "zone",
-      "origin": {
-        "lon": -73.3499,
-        "lat": 8.232
-      },
-      "center": [
-        -73.3499,
-        8.232
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -73.888,
-        7.511,
-        -72.854,
-        9.31
-      ],
-      "place": 6946,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 1227472.0
+      "localTrips": 1111257.0
     },
     {
       "id": "sos",
@@ -124845,8 +124629,8 @@
         "lat": -33.6196
       },
       "center": [
-        -70.5871,
-        -33.6196
+        -70.65107,
+        -33.4377
       ],
       "zoom": 11.2,
       "utcOffset": -4,
@@ -125120,59 +124904,7 @@
       "place": 6975,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 3665020.0
-    },
-    {
-      "id": "vll",
-      "name": "Valledupar",
-      "kind": "zone",
-      "origin": {
-        "lon": -73.2494,
-        "lat": 10.4757
-      },
-      "center": [
-        -73.2494,
-        10.4757
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -74.159,
-        8.965,
-        -72.867,
-        10.886
-      ],
-      "place": 6976,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 2529942.0
-    },
-    {
-      "id": "zip",
-      "name": "Zipaquira",
-      "kind": "zone",
-      "origin": {
-        "lon": -73.9964,
-        "lat": 5.029
-      },
-      "center": [
-        -73.9964,
-        5.029
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -74.788,
-        4.707,
-        -73.887,
-        5.855
-      ],
-      "place": 6978,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 861574.0
+      "localTrips": 3656546.0
     },
     {
       "id": "rag",
@@ -125805,8 +125537,8 @@
         "lat": -2.1232
       },
       "center": [
-        -79.9109,
-        -2.1232
+        -79.90774,
+        -2.17047
       ],
       "zoom": 11.2,
       "utcOffset": -5,
@@ -125949,7 +125681,7 @@
       "place": 7013,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 3221843.0
+      "localTrips": 3211871.0
     },
     {
       "id": "rih",
@@ -125975,59 +125707,7 @@
       "place": 7014,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 1473917.0
-    },
-    {
-      "id": "fle",
-      "name": "Florencia",
-      "kind": "zone",
-      "origin": {
-        "lon": -75.6051,
-        "lat": 1.6136
-      },
-      "center": [
-        -75.6051,
-        1.6136
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -76.324,
-        0.007,
-        -73.12,
-        2.952
-      ],
-      "place": 7015,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 1374276.0
-    },
-    {
-      "id": "tma",
-      "name": "Tumaco",
-      "kind": "zone",
-      "origin": {
-        "lon": -78.7638,
-        "lat": 1.8077
-      },
-      "center": [
-        -78.7638,
-        1.8077
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -79.029,
-        0.986,
-        -77.287,
-        2.702
-      ],
-      "place": 7016,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 1120944.0
+      "localTrips": 1471147.0
     },
     {
       "id": "ads",
@@ -126053,59 +125733,7 @@
       "place": 7017,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 1003416.0
-    },
-    {
-      "id": "gio",
-      "name": "Girardot",
-      "kind": "zone",
-      "origin": {
-        "lon": -74.7981,
-        "lat": 4.2921
-      },
-      "center": [
-        -74.7981,
-        4.2921
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -74.909,
-        4.18,
-        -74.251,
-        4.861
-      ],
-      "place": 7018,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 752590.0
-    },
-    {
-      "id": "fus",
-      "name": "Fusagasugá",
-      "kind": "zone",
-      "origin": {
-        "lon": -74.3618,
-        "lat": 4.3487
-      },
-      "center": [
-        -74.3618,
-        4.3487
-      ],
-      "zoom": 10.5,
-      "utcOffset": -5,
-      "market": -1,
-      "box": [
-        -74.574,
-        3.711,
-        -74.221,
-        4.446
-      ],
-      "place": 7019,
-      "country": "CO",
-      "realm": "colombia",
-      "localTrips": 395537.0
+      "localTrips": 997139.0
     },
     {
       "id": "lex",
@@ -126131,7 +125759,7 @@
       "place": 7020,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 172273.0
+      "localTrips": 172288.0
     },
     {
       "id": "mbh",
@@ -126296,8 +125924,8 @@
         "lat": 35.1682
       },
       "center": [
-        129.1706,
-        35.1682
+        129.07524,
+        35.17995
       ],
       "zoom": 11.2,
       "utcOffset": 9,
@@ -126683,8 +126311,8 @@
         "lat": 22.2085
       },
       "center": [
-        113.5579,
-        22.2085
+        113.57213,
+        22.27373
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -126698,7 +126326,7 @@
       "place": 7045,
       "country": "CN",
       "realm": "cn-south",
-      "localTrips": 4990359.0
+      "localTrips": 4990275.0
     },
     {
       "id": "zug",
@@ -127478,7 +127106,7 @@
       "place": 7083,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 912966.0
+      "localTrips": 897815.0
     },
     {
       "id": "tiq",
@@ -127504,7 +127132,7 @@
       "place": 7084,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 564233.0
+      "localTrips": 557667.0
     },
     {
       "id": "lve",
@@ -127530,7 +127158,7 @@
       "place": 7085,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 1372998.0
+      "localTrips": 1373786.0
     },
     {
       "id": "seq",
@@ -127556,7 +127184,7 @@
       "place": 7086,
       "country": "CO",
       "realm": "colombia",
-      "localTrips": 966134.0
+      "localTrips": 959402.0
     },
     {
       "id": "lna",
@@ -133776,7 +133404,7 @@
       "place": 7389,
       "country": "PT",
       "realm": "iberia",
-      "localTrips": 873926.0
+      "localTrips": 874044.0
     },
     {
       "id": "atj",
@@ -133802,7 +133430,7 @@
       "place": 7390,
       "country": "PT",
       "realm": "iberia",
-      "localTrips": 496345.0
+      "localTrips": 496346.0
     },
     {
       "id": "trs",
@@ -133828,7 +133456,7 @@
       "place": 7391,
       "country": "PT",
       "realm": "iberia",
-      "localTrips": 255557.0
+      "localTrips": 255556.0
     },
     {
       "id": "ces",
@@ -134462,8 +134090,8 @@
         "lat": 1.3952
       },
       "center": [
-        103.9026,
-        1.3952
+        103.85191,
+        1.28992
       ],
       "zoom": 11.2,
       "utcOffset": 8,
@@ -134478,6 +134106,3292 @@
       "country": "SG",
       "localTrips": 17748332.0,
       "realm": "singapore"
+    },
+    {
+      "id": "shz",
+      "name": "Shenzhen",
+      "origin": {
+        "lon": 114.0957,
+        "lat": 22.5668
+      },
+      "center": [
+        114.0957,
+        22.5668
+      ],
+      "zoom": 11.2,
+      "utcOffset": 8,
+      "market": -1,
+      "box": [
+        113.727,
+        22.428,
+        114.643,
+        22.883
+      ],
+      "place": 7423,
+      "country": "CN",
+      "realm": "cn-south",
+      "localTrips": 49235990.0
+    },
+    {
+      "id": "gut",
+      "name": "Guatemala City",
+      "origin": {
+        "lon": -90.4849,
+        "lat": 14.6883
+      },
+      "center": [
+        -90.4849,
+        14.6883
+      ],
+      "zoom": 11.2,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -90.922,
+        14.0,
+        -90.083,
+        14.955
+      ],
+      "place": 7424,
+      "country": "GT",
+      "localTrips": 11228597.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "ccc",
+      "name": "Chichicastenango",
+      "kind": "zone",
+      "origin": {
+        "lon": -91.1111,
+        "lat": 14.9423
+      },
+      "center": [
+        -91.1111,
+        14.9423
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -91.346,
+        14.783,
+        -90.399,
+        16.092
+      ],
+      "place": 7425,
+      "country": "GT",
+      "localTrips": 3357516.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "mlc",
+      "name": "Malacatán",
+      "kind": "zone",
+      "origin": {
+        "lon": -92.0604,
+        "lat": 14.9095
+      },
+      "center": [
+        -92.0604,
+        14.9095
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -92.247,
+        14.466,
+        -91.549,
+        15.44
+      ],
+      "place": 7426,
+      "country": "GT",
+      "localTrips": 3295261.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "mze",
+      "name": "Mazatenango",
+      "kind": "zone",
+      "origin": {
+        "lon": -91.5041,
+        "lat": 14.5327
+      },
+      "center": [
+        -91.5041,
+        14.5327
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -92.182,
+        14.025,
+        -91.074,
+        14.734
+      ],
+      "place": 7427,
+      "country": "GT",
+      "localTrips": 2600637.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "cbi",
+      "name": "Cobán",
+      "kind": "zone",
+      "origin": {
+        "lon": -90.3655,
+        "lat": 15.4752
+      },
+      "center": [
+        -90.3655,
+        15.4752
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -90.84,
+        14.851,
+        -89.84,
+        16.06
+      ],
+      "place": 7428,
+      "country": "GT",
+      "localTrips": 2378850.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "qet",
+      "name": "Quetzaltenango",
+      "kind": "zone",
+      "origin": {
+        "lon": -91.5154,
+        "lat": 14.8522
+      },
+      "center": [
+        -91.5154,
+        14.8522
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -92.158,
+        14.474,
+        -91.384,
+        15.245
+      ],
+      "place": 7429,
+      "country": "GT",
+      "localTrips": 2411788.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "syx",
+      "name": "Sayaxché",
+      "kind": "zone",
+      "origin": {
+        "lon": -89.885,
+        "lat": 16.915
+      },
+      "center": [
+        -89.885,
+        16.915
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -91.459,
+        15.829,
+        -89.131,
+        17.835
+      ],
+      "place": 7430,
+      "country": "GT",
+      "localTrips": 2261984.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "spe",
+      "name": "San Pedro Carchá",
+      "kind": "zone",
+      "origin": {
+        "lon": -90.3144,
+        "lat": 15.4752
+      },
+      "center": [
+        -90.3144,
+        15.4752
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -90.527,
+        15.101,
+        -89.389,
+        16.092
+      ],
+      "place": 7431,
+      "country": "GT",
+      "localTrips": 2152530.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "cbj",
+      "name": "Chiantla",
+      "kind": "zone",
+      "origin": {
+        "lon": -91.4571,
+        "lat": 15.3604
+      },
+      "center": [
+        -91.4571,
+        15.3604
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -92.135,
+        15.12,
+        -91.139,
+        15.854
+      ],
+      "place": 7432,
+      "country": "GT",
+      "localTrips": 2138293.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "ttn",
+      "name": "Totonicapán",
+      "kind": "zone",
+      "origin": {
+        "lon": -91.3572,
+        "lat": 14.9095
+      },
+      "center": [
+        -91.3572,
+        14.9095
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -91.575,
+        14.805,
+        -91.156,
+        15.272
+      ],
+      "place": 7433,
+      "country": "GT",
+      "localTrips": 1458675.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "mac",
+      "name": "Maracaibo",
+      "origin": {
+        "lon": -71.604,
+        "lat": 10.6711
+      },
+      "center": [
+        -71.604,
+        10.6711
+      ],
+      "zoom": 11.2,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -72.329,
+        10.067,
+        -71.563,
+        10.787
+      ],
+      "place": 7435,
+      "country": "VE",
+      "localTrips": 5811849.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "vae",
+      "name": "Valencia",
+      "origin": {
+        "lon": -68.0221,
+        "lat": 10.2885
+      },
+      "center": [
+        -68.0221,
+        10.2885
+      ],
+      "zoom": 11.2,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -68.393,
+        8.645,
+        -67.632,
+        10.391
+      ],
+      "place": 7436,
+      "country": "VE",
+      "localTrips": 4837028.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "mcy",
+      "name": "Maracay",
+      "kind": "zone",
+      "origin": {
+        "lon": -67.5865,
+        "lat": 10.2722
+      },
+      "center": [
+        -67.5865,
+        10.2722
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -67.9,
+        9.228,
+        -66.528,
+        10.556
+      ],
+      "place": 7437,
+      "country": "VE",
+      "localTrips": 4009300.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "irb",
+      "name": "Iribarren",
+      "kind": "zone",
+      "origin": {
+        "lon": -69.3171,
+        "lat": 10.1014
+      },
+      "center": [
+        -69.3171,
+        10.1014
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -70.324,
+        9.656,
+        -68.856,
+        10.773
+      ],
+      "place": 7438,
+      "country": "VE",
+      "localTrips": 3886390.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "pub",
+      "name": "Puerto Cabello",
+      "kind": "zone",
+      "origin": {
+        "lon": -68.0371,
+        "lat": 10.4757
+      },
+      "center": [
+        -68.0371,
+        10.4757
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -69.242,
+        9.816,
+        -67.838,
+        10.793
+      ],
+      "place": 7439,
+      "country": "VE",
+      "localTrips": 2641178.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "smv",
+      "name": "Simón Bolívar",
+      "kind": "zone",
+      "origin": {
+        "lon": -64.6628,
+        "lat": 10.1827
+      },
+      "center": [
+        -64.6628,
+        10.1827
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -65.77,
+        9.367,
+        -64.094,
+        10.271
+      ],
+      "place": 7442,
+      "country": "VE",
+      "localTrips": 2436246.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "scj",
+      "name": "Sucre",
+      "kind": "zone",
+      "origin": {
+        "lon": -64.1647,
+        "lat": 10.4676
+      },
+      "center": [
+        -64.1647,
+        10.4676
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -64.549,
+        10.015,
+        -61.828,
+        10.784
+      ],
+      "place": 7443,
+      "country": "VE",
+      "localTrips": 2534816.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "jup",
+      "name": "Jutiapa",
+      "kind": "zone",
+      "origin": {
+        "lon": -89.8975,
+        "lat": 14.2953
+      },
+      "center": [
+        -89.8975,
+        14.2953
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -90.693,
+        13.721,
+        -89.479,
+        14.582
+      ],
+      "place": 7444,
+      "country": "GT",
+      "localTrips": 2335372.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "ciq",
+      "name": "Chiquimula",
+      "kind": "zone",
+      "origin": {
+        "lon": -89.5465,
+        "lat": 14.803
+      },
+      "center": [
+        -89.5465,
+        14.803
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -89.919,
+        14.387,
+        -89.112,
+        15.316
+      ],
+      "place": 7445,
+      "country": "GT",
+      "localTrips": 1893070.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "sco",
+      "name": "Santa Lucía Cotzumalguapa",
+      "kind": "zone",
+      "origin": {
+        "lon": -91.0268,
+        "lat": 14.3362
+      },
+      "center": [
+        -91.0268,
+        14.3362
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -91.556,
+        13.89,
+        -90.634,
+        14.496
+      ],
+      "place": 7446,
+      "country": "GT",
+      "localTrips": 1874262.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "bll",
+      "name": "Barillas",
+      "kind": "zone",
+      "origin": {
+        "lon": -91.3134,
+        "lat": 15.8034
+      },
+      "center": [
+        -91.3134,
+        15.8034
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -91.914,
+        15.575,
+        -91.028,
+        16.093
+      ],
+      "place": 7447,
+      "country": "GT",
+      "localTrips": 1443202.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "mbk",
+      "name": "Morales",
+      "kind": "zone",
+      "origin": {
+        "lon": -88.8445,
+        "lat": 15.4752
+      },
+      "center": [
+        -88.8445,
+        15.4752
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -89.646,
+        15.05,
+        -88.211,
+        15.985
+      ],
+      "place": 7448,
+      "country": "GT",
+      "localTrips": 1300363.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "jlx",
+      "name": "Jalapa",
+      "kind": "zone",
+      "origin": {
+        "lon": -89.9836,
+        "lat": 14.6392
+      },
+      "center": [
+        -89.9836,
+        14.6392
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -90.341,
+        14.402,
+        -89.631,
+        15.171
+      ],
+      "place": 7449,
+      "country": "GT",
+      "localTrips": 1214192.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "cbk",
+      "name": "Caroní",
+      "kind": "zone",
+      "origin": {
+        "lon": -62.7213,
+        "lat": 8.2888
+      },
+      "center": [
+        -62.7213,
+        8.2888
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -63.047,
+        5.886,
+        -59.787,
+        10.039
+      ],
+      "place": 7451,
+      "country": "VE",
+      "localTrips": 3297085.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "sct",
+      "name": "San Cristóbal",
+      "kind": "zone",
+      "origin": {
+        "lon": -72.234,
+        "lat": 7.7611
+      },
+      "center": [
+        -72.234,
+        7.7611
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -72.507,
+        7.343,
+        -71.297,
+        8.663
+      ],
+      "place": 7452,
+      "country": "VE",
+      "localTrips": 3190703.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "mtu",
+      "name": "Maturín",
+      "kind": "zone",
+      "origin": {
+        "lon": -63.1895,
+        "lat": 9.7434
+      },
+      "center": [
+        -63.1895,
+        9.7434
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -64.037,
+        8.363,
+        -61.975,
+        10.324
+      ],
+      "place": 7453,
+      "country": "VE",
+      "localTrips": 2782046.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "bby",
+      "name": "Barinas",
+      "kind": "zone",
+      "origin": {
+        "lon": -70.2103,
+        "lat": 8.6218
+      },
+      "center": [
+        -70.2103,
+        8.6218
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -70.777,
+        7.849,
+        -67.484,
+        9.588
+      ],
+      "place": 7454,
+      "country": "VE",
+      "localTrips": 2739417.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "cbl",
+      "name": "Carirubana",
+      "kind": "zone",
+      "origin": {
+        "lon": -70.2243,
+        "lat": 11.6324
+      },
+      "center": [
+        -70.2243,
+        11.6324
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -71.3,
+        10.274,
+        -68.187,
+        12.215
+      ],
+      "place": 7455,
+      "country": "VE",
+      "localTrips": 2539840.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "scv",
+      "name": "Sucre, Valera",
+      "kind": "zone",
+      "origin": {
+        "lon": -70.607,
+        "lat": 9.318
+      },
+      "center": [
+        -70.607,
+        9.318
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -71.484,
+        8.879,
+        -69.977,
+        10.058
+      ],
+      "place": 7456,
+      "country": "VE",
+      "localTrips": 2101358.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "lib",
+      "name": "Libertador",
+      "kind": "zone",
+      "origin": {
+        "lon": -71.142,
+        "lat": 8.5974
+      },
+      "center": [
+        -71.142,
+        8.5974
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -71.932,
+        7.647,
+        -70.525,
+        9.212
+      ],
+      "place": 7457,
+      "country": "VE",
+      "localTrips": 2055087.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "siz",
+      "name": "Simón Rodríguez",
+      "kind": "zone",
+      "origin": {
+        "lon": -64.2551,
+        "lat": 8.8412
+      },
+      "center": [
+        -64.2551,
+        8.8412
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -65.526,
+        7.643,
+        -62.669,
+        10.139
+      ],
+      "place": 7458,
+      "country": "VE",
+      "localTrips": 1603393.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "mbl",
+      "name": "Mariño",
+      "kind": "zone",
+      "origin": {
+        "lon": -63.8462,
+        "lat": 10.9643
+      },
+      "center": [
+        -63.8462,
+        10.9643
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -64.428,
+        10.717,
+        -63.758,
+        11.199
+      ],
+      "place": 7459,
+      "country": "VE",
+      "localTrips": 1469970.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "aru",
+      "name": "Araure",
+      "kind": "zone",
+      "origin": {
+        "lon": -69.2397,
+        "lat": 9.5808
+      },
+      "center": [
+        -69.2397,
+        9.5808
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -69.712,
+        8.799,
+        -68.552,
+        9.862
+      ],
+      "place": 7460,
+      "country": "VE",
+      "localTrips": 1440275.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "frd",
+      "name": "Francisco de Miranda",
+      "kind": "zone",
+      "origin": {
+        "lon": -67.4306,
+        "lat": 8.9224
+      },
+      "center": [
+        -67.4306,
+        8.9224
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -69.557,
+        6.061,
+        -66.309,
+        9.276
+      ],
+      "place": 7462,
+      "country": "VE",
+      "localTrips": 1246878.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "anj",
+      "name": "Antonio José de Sucre",
+      "kind": "zone",
+      "origin": {
+        "lon": -70.8185,
+        "lat": 8.2239
+      },
+      "center": [
+        -70.8185,
+        8.2239
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -72.439,
+        6.226,
+        -67.831,
+        8.739
+      ],
+      "place": 7464,
+      "country": "VE",
+      "localTrips": 1138850.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "zae",
+      "name": "Zamora, Juan Germán Roscio",
+      "kind": "zone",
+      "origin": {
+        "lon": -67.4853,
+        "lat": 10.0363
+      },
+      "center": [
+        -67.4853,
+        10.0363
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -68.001,
+        9.118,
+        -66.571,
+        10.22
+      ],
+      "place": 7465,
+      "country": "VE",
+      "localTrips": 995987.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "lrx",
+      "name": "La Guaira",
+      "kind": "zone",
+      "origin": {
+        "lon": -66.9748,
+        "lat": 10.5978
+      },
+      "center": [
+        -66.9748,
+        10.5978
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -67.431,
+        10.37,
+        -66.288,
+        10.65
+      ],
+      "place": 7468,
+      "country": "VE",
+      "localTrips": 859433.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "lad",
+      "name": "Lander",
+      "kind": "zone",
+      "origin": {
+        "lon": -66.7794,
+        "lat": 10.1095
+      },
+      "center": [
+        -66.7794,
+        10.1095
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -67.016,
+        9.947,
+        -66.466,
+        10.265
+      ],
+      "place": 7469,
+      "country": "VE",
+      "localTrips": 730537.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "mbn",
+      "name": "Morán",
+      "kind": "zone",
+      "origin": {
+        "lon": -69.7902,
+        "lat": 9.7922
+      },
+      "center": [
+        -69.7902,
+        9.7922
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -70.146,
+        9.37,
+        -69.324,
+        10.046
+      ],
+      "place": 7471,
+      "country": "VE",
+      "localTrips": 458695.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "cee",
+      "name": "Cedeño",
+      "kind": "zone",
+      "origin": {
+        "lon": -66.165,
+        "lat": 7.64
+      },
+      "center": [
+        -66.165,
+        7.64
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -67.46,
+        3.822,
+        -63.366,
+        8.109
+      ],
+      "place": 7474,
+      "country": "VE",
+      "localTrips": 266161.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "saj",
+      "name": "San José",
+      "origin": {
+        "lon": -84.0486,
+        "lat": 9.8654
+      },
+      "center": [
+        -84.0486,
+        9.8654
+      ],
+      "zoom": 11.2,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -84.709,
+        9.466,
+        -83.297,
+        10.596
+      ],
+      "place": 7475,
+      "country": "CR",
+      "localTrips": 8567632.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "scs",
+      "name": "San Carlos",
+      "kind": "zone",
+      "origin": {
+        "lon": -84.4245,
+        "lat": 10.3211
+      },
+      "center": [
+        -84.4245,
+        10.3211
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -85.975,
+        9.708,
+        -84.142,
+        11.238
+      ],
+      "place": 7476,
+      "country": "CR",
+      "localTrips": 1861408.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "pbe",
+      "name": "Puntarenas",
+      "kind": "zone",
+      "origin": {
+        "lon": -84.7214,
+        "lat": 9.9793
+      },
+      "center": [
+        -84.7214,
+        9.9793
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -85.299,
+        9.235,
+        -83.82,
+        10.475
+      ],
+      "place": 7477,
+      "country": "CR",
+      "localTrips": 1168633.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "pcc",
+      "name": "Pococi",
+      "kind": "zone",
+      "origin": {
+        "lon": -83.7358,
+        "lat": 10.3618
+      },
+      "center": [
+        -83.7358,
+        10.3618
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -84.181,
+        9.466,
+        -82.852,
+        10.959
+      ],
+      "place": 7478,
+      "country": "CR",
+      "localTrips": 1232645.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "pzz",
+      "name": "Perez Zeledon",
+      "kind": "zone",
+      "origin": {
+        "lon": -83.6896,
+        "lat": 9.3613
+      },
+      "center": [
+        -83.6896,
+        9.3613
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -84.176,
+        8.022,
+        -82.532,
+        9.786
+      ],
+      "place": 7479,
+      "country": "CR",
+      "localTrips": 1102113.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "sas",
+      "name": "San Salvador",
+      "origin": {
+        "lon": -89.0988,
+        "lat": 13.7226
+      },
+      "center": [
+        -89.0988,
+        13.7226
+      ],
+      "zoom": 11.2,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -89.629,
+        13.34,
+        -88.783,
+        14.083
+      ],
+      "place": 7480,
+      "country": "SV",
+      "localTrips": 8268425.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "sig",
+      "name": "San Miguel",
+      "kind": "zone",
+      "origin": {
+        "lon": -88.1808,
+        "lat": 13.4855
+      },
+      "center": [
+        -88.1808,
+        13.4855
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -88.833,
+        13.137,
+        -87.689,
+        14.019
+      ],
+      "place": 7483,
+      "country": "SV",
+      "localTrips": 3510580.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "ahc",
+      "name": "Ahuachpan",
+      "kind": "zone",
+      "origin": {
+        "lon": -89.8465,
+        "lat": 13.9189
+      },
+      "center": [
+        -89.8465,
+        13.9189
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -90.155,
+        13.475,
+        -89.465,
+        14.082
+      ],
+      "place": 7484,
+      "country": "SV",
+      "localTrips": 2305045.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "scf",
+      "name": "Santa Ana",
+      "kind": "zone",
+      "origin": {
+        "lon": -89.5573,
+        "lat": 13.9843
+      },
+      "center": [
+        -89.5573,
+        13.9843
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -89.765,
+        13.767,
+        -88.662,
+        14.47
+      ],
+      "place": 7485,
+      "country": "SV",
+      "localTrips": 2297458.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "juc",
+      "name": "Juticalpa",
+      "kind": "zone",
+      "origin": {
+        "lon": -86.2218,
+        "lat": 14.6638
+      },
+      "center": [
+        -86.2218,
+        14.6638
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -87.488,
+        14.027,
+        -84.981,
+        15.615
+      ],
+      "place": 7486,
+      "country": "HN",
+      "localTrips": 1838315.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "inb",
+      "name": "Intibuca",
+      "kind": "zone",
+      "origin": {
+        "lon": -88.172,
+        "lat": 14.3117
+      },
+      "center": [
+        -88.172,
+        14.3117
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -89.001,
+        13.83,
+        -87.823,
+        14.966
+      ],
+      "place": 7487,
+      "country": "HN",
+      "localTrips": 1628343.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "elg",
+      "name": "El Progreso",
+      "kind": "zone",
+      "origin": {
+        "lon": -87.7861,
+        "lat": 15.4096
+      },
+      "center": [
+        -87.7861,
+        15.4096
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -87.958,
+        14.856,
+        -86.209,
+        15.744
+      ],
+      "place": 7488,
+      "country": "HN",
+      "localTrips": 1618173.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "ssd",
+      "name": "Santa Rosa de Copan",
+      "kind": "zone",
+      "origin": {
+        "lon": -88.7823,
+        "lat": 14.7621
+      },
+      "center": [
+        -88.7823,
+        14.7621
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -89.376,
+        14.206,
+        -88.618,
+        15.313
+      ],
+      "place": 7489,
+      "country": "HN",
+      "localTrips": 1594857.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "hex",
+      "name": "Heres",
+      "kind": "zone",
+      "origin": {
+        "lon": -63.5565,
+        "lat": 8.1021
+      },
+      "center": [
+        -63.5565,
+        8.1021
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -64.314,
+        3.591,
+        -62.063,
+        8.343
+      ],
+      "place": 7490,
+      "country": "VE",
+      "localTrips": 1116453.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "zat",
+      "name": "Zacatecoluca",
+      "kind": "zone",
+      "origin": {
+        "lon": -88.8749,
+        "lat": 13.5018
+      },
+      "center": [
+        -88.8749,
+        13.5018
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -89.066,
+        13.233,
+        -88.467,
+        14.042
+      ],
+      "place": 7491,
+      "country": "SV",
+      "localTrips": 1356016.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "cmy",
+      "name": "Comayagua",
+      "kind": "zone",
+      "origin": {
+        "lon": -87.64,
+        "lat": 14.4672
+      },
+      "center": [
+        -87.64,
+        14.4672
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -88.256,
+        13.812,
+        -87.19,
+        15.075
+      ],
+      "place": 7492,
+      "country": "HN",
+      "localTrips": 2091493.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "clu",
+      "name": "Choluteca",
+      "kind": "zone",
+      "origin": {
+        "lon": -87.1863,
+        "lat": 13.3056
+      },
+      "center": [
+        -87.1863,
+        13.3056
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -87.839,
+        12.962,
+        -86.359,
+        14.014
+      ],
+      "place": 7493,
+      "country": "HN",
+      "localTrips": 2209566.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "lce",
+      "name": "La Ceiba",
+      "kind": "zone",
+      "origin": {
+        "lon": -86.7905,
+        "lat": 15.7788
+      },
+      "center": [
+        -86.7905,
+        15.7788
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -87.822,
+        15.401,
+        -86.343,
+        15.947
+      ],
+      "place": 7494,
+      "country": "HN",
+      "localTrips": 1566888.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "vla",
+      "name": "Villanueva",
+      "kind": "zone",
+      "origin": {
+        "lon": -87.9952,
+        "lat": 15.3112
+      },
+      "center": [
+        -87.9952,
+        15.3112
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -88.164,
+        14.773,
+        -87.712,
+        15.468
+      ],
+      "place": 7495,
+      "country": "HN",
+      "localTrips": 1012171.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "tca",
+      "name": "Tocoa",
+      "kind": "zone",
+      "origin": {
+        "lon": -86.0023,
+        "lat": 15.6557
+      },
+      "center": [
+        -86.0023,
+        15.6557
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -86.478,
+        14.597,
+        -83.112,
+        16.048
+      ],
+      "place": 7496,
+      "country": "HN",
+      "localTrips": 1182635.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "mcz",
+      "name": "Macuelizo",
+      "kind": "zone",
+      "origin": {
+        "lon": -88.236,
+        "lat": 14.919
+      },
+      "center": [
+        -88.236,
+        14.919
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -88.777,
+        14.624,
+        -87.975,
+        15.48
+      ],
+      "place": 7497,
+      "country": "HN",
+      "localTrips": 991484.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "pco",
+      "name": "Puerto Cortes",
+      "kind": "zone",
+      "origin": {
+        "lon": -87.9423,
+        "lat": 15.8445
+      },
+      "center": [
+        -87.9423,
+        15.8445
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -88.492,
+        15.495,
+        -87.7,
+        15.938
+      ],
+      "place": 7499,
+      "country": "HN",
+      "localTrips": 475045.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "paa",
+      "name": "Panama City",
+      "origin": {
+        "lon": -79.5399,
+        "lat": 8.963
+      },
+      "center": [
+        -79.5399,
+        8.963
+      ],
+      "zoom": 11.2,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -79.795,
+        8.55,
+        -78.771,
+        9.623
+      ],
+      "place": 7501,
+      "country": "PA",
+      "localTrips": 4989021.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "dvi",
+      "name": "DAVID (CAB.)",
+      "kind": "zone",
+      "origin": {
+        "lon": -82.4329,
+        "lat": 8.4269
+      },
+      "center": [
+        -82.4329,
+        8.4269
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -83.071,
+        7.953,
+        -81.139,
+        9.636
+      ],
+      "place": 7502,
+      "country": "PA",
+      "localTrips": 2411854.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "pnm",
+      "name": "PENONOMÉ",
+      "kind": "zone",
+      "origin": {
+        "lon": -80.354,
+        "lat": 8.5081
+      },
+      "center": [
+        -80.354,
+        8.5081
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -81.911,
+        7.185,
+        -79.974,
+        9.076
+      ],
+      "place": 7503,
+      "country": "PA",
+      "localTrips": 2084452.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "vst",
+      "name": "VISTA ALEGRE",
+      "kind": "zone",
+      "origin": {
+        "lon": -79.7132,
+        "lat": 8.9062
+      },
+      "center": [
+        -79.7132,
+        8.9062
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -80.195,
+        8.391,
+        -79.547,
+        9.201
+      ],
+      "place": 7504,
+      "country": "PA",
+      "localTrips": 1563546.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "cso",
+      "name": "CRISTOBAL",
+      "kind": "zone",
+      "origin": {
+        "lon": -79.8732,
+        "lat": 9.3369
+      },
+      "center": [
+        -79.8732,
+        9.3369
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -80.894,
+        8.605,
+        -79.48,
+        9.66
+      ],
+      "place": 7505,
+      "country": "PA",
+      "localTrips": 748519.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "trx",
+      "name": "TORTÍ",
+      "kind": "zone",
+      "origin": {
+        "lon": -78.3984,
+        "lat": 8.9224
+      },
+      "center": [
+        -78.3984,
+        8.9224
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -79.444,
+        7.204,
+        -77.14,
+        9.606
+      ],
+      "place": 7506,
+      "country": "PA",
+      "localTrips": 275196.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "mag",
+      "name": "Managua",
+      "origin": {
+        "lon": -86.3034,
+        "lat": 12.0973
+      },
+      "center": [
+        -86.3034,
+        12.0973
+      ],
+      "zoom": 11.2,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -86.549,
+        11.82,
+        -86.074,
+        12.812
+      ],
+      "place": 7507,
+      "country": "NI",
+      "localTrips": 4731144.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "msy",
+      "name": "Masaya (Municipio)",
+      "kind": "zone",
+      "origin": {
+        "lon": -86.0987,
+        "lat": 11.9831
+      },
+      "center": [
+        -86.0987,
+        11.9831
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -86.694,
+        11.026,
+        -85.131,
+        12.233
+      ],
+      "place": 7508,
+      "country": "NI",
+      "localTrips": 2395036.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "mue",
+      "name": "Municipio León",
+      "kind": "zone",
+      "origin": {
+        "lon": -86.8774,
+        "lat": 12.4318
+      },
+      "center": [
+        -86.8774,
+        12.4318
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -87.711,
+        11.972,
+        -86.266,
+        13.332
+      ],
+      "place": 7510,
+      "country": "NI",
+      "localTrips": 2269097.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "mus",
+      "name": "Municipio Puerto Cabezas",
+      "kind": "zone",
+      "origin": {
+        "lon": -83.3881,
+        "lat": 14.0334
+      },
+      "center": [
+        -83.3881,
+        14.0334
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -85.529,
+        13.002,
+        -83.11,
+        15.048
+      ],
+      "place": 7511,
+      "country": "NI",
+      "localTrips": 1600944.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "tip",
+      "name": "Tipitapa (Municipio)",
+      "kind": "zone",
+      "origin": {
+        "lon": -86.0971,
+        "lat": 12.1788
+      },
+      "center": [
+        -86.0971,
+        12.1788
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -86.216,
+        11.348,
+        -84.507,
+        12.819
+      ],
+      "place": 7514,
+      "country": "NI",
+      "localTrips": 1369629.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "stk",
+      "name": "Stann Creek West",
+      "kind": "zone",
+      "origin": {
+        "lon": -88.1975,
+        "lat": 17.4995
+      },
+      "center": [
+        -88.1975,
+        17.4995
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -89.247,
+        15.867,
+        -87.472,
+        18.514
+      ],
+      "place": 7516,
+      "country": "BZ",
+      "localTrips": 1037796.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "gla",
+      "name": "Glasgow",
+      "origin": {
+        "lon": -4.2605,
+        "lat": 55.8388
+      },
+      "center": [
+        -4.2605,
+        55.8388
+      ],
+      "zoom": 11.2,
+      "utcOffset": 0,
+      "market": -1,
+      "box": [
+        -4.932,
+        55.272,
+        -3.364,
+        56.103
+      ],
+      "place": 7517,
+      "country": "GB",
+      "localTrips": 5515479.0,
+      "realm": "uk-ie"
+    },
+    {
+      "id": "lis",
+      "name": "Lisbon",
+      "origin": {
+        "lon": -9.2991,
+        "lat": 38.7704
+      },
+      "center": [
+        -9.2991,
+        38.7704
+      ],
+      "zoom": 11.2,
+      "utcOffset": 0,
+      "market": -1,
+      "box": [
+        -9.524,
+        38.39,
+        -8.467,
+        39.083
+      ],
+      "place": 7518,
+      "country": "PT",
+      "localTrips": 8447520.0,
+      "realm": "iberia"
+    },
+    {
+      "id": "pot",
+      "name": "Porto",
+      "origin": {
+        "lon": -8.5568,
+        "lat": 41.2128
+      },
+      "center": [
+        -8.5568,
+        41.2128
+      ],
+      "zoom": 11.2,
+      "utcOffset": 0,
+      "market": -1,
+      "box": [
+        -8.813,
+        40.74,
+        -8.065,
+        41.49
+      ],
+      "place": 7519,
+      "country": "PT",
+      "localTrips": 4740707.0,
+      "realm": "iberia"
+    },
+    {
+      "id": "ist",
+      "name": "Istanbul",
+      "origin": {
+        "lon": 28.8675,
+        "lat": 41.0597
+      },
+      "center": [
+        28.8675,
+        41.0597
+      ],
+      "zoom": 11.2,
+      "utcOffset": 3,
+      "market": -1,
+      "box": [
+        28.046,
+        40.733,
+        29.778,
+        41.602
+      ],
+      "place": 7520,
+      "country": "TR",
+      "localTrips": 49580727.0,
+      "realm": "turkey"
+    },
+    {
+      "id": "yae",
+      "name": "Yalova merkez",
+      "kind": "zone",
+      "origin": {
+        "lon": 29.2786,
+        "lat": 40.6552
+      },
+      "center": [
+        29.2786,
+        40.6552
+      ],
+      "zoom": 10.5,
+      "utcOffset": 3,
+      "market": -1,
+      "box": [
+        28.755,
+        40.293,
+        29.583,
+        40.762
+      ],
+      "place": 7521,
+      "country": "TR",
+      "localTrips": 1252474.0,
+      "realm": "turkey"
+    },
+    {
+      "id": "kce",
+      "name": "Kocaeli",
+      "kind": "zone",
+      "origin": {
+        "lon": 29.7495,
+        "lat": 40.7719
+      },
+      "center": [
+        29.7495,
+        40.7719
+      ],
+      "zoom": 10.5,
+      "utcOffset": 3,
+      "market": -1,
+      "box": [
+        29.297,
+        40.505,
+        30.392,
+        41.236
+      ],
+      "place": 7522,
+      "country": "TR",
+      "localTrips": 3632613.0,
+      "realm": "turkey"
+    },
+    {
+      "id": "mee",
+      "name": "Medellín",
+      "origin": {
+        "lon": -75.5485,
+        "lat": 6.293
+      },
+      "center": [
+        -75.5485,
+        6.293
+      ],
+      "zoom": 11.2,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -75.876,
+        5.944,
+        -75.198,
+        6.548
+      ],
+      "place": 7523,
+      "country": "CO",
+      "localTrips": 13482499.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "crs",
+      "name": "Cartagena De Indias",
+      "kind": "zone",
+      "origin": {
+        "lon": -75.5068,
+        "lat": 10.4025
+      },
+      "center": [
+        -75.5068,
+        10.4025
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -76.209,
+        9.359,
+        -74.767,
+        10.82
+      ],
+      "place": 7524,
+      "country": "CO",
+      "localTrips": 4810365.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "yop",
+      "name": "Yopal",
+      "kind": "zone",
+      "origin": {
+        "lon": -72.3985,
+        "lat": 5.3449
+      },
+      "center": [
+        -72.3985,
+        5.3449
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -73.093,
+        4.267,
+        -69.417,
+        7.123
+      ],
+      "place": 7525,
+      "country": "CO",
+      "localTrips": 2129254.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "sux",
+      "name": "Sahagún",
+      "kind": "zone",
+      "origin": {
+        "lon": -75.447,
+        "lat": 8.9549
+      },
+      "center": [
+        -75.447,
+        8.9549
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -76.534,
+        7.339,
+        -74.766,
+        9.305
+      ],
+      "place": 7526,
+      "country": "CO",
+      "localTrips": 2152060.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "tuj",
+      "name": "Tunja",
+      "kind": "zone",
+      "origin": {
+        "lon": -73.363,
+        "lat": 5.5312
+      },
+      "center": [
+        -73.363,
+        5.5312
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -74.684,
+        4.637,
+        -71.925,
+        7.073
+      ],
+      "place": 7527,
+      "country": "CO",
+      "localTrips": 3503620.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "ccu",
+      "name": "Cúcuta",
+      "kind": "zone",
+      "origin": {
+        "lon": -72.5071,
+        "lat": 7.8748
+      },
+      "center": [
+        -72.5071,
+        7.8748
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -73.093,
+        6.854,
+        -72.031,
+        9.159
+      ],
+      "place": 7528,
+      "country": "CO",
+      "localTrips": 3951089.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "brc",
+      "name": "Barrancabermeja",
+      "kind": "zone",
+      "origin": {
+        "lon": -73.8576,
+        "lat": 7.0634
+      },
+      "center": [
+        -73.8576,
+        7.0634
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -74.545,
+        5.688,
+        -72.458,
+        8.162
+      ],
+      "place": 7529,
+      "country": "CO",
+      "localTrips": 2416511.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "vll",
+      "name": "Valledupar",
+      "kind": "zone",
+      "origin": {
+        "lon": -73.2494,
+        "lat": 10.4757
+      },
+      "center": [
+        -73.2494,
+        10.4757
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -74.159,
+        8.965,
+        -72.867,
+        10.886
+      ],
+      "place": 7530,
+      "country": "CO",
+      "localTrips": 3081328.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "mnr",
+      "name": "Montería",
+      "kind": "zone",
+      "origin": {
+        "lon": -75.8836,
+        "lat": 8.7518
+      },
+      "center": [
+        -75.8836,
+        8.7518
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -76.435,
+        8.245,
+        -75.561,
+        9.467
+      ],
+      "place": 7531,
+      "country": "CO",
+      "localTrips": 2965620.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "miz",
+      "name": "Manizales",
+      "kind": "zone",
+      "origin": {
+        "lon": -75.4884,
+        "lat": 5.0533
+      },
+      "center": [
+        -75.4884,
+        5.0533
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -75.941,
+        4.784,
+        -74.606,
+        5.798
+      ],
+      "place": 7532,
+      "country": "CO",
+      "localTrips": 2907794.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "viv",
+      "name": "Villavicencio",
+      "kind": "zone",
+      "origin": {
+        "lon": -73.6402,
+        "lat": 4.1463
+      },
+      "center": [
+        -73.6402,
+        4.1463
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -74.953,
+        0.876,
+        -69.976,
+        4.944
+      ],
+      "place": 7533,
+      "country": "CO",
+      "localTrips": 3399586.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "ccs",
+      "name": "Caucasia",
+      "kind": "zone",
+      "origin": {
+        "lon": -75.1987,
+        "lat": 7.9803
+      },
+      "center": [
+        -75.1987,
+        7.9803
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -76.941,
+        6.191,
+        -73.861,
+        8.218
+      ],
+      "place": 7534,
+      "country": "CO",
+      "localTrips": 2676835.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "sbo",
+      "name": "Santa Marta",
+      "kind": "zone",
+      "origin": {
+        "lon": -74.1922,
+        "lat": 11.2331
+      },
+      "center": [
+        -74.1922,
+        11.2331
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -74.504,
+        10.033,
+        -73.523,
+        11.368
+      ],
+      "place": 7535,
+      "country": "CO",
+      "localTrips": 2785352.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "scl",
+      "name": "Sincelejo",
+      "kind": "zone",
+      "origin": {
+        "lon": -75.4032,
+        "lat": 9.3125
+      },
+      "center": [
+        -75.4032,
+        9.3125
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -75.723,
+        8.258,
+        -74.514,
+        10.167
+      ],
+      "place": 7536,
+      "country": "CO",
+      "localTrips": 2686136.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "slg",
+      "name": "Sabanalarga",
+      "kind": "zone",
+      "origin": {
+        "lon": -74.9261,
+        "lat": 10.6304
+      },
+      "center": [
+        -74.9261,
+        10.6304
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -75.269,
+        8.898,
+        -73.779,
+        10.905
+      ],
+      "place": 7537,
+      "country": "CO",
+      "localTrips": 2338857.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "apr",
+      "name": "Apartadó",
+      "kind": "zone",
+      "origin": {
+        "lon": -76.6329,
+        "lat": 7.8829
+      },
+      "center": [
+        -76.6329,
+        7.8829
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -77.146,
+        7.114,
+        -76.171,
+        8.908
+      ],
+      "place": 7538,
+      "country": "CO",
+      "localTrips": 1543177.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "plm",
+      "name": "Palmira",
+      "kind": "zone",
+      "origin": {
+        "lon": -76.2942,
+        "lat": 3.523
+      },
+      "center": [
+        -76.2942,
+        3.523
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -76.631,
+        3.193,
+        -75.931,
+        4.086
+      ],
+      "place": 7539,
+      "country": "CO",
+      "localTrips": 1636496.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "snv",
+      "name": "Santa Cruz (Guachavés)",
+      "kind": "zone",
+      "origin": {
+        "lon": -77.673,
+        "lat": 1.2253
+      },
+      "center": [
+        -77.673,
+        1.2253
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -78.228,
+        0.342,
+        -77.069,
+        1.483
+      ],
+      "place": 7540,
+      "country": "CO",
+      "localTrips": 1030961.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "fle",
+      "name": "Florencia",
+      "kind": "zone",
+      "origin": {
+        "lon": -75.6051,
+        "lat": 1.6136
+      },
+      "center": [
+        -75.6051,
+        1.6136
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -76.324,
+        0.007,
+        -73.12,
+        2.952
+      ],
+      "place": 7541,
+      "country": "CO",
+      "localTrips": 1160928.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "jmu",
+      "name": "Jamundí",
+      "kind": "zone",
+      "origin": {
+        "lon": -76.5409,
+        "lat": 3.256
+      },
+      "center": [
+        -76.5409,
+        3.256
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -76.802,
+        2.686,
+        -76.033,
+        3.377
+      ],
+      "place": 7542,
+      "country": "CO",
+      "localTrips": 1369403.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "qub",
+      "name": "Quibdó",
+      "kind": "zone",
+      "origin": {
+        "lon": -76.6576,
+        "lat": 5.6852
+      },
+      "center": [
+        -76.6576,
+        5.6852
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -77.912,
+        3.946,
+        -75.984,
+        8.696
+      ],
+      "place": 7543,
+      "country": "CO",
+      "localTrips": 1445420.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "roe",
+      "name": "Rionegro",
+      "kind": "zone",
+      "origin": {
+        "lon": -75.3761,
+        "lat": 6.1552
+      },
+      "center": [
+        -75.3761,
+        6.1552
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -75.529,
+        5.4,
+        -74.516,
+        6.357
+      ],
+      "place": 7544,
+      "country": "CO",
+      "localTrips": 1558571.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "bna",
+      "name": "Buenaventura",
+      "kind": "zone",
+      "origin": {
+        "lon": -77.0026,
+        "lat": 3.8792
+      },
+      "center": [
+        -77.0026,
+        3.8792
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -77.568,
+        3.089,
+        -76.669,
+        4.253
+      ],
+      "place": 7545,
+      "country": "CO",
+      "localTrips": 915175.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "tma",
+      "name": "Tumaco",
+      "kind": "zone",
+      "origin": {
+        "lon": -78.7638,
+        "lat": 1.8077
+      },
+      "center": [
+        -78.7638,
+        1.8077
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -79.029,
+        0.986,
+        -77.287,
+        2.702
+      ],
+      "place": 7546,
+      "country": "CO",
+      "localTrips": 1345845.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "oca",
+      "name": "Ocaña",
+      "kind": "zone",
+      "origin": {
+        "lon": -73.3499,
+        "lat": 8.232
+      },
+      "center": [
+        -73.3499,
+        8.232
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -73.888,
+        7.511,
+        -72.854,
+        9.31
+      ],
+      "place": 7547,
+      "country": "CO",
+      "localTrips": 1708175.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "zip",
+      "name": "Zipaquira",
+      "kind": "zone",
+      "origin": {
+        "lon": -73.9964,
+        "lat": 5.029
+      },
+      "center": [
+        -73.9964,
+        5.029
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -74.788,
+        4.707,
+        -73.887,
+        5.855
+      ],
+      "place": 7548,
+      "country": "CO",
+      "localTrips": 1145222.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "gio",
+      "name": "Girardot",
+      "kind": "zone",
+      "origin": {
+        "lon": -74.7981,
+        "lat": 4.2921
+      },
+      "center": [
+        -74.7981,
+        4.2921
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -74.909,
+        4.18,
+        -74.251,
+        4.862
+      ],
+      "place": 7549,
+      "country": "CO",
+      "localTrips": 891012.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "fus",
+      "name": "Fusagasugá",
+      "kind": "zone",
+      "origin": {
+        "lon": -74.3618,
+        "lat": 4.3487
+      },
+      "center": [
+        -74.3618,
+        4.3487
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -74.574,
+        3.711,
+        -74.221,
+        4.446
+      ],
+      "place": 7550,
+      "country": "CO",
+      "localTrips": 581136.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "bug",
+      "name": "Bucaramanga",
+      "kind": "zone",
+      "origin": {
+        "lon": -73.1113,
+        "lat": 7.1201
+      },
+      "center": [
+        -73.1113,
+        7.1201
+      ],
+      "zoom": 10.5,
+      "utcOffset": -5,
+      "market": -1,
+      "box": [
+        -73.78,
+        6.706,
+        -72.799,
+        7.769
+      ],
+      "place": 7551,
+      "country": "CO",
+      "localTrips": 4249788.0,
+      "realm": "colombia"
+    },
+    {
+      "id": "caa",
+      "name": "Caracas",
+      "origin": {
+        "lon": -66.7992,
+        "lat": 10.492
+      },
+      "center": [
+        -66.7992,
+        10.492
+      ],
+      "zoom": 11.2,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -67.488,
+        10.038,
+        -66.673,
+        10.586
+      ],
+      "place": 7552,
+      "country": "VE",
+      "localTrips": 8624693.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "zmo",
+      "name": "Zamora",
+      "kind": "zone",
+      "origin": {
+        "lon": -66.545,
+        "lat": 10.4757
+      },
+      "center": [
+        -66.545,
+        10.4757
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -66.814,
+        9.919,
+        -65.412,
+        10.669
+      ],
+      "place": 7553,
+      "country": "VE",
+      "localTrips": 2546977.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "cbm",
+      "name": "Cabimas",
+      "kind": "zone",
+      "origin": {
+        "lon": -71.4557,
+        "lat": 10.4106
+      },
+      "center": [
+        -71.4557,
+        10.4106
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -71.611,
+        9.562,
+        -70.649,
+        10.999
+      ],
+      "place": 7554,
+      "country": "VE",
+      "localTrips": 2223742.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "clo",
+      "name": "Colón",
+      "kind": "zone",
+      "origin": {
+        "lon": -71.9131,
+        "lat": 8.9955
+      },
+      "center": [
+        -71.9131,
+        8.9955
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -73.372,
+        8.291,
+        -71.379,
+        10.642
+      ],
+      "place": 7555,
+      "country": "VE",
+      "localTrips": 1291121.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "mbm",
+      "name": "Mara",
+      "kind": "zone",
+      "origin": {
+        "lon": -71.738,
+        "lat": 10.9643
+      },
+      "center": [
+        -71.738,
+        10.9643
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -72.918,
+        10.338,
+        -71.305,
+        11.869
+      ],
+      "place": 7556,
+      "country": "VE",
+      "localTrips": 1209776.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "led",
+      "name": "Leonardo Infante",
+      "kind": "zone",
+      "origin": {
+        "lon": -66.0061,
+        "lat": 9.215
+      },
+      "center": [
+        -66.0061,
+        9.215
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -66.82,
+        7.61,
+        -64.754,
+        10.06
+      ],
+      "place": 7557,
+      "country": "VE",
+      "localTrips": 1009587.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "sck",
+      "name": "San Carlos",
+      "kind": "zone",
+      "origin": {
+        "lon": -68.5745,
+        "lat": 9.654
+      },
+      "center": [
+        -68.5745,
+        9.654
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -69.007,
+        8.515,
+        -67.975,
+        10.104
+      ],
+      "place": 7558,
+      "country": "VE",
+      "localTrips": 913981.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "crj",
+      "name": "Cristóbal Rojas",
+      "kind": "zone",
+      "origin": {
+        "lon": -66.8578,
+        "lat": 10.2478
+      },
+      "center": [
+        -66.8578,
+        10.2478
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -66.918,
+        10.136,
+        -66.73,
+        10.371
+      ],
+      "place": 7559,
+      "country": "VE",
+      "localTrips": 374277.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "auo",
+      "name": "Autónomo Atures",
+      "kind": "zone",
+      "origin": {
+        "lon": -67.6185,
+        "lat": 5.6609
+      },
+      "center": [
+        -67.6185,
+        5.6609
+      ],
+      "zoom": 10.5,
+      "utcOffset": -4,
+      "market": -1,
+      "box": [
+        -67.882,
+        4.088,
+        -66.365,
+        6.214
+      ],
+      "place": 7560,
+      "country": "VE",
+      "localTrips": 356355.0,
+      "realm": "venezuela"
+    },
+    {
+      "id": "teu",
+      "name": "Tegucigalpa",
+      "origin": {
+        "lon": -87.1655,
+        "lat": 14.058
+      },
+      "center": [
+        -87.1655,
+        14.058
+      ],
+      "zoom": 11.2,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -87.666,
+        13.666,
+        -86.689,
+        14.501
+      ],
+      "place": 7561,
+      "country": "HN",
+      "localTrips": 5513650.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "sap",
+      "name": "San Pedro Sula",
+      "origin": {
+        "lon": -88.0263,
+        "lat": 15.508
+      },
+      "center": [
+        -88.0263,
+        15.508
+      ],
+      "zoom": 11.2,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -88.554,
+        15.168,
+        -87.752,
+        15.779
+      ],
+      "place": 7562,
+      "country": "HN",
+      "localTrips": 4256378.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "dnl",
+      "name": "Danli",
+      "kind": "zone",
+      "origin": {
+        "lon": -86.5701,
+        "lat": 14.0334
+      },
+      "center": [
+        -86.5701,
+        14.0334
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -87.087,
+        13.744,
+        -85.55,
+        14.441
+      ],
+      "place": 7563,
+      "country": "HN",
+      "localTrips": 991325.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "rta",
+      "name": "Roatan",
+      "kind": "zone",
+      "origin": {
+        "lon": -86.4726,
+        "lat": 16.3454
+      },
+      "center": [
+        -86.4726,
+        16.3454
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -86.622,
+        15.934,
+        -85.796,
+        16.535
+      ],
+      "place": 7564,
+      "country": "HN",
+      "localTrips": 178147.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "mui",
+      "name": "Municipio de Jinotega",
+      "kind": "zone",
+      "origin": {
+        "lon": -86.0019,
+        "lat": 13.085
+      },
+      "center": [
+        -86.0019,
+        13.085
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -86.805,
+        12.976,
+        -84.809,
+        14.632
+      ],
+      "place": 7565,
+      "country": "NI",
+      "localTrips": 2185224.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "mio",
+      "name": "Municipio Matagalpa",
+      "kind": "zone",
+      "origin": {
+        "lon": -85.918,
+        "lat": 12.9298
+      },
+      "center": [
+        -85.918,
+        12.9298
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -86.32,
+        12.516,
+        -85.052,
+        13.365
+      ],
+      "place": 7566,
+      "country": "NI",
+      "localTrips": 1688073.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "miv",
+      "name": "Municipio Nueva Guinea",
+      "kind": "zone",
+      "origin": {
+        "lon": -84.4547,
+        "lat": 11.6895
+      },
+      "center": [
+        -84.4547,
+        11.6895
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -85.218,
+        10.689,
+        -82.98,
+        13.33
+      ],
+      "place": 7567,
+      "country": "NI",
+      "localTrips": 1433345.0,
+      "realm": "central-america"
+    },
+    {
+      "id": "mcs",
+      "name": "Municipio Estelí",
+      "kind": "zone",
+      "origin": {
+        "lon": -86.3568,
+        "lat": 13.085
+      },
+      "center": [
+        -86.3568,
+        13.085
+      ],
+      "zoom": 10.5,
+      "utcOffset": -6,
+      "market": -1,
+      "box": [
+        -86.789,
+        12.843,
+        -86.049,
+        13.682
+      ],
+      "place": 7568,
+      "country": "NI",
+      "localTrips": 1138373.0,
+      "realm": "central-america"
     }
   ]
 }

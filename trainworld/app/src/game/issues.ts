@@ -46,6 +46,7 @@ const TEXT: Record<string, () => string> = {
   InsertStop: () => t("issues.insertStop"),
   DropStop: () => t("issues.dropStop"),
   LineSchedule: () => t("issues.lineSchedule"),
+  StationCurveTight: () => t("issues.stationCurveTight"),
   SplitPoint: () => t("issues.splitPoint"),
   NodeInUse: () => t("issues.nodeInUse"),
   NoSuchEdge: () => t("issues.noSuchEdge"),
@@ -63,6 +64,7 @@ const TEXT: Record<string, () => string> = {
   "NoSingle:OneWay": () => t("issues.singleOneWay"),
   "NoSingle:Flyover": () => t("issues.singleFlyover"),
   // T-3332: one-track stations
+  NoWayBack: () => t("issues.noWayBack"),
   OneTrackStop: () => t("issues.oneTrackStop"),
   OneTrackHere: () => t("issues.oneTrackHere"),
   TrackFamily: () => t("issues.trackFamily"),
@@ -107,7 +109,9 @@ export function describeIssue(kind: string, buys?: Buys, vehicle: Vehicle = "tra
 /** a platform short of room at both ends says only the first of these it meets (T-1870) */
 const ROOM = ["PlatformStation", "PlatformJunction", "PlatformJoint", "PlatformTooLong"]; // i18n-ignore
 
-export function describeIssues(kinds: string[], buys?: Buys, vehicle: Vehicle = "train"): string {
+/** `station`: the issues of a station trial, which draws no track: a too-tight curve there is one the split piece keeps from the track (an imported curve) */
+export function describeIssues(kinds: string[], buys?: Buys, vehicle: Vehicle = "train", station = false): string {
+  if (station) kinds = kinds.map((k) => (k === "Geom:RadiusTooSmall" ? "StationCurveTight" : k));
   const room = ROOM.find((k) => kinds.includes(k));
   return [...new Set(kinds.filter((k) => !ROOM.includes(k) || k === room).map((k) => describeIssue(k, buys, vehicle)))].join(" ");
 }

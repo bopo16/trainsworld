@@ -57,7 +57,8 @@ impl TrackApi {
                 continue;
             }
             let i = e as usize;
-            let vmin = n.edge_pieces(e).iter().map(|p| p.v_curve()).fold(n.v_cap(e), f64::min);
+            // the track's own: the player's limit on it (T-3405) is not a curve
+            let vmin = n.edge_pieces(e).iter().map(|p| p.v_curve()).fold(n.v_kind_cap(e), f64::min);
             let zs = n.edge_vert(e).iter().map(|v| v[1]);
             let (lo, hi) = zs.fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), z| (a.min(z), b.max(z)));
             out.extend([e as f64, n.edge_a[i] as f64, n.edge_b[i] as f64, n.edge_tracks[i] as f64, n.edge_built[i] as u8 as f64, n.edge_len[i], n.edge_cost[i], vmin * 3.6, (lo / LEVEL_H).round(), (hi / LEVEL_H).round()]);
@@ -102,9 +103,9 @@ impl TrackApi {
         }
         out
     }
-    /// Per crossing of two edges at one height, 5 numbers: x, y, kind (0 flat, 1 bad), level (a
-    /// flat crossing's, else 0), built (1 when both its edges are constructed). For the map's
-    /// marks (T-629).
+    /// Per crossing of two edges at one height, 6 numbers: x, y, kind (0 flat, 1 bad), level (a
+    /// flat crossing's, else 0), built (1 when both its edges are constructed), tram tracks
+    /// (`Network::crossing_trams`, T-3062). For the map's marks (T-629).
     pub fn crossings_info(&self) -> Vec<f64> {
         let n = &self.w.net;
         let mut out = vec![];
@@ -115,12 +116,13 @@ impl TrackApi {
                 CrossKind::Overlap => continue,
             };
             let built = n.edge_built[c.e1 as usize] && n.edge_built[c.e2 as usize];
-            out.extend([c.x, c.y, kind, level, built as u8 as f64]);
+            out.extend([c.x, c.y, kind, level, built as u8 as f64, n.crossing_trams(c.e1, c.e2) as f64]);
         }
         out
     }
     /// Where the last route, edge or node-move preview makes a crossing or a flat junction:
-    /// x, y, kind (0 crossing, 1 junction) per mark (T-629).
+    /// x, y, kind (0 crossing, 1 junction), tram tracks of a crossing (`Network::crossing_trams`,
+    /// T-3535) per mark (T-629).
     pub fn preview_marks(&self) -> Vec<f64> {
         self.preview_marks.clone()
     }
@@ -202,10 +204,20 @@ impl TrackApi {
     pub fn line_back_path(&self, id: u32) -> Vec<u32> {
         let n = &self.w.net;
         let rail = n.line_bus.get(id as usize).map_or(true, |b| b.is_none()) && n.line_ferry.get(id as usize).map_or(true, |f| f.is_none());
-        if !n.line_ok(id) || !rail || n.line_runs_once(id) || n.line_path(id).iter().all(|&p| n.dir_ok(p ^ 1)) {
+        if !n.line_ok(id) || !rail || n.line_runs_once(id) {
             return vec![];
         }
-        n.back_path(id).unwrap_or_default()
+        let back = n.back_path(id).unwrap_or_default();
+        // T-3348: a return run to a one-track station beside may leave the path on two-way track too
+        if back.iter().eq(n.line_path(id).iter().rev().map(|p| p ^ 1).collect::<Vec<_>>().iter()) { vec![] } else { back }
+    }
+    /// T-3348: the stations the return run stops at, first stop to last (the order of `line_stops`),
+    /// where one is not the line's own stop (a platform on its own track beside it); else empty.
+    pub fn line_back_stops(&self, id: u32) -> Vec<u32> {
+        let Some(ls) = self.w.svc.lines.get(id as usize).filter(|l| l.ok && !l.is_bus()) else { return vec![] };
+        let n = ls.runs[1].stop_idx.len();
+        let back: Vec<u32> = (0..n).rev().filter_map(|k| ls.stop_node(1, k)).collect();
+        if back.len() != ls.stops.len() || back == ls.stops { vec![] } else { back }
     }
     /// Where each stop is along a run's path, m (the train's middle when standing).
     pub fn line_stop_s(&self, line: u32, run: usize) -> Vec<f64> {

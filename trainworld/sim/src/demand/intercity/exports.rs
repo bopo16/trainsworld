@@ -28,6 +28,10 @@ impl IntercityApi {
     pub fn set_span(&mut self, span: &[f32]) {
         self.span_in = span.to_vec();
     }
+    /// `DemandApi::set_back_stops` (T-3348).
+    pub fn set_back_stops(&mut self, back: &[u32]) {
+        self.back_in = back.to_vec();
+    }
     /// `DemandApi::set_bus` (T-1464), the points as longitude and latitude, as `set_network_ll`
     /// takes the stations.
     pub fn set_bus_ll(&mut self, catch_n: &[u32], catch_ll: &[f64]) {
@@ -135,7 +139,7 @@ impl IntercityApi {
         };
         let net = DemandApi::period_net(svc, q);
         let mut g = build_graph(&net, &p);
-        put_fares(&mut g, &self.fare_curve, &self.fare_km, &self.fare_mul, self.base.fare_min, self.fare_per_km, self.base.fare_w);
+        put_fares(&mut g, &self.fare_curve, &self.fare_km, &self.fare_mul, &self.base_mul, self.base.fare_min, self.fare_per_km, self.base.fare_w);
         let no_crowding = vec![1.0; g.rn_ride.len()];
         set_crowding(&mut g, &no_crowding);
         let (mut fac, mut uniform) = (no_crowding, true);
@@ -273,6 +277,16 @@ impl IntercityApi {
         }
         Ok(())
     }
+    /// T-3578: `DemandApi::set_base_mul`.
+    pub fn set_base_mul(&mut self, mul: &[f32]) -> Result<(), String> {
+        check_fare_mul(mul, self.svc.as_ref().map_or(0, |s| 2 * s.stops.len()))?;
+        let mul = if mul.iter().all(|&v| v == 1.) { &[][..] } else { mul };
+        if !same_bits(mul, &self.base_mul) {
+            self.base_mul = mul.to_vec();
+            self.per.iter_mut().for_each(|p| *p = None);
+        }
+        Ok(())
+    }
     /// T-1277: perceived minutes a dollar of the fares the market is given (`DemandApi::
     /// set_fare_weight`); before `set_fares`. The plane's fare weighs each departing country's
     /// own (`WorldIn::fare_w`).
@@ -386,6 +400,7 @@ impl IntercityApi {
         msa_w(&mut st.avg.entry, &l.entry, wf);
         msa_w(&mut st.avg.exit, &l.exit, wf);
         msa_w(&mut st.avg.rn_fare_x, &l.rn_fare_x, wf);
+        msa_w(&mut st.avg.rn_base_x, &l.rn_base_x, wf);
         st.rail += (rail - st.rail) * w;
         st.rail_d.toward(rail_d, w);
         st.corridors.toward(&cor, w);
@@ -565,8 +580,8 @@ impl IntercityApi {
     /// T-1008: per corridor, its longer trips a day; period `q`'s are these times `corridor_shares(q)[0]`.
     pub fn corridor_trips(&self) -> Vec<f64> {
         let mut out = vec![0f64; self.m.n_corridors()];
-        for (&c, &t) in self.m.cw.trips_at.iter().zip(&self.m.cw.trips) {
-            out[c as usize] = t;
+        for (c, t) in self.m.cw.with_trips() {
+            out[c] = t;
         }
         out
     }
@@ -600,6 +615,10 @@ impl IntercityApi {
     pub fn alight(&self, q: usize) -> Vec<f32> {
         self.per(q).map_or(vec![], |s| s.avg.rn_alight.clone())
     }
+    /// As `DemandApi::base_extra`.
+    pub fn base_extra(&self, q: usize) -> Vec<f32> {
+        self.per(q).map_or(vec![], |s| fare_x_usd(&s.avg.rn_base_x, self.base.fare_w))
+    }
     /// As `DemandApi::fare_extra`.
     pub fn fare_extra(&self, q: usize) -> Vec<f32> {
         self.per(q).map_or(vec![], |s| fare_x_usd(&s.avg.rn_fare_x, self.base.fare_w))
@@ -632,8 +651,9 @@ impl IntercityApi {
     /// commutes 4 per place, the trips with places that have no zone (2), then the far zones the
     /// selection reaches: their count, then each (global zone ascending) with its x, y and place and
     /// `SEL_Z` numbers.
-    pub fn selection_all_day(&self, market: u32, xy: &[f32], share: &[f32], day: u32, mask: u32) -> Vec<f64> {
-        self.selection(market, xy, share, day, mask, false).pack(&self.m)
+    /// `air`: the selection's airport terminals (T-3500), as `selection` takes them.
+    pub fn selection_all_day(&self, market: u32, xy: &[f32], share: &[f32], air: &[f32], day: u32, mask: u32) -> Vec<f64> {
+        self.selection(market, xy, share, air, day, mask, false).pack(&self.m)
     }
     /// T-1204: which corridors' figures this market reads; compositions of one world with rows
     /// (and their parts) share them, so `corridor_pairs`, `corridor_trips`, `commute_base` and

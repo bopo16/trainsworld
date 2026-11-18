@@ -183,7 +183,7 @@ pub(super) fn sweep(a: &mut TrackApi, step: f64) -> Sweep {
                 out.slid += 1;
             } else {
                 *out.left.entry(key.clone()).or_default() += 1;
-                if out.examples.len() < 400 && joints.iter().any(|j| *j == "plain") {
+                if out.examples.len() < 400 && joints.contains(&"plain") {
                     let (x, y, _) = geom::pos_at(a.w.net.edge_pieces(e), s);
                     out.examples.push(format!("edge {e} s {s:.0} ({x:.0},{y:.0}): {key}"));
                 }
@@ -223,7 +223,7 @@ fn kinked(y: f64) -> (TrackApi, [u32; 2]) {
     }
     let e = [a.new_edge_id(), a.new_edge_id()];
     for k in 0..2 {
-        let op = Op::Edge { id: e[k], data: Some(EdgeData { a: n[k], b: n[k + 1], tracks: 2, pis: vec![], built: false, off: false, thru: vec![], crossover: false, kind: TrackKind::Regular, sep: false, day: 0, oneway: 0, join: [0; 2] }) };
+        let op = Op::Edge { id: e[k], data: Some(EdgeData { a: n[k], b: n[k + 1], tracks: 2, pis: vec![], built: false, off: false, thru: vec![], crossover: false, kind: TrackKind::Regular, sep: false, day: 0, oneway: 0, join: [0; 2], limit: 0 }) };
         let r = a.w.apply(op);
         assert!(r.is_ok(), "y {y}: {:?}", r.err());
     }

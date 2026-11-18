@@ -100,6 +100,8 @@ export type EditOp =
   | { op: "doubleUp"; edge: EdgeId }
   /** single track run one way (`dir` 1 a to b, 2 b to a) or both (0), the lines that ran against it taking another way in the same edit (T-3094); refused with "OneWayNoWay:<line>" */
   | { op: "oneWay"; edge: EdgeId; dir: 0 | 1 | 2 | 3 }
+  /** T-3405: a speed limit on pieces of track, km/h, 0 for none; free */
+  | { op: "pieceLimit"; edges: EdgeId[]; kmh: number }
   | { op: "stationProps"; node: NodeId; platform: number; name: string }
   /** T-3332: a station's platforms on one track (`one`) or both; a constructed one pays the difference to both, nothing back to one */
   | { op: "stationTracks"; node: NodeId; one: boolean }
@@ -153,6 +155,15 @@ export type EditOp =
   | { op: "setTrainCount"; line: number; trains: [number, number, number] }
   /** T-625: the line's trains follow a headway in seconds per level (0: no service), or null: counts by hand */
   | { op: "setHeadway"; line: number; seconds: [number, number, number] | null }
+  /** T-3521: a line's weekends at a percent of its weekdays (`TrackApi.set_line_weekend_share`), its
+   * counts set by hand dropped. Undoable, and charged for the trains it makes the line need */
+  | { op: "weekendShare"; line: number; share: number }
+  /** T-3521: a line's whole trains on weekends set by hand, high, medium, low
+   * (`TrackApi.set_line_weekend_counts`) */
+  | { op: "weekendCounts"; line: number; counts: [number, number, number]; headways?: [number, number, number] }
+  /** T-3521: every line's weekends at a percent of its weekdays, as one edit
+   * (`TrackApi.set_weekend_share_all`) */
+  | { op: "weekendShareAll"; share: number }
   /** a field left out keeps the line's own as the worker has it now, so an edit never carries a stale
    * name, colour or symbol over one still on its way (T-1812); `letter` is the symbol set by hand, "" for none */
   | { op: "lineLook"; line: number; name?: string; colour?: string; letter?: string }
@@ -181,6 +192,8 @@ export type EditOp =
   /** T-2194: the fare multiplier on ferry lines */
   | { op: "fareFerry"; mul: number }
   | { op: "fareBus"; mul: number }
+  /** T-3567: line `line`'s own fare multiplier, 0 to 3 (1: none); refused for a line that is gone */
+  | { op: "fareLine"; line: number; mul: number }
   | { op: "fareTransfer"; usd: number }
   /** T-1661: take a loan of `amount` US$M (one of `LOAN_AMOUNTS`, none out), or pay off what is left of it; refused otherwise */
   | { op: "borrow"; amount: number }
@@ -228,6 +241,8 @@ export type ToClock =
   /** T-1196: the page reloads into another game: save the one in hand, keep `pending` (the game the
    * reloaded page opens, when not a slot) and let go of the slot; answered with "left" */
   | { kind: "leave"; pending?: PendingLoad }
+  /** T-3479: fetch the terrain and water that failed again now (the status tag clicked) */
+  | { kind: "retryGround" }
   /** the view's bounds in degrees after a move (T-302): water masks near it are fetched ahead, but
    * not those of `skip`, the zones of realms not shown (T-975) */
   | { kind: "view"; w: number; s: number; e: number; n: number; skip?: string[] }
@@ -331,6 +346,10 @@ export type ToClock =
   | { kind: "listOrder"; list: 0 | 1; ids: number[] }
   /** T-3319: a line's own bullet shape, null for its mode's; outside the undo history */
   | { kind: "lineShape"; line: string; shape: LineShape | null }
+  /** T-3543: the headways (seconds at high, medium, low) new lines start with, null for the game's counts; outside the undo history */
+  | { kind: "newHeadway"; seconds: import("./saveFile").NewHeadways }
+  /** T-3420: the line ids the player hid on the map; outside the undo history */
+  | { kind: "hideLines"; lines: string[] }
   /** `restore`: `key` is a backup's (T-744) */
   | { kind: "saveSlot"; action: "refresh" | "save" | "create" | "open" | "rename" | "delete" | "restore"; key?: string; name?: string }
   /** inspector queries (T-031), answered with "answer": a junction's moves
@@ -414,7 +433,7 @@ export interface MoneyState {
   economy: number;
   /** T-1661, T-2022: the loan out, null for none */
   loan: Loan | null;
-  fares: { base: number; perKm: number; nodes: [number, number][]; scales?: Record<string, number>; baseline?: string; basis?: "usd"; income?: number; hsr?: number; ferry?: number; bus?: number; transfer?: number };
+  fares: { base: number; perKm: number; nodes: [number, number][]; scales?: Record<string, number>; baseline?: string; basis?: "usd"; income?: number; hsr?: number; ferry?: number; bus?: number; transfer?: number; lines?: Record<string, number> };
   /** running cost per game hour at high, medium, low demand */
   runningPerHour: [number, number, number];
   /** recent game days, oldest first; the last is today so far (as of the last whole hour; the
@@ -424,6 +443,9 @@ export interface MoneyState {
   hours: HourLedger[];
   /** T-531: the same per region (a zone id; "" outside every zone) */
   regions: Record<string, { ledger: DayLedger[]; hours: HourLedger[] }>;
+  /** T-2787: each line's recent days, by line id: [day, fares, running cost] flattened, US$M, oldest
+   * first, the day now last (as of the last whole hour) */
+  lineDays: Record<string, number[]>;
   /** T-685: stars earned, per region the game second it was earned */
   stars: Record<string, number>;
   /** T-1437: the higher goals reached, per region and share (%) the game second it was reached */
@@ -465,6 +487,8 @@ export interface ClockEdge {
   /** US$M */
   cost: number;
   vminKmh: number;
+  /** T-3405: the player's speed limit on it, km/h (`TrackApi::edge_limits`); 0 none */
+  limit: number;
   levelMin: number;
   levelMax: number;
 }
@@ -544,6 +568,9 @@ export interface ClockLine {
   /** T-3117: the return run's path, last stop to first, where it is not `path` run backward (round
    * one-way track: a flyover's other leg) */
   back?: number[];
+  /** T-3348: the return run's stations, first stop to last, where one is a platform beside the
+   * line's own stop on the return run's track */
+  backStops?: number[];
   /** run 0, per demand level: arrival at each stop from the start, s */
   fromStart: number[][];
   stopS: [number[], number[]];
@@ -574,6 +601,12 @@ export interface ClockLine {
   oneWay: boolean;
   /** T-2987: the line's speed limit, km/h; 0 for none (`TrackApi::line_limit`) */
   limit: number;
+  /** T-3521: the line's weekends (`TrackApi::line_weekend`): its percent, 1 where its counts are set
+   * by hand, then its whole trains on weekends, high, medium, low; absent: the weekdays' at 100% */
+  weekend?: number[];
+  /** T-3521: the line's trains an hour on weekends, high, medium, low, as settled for them
+   * (`TrackApi::line_tph_rest`) */
+  restTph?: number[];
   /** T-3333: the switch to run on both pairs of quad track is on: 1 it runs on both (its counts,
    * rates and headways are one pair's, its hidden twin runs the other), 2 on one pair for now
    * (`TrackApi::line_pairs`) */
@@ -781,8 +814,8 @@ export type FromClock =
       legs?: Float64Array;
       /** the draw anchor version `verts`, `pts`, `arc` and `marks` are relative to (T-307) */
       anchor?: number;
-      /** where the track makes a crossing or a flat junction (T-629): x, y (local units), kind (0
-       * crossing, 1 junction), per mark */
+      /** where the track makes a crossing or a flat junction (T-629): x, y (local units), then 1 for a
+       * junction, or for a crossing its tram tracks as `packCross(0, trams)` (0, 0.1 or 0.2; T-3535), per mark */
       marks?: Float32Array;
     }
   | { kind: "state"; state: ClockState }
@@ -795,7 +828,8 @@ export type FromClock =
   | { kind: "trips"; version: number; epoch: number; trips: Float32Array; ends?: Float32Array; nexts?: Float32Array; bays?: Float32Array; board?: Float32Array; boardMs?: number; redone?: number; prepMs?: number; prepMax?: number }
   | { kind: "snapshot"; snapshot: NetworkSnapshot }
   /** T-2159: the network diagram's graph, after a network state while the diagram is shown */
-  | { kind: "diagramGraph"; graph: DiagramGraph; ms: number }
+  /** one graph per region of the network (T-3448), each in a frame of its own */
+  | { kind: "diagramGraph"; graphs: DiagramGraph[]; ms: number }
   /** money changed without a network change (an hour settled, fares set) */
   | { kind: "money"; money: MoneyState }
   /** T-284: the cash and today's ledger as fares land and running costs drain, several times a wall
@@ -833,6 +867,10 @@ export type FromClock =
   | { kind: "listOrder"; lines: number[]; stations: number[] }
   /** T-3319: the game's line shapes (`SaveHeader.shapes`), sent with "opened" and after a new line or a copy */
   | { kind: "lineShapes"; shapes: Record<string, LineShape> }
+  /** T-3543: the game's new-line headways (`SaveHeader.newHeadway`), sent with "opened" */
+  | { kind: "newHeadway"; seconds: import("./saveFile").NewHeadways }
+  /** T-3420: the game's hidden lines (`SaveHeader.hidden`), sent with "opened" and after a new line takes a hidden one's id */
+  | { kind: "hiddenLines"; lines: string[] }
   /** T-2395: the home of the game in hand (`SaveHeader.home`), sent with "opened" */
   | { kind: "home"; home: string | null }
   /** the save file, for the player to keep */
@@ -920,6 +958,9 @@ export interface SnapshotLine {
   name: string;
   /** station ids in order, first to last (run 0); run 1 is the same stops reversed */
   stops: number[];
+  /** T-3348: run 1's stations in `stops` order, where a stop's way back is at a platform beside it
+   * (`TrackApi.line_back_stops`, one-way track); absent where every stop is the same both ways */
+  backStops?: number[];
   /** trains an hour at high, medium, low demand (SPEC 6.3; periods in sim/src/track/params.rs) */
   tph: [number, number, number];
   /**

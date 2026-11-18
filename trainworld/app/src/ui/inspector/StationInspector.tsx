@@ -5,7 +5,7 @@ import { clock } from "../../game/clock";
 import { t as tr, tNumber } from "../../i18n";
 import { mobileDevice } from "../../workers/deviceMemory";
 import { lineDemand } from "../../game/demand";
-import { area, count, distance, duration, length, levelLabel, money, roughDistance } from "../../game/format";
+import { area, count, distance, duration, levelLabel, money, roughDistance } from "../../game/format";
 import { groundDist, groundScale } from "../../game/coords";
 import { outlineArea } from "../../game/buildings";
 import { buildingMembersById, buildingOf, hallWaiting } from "../../game/buildingView";
@@ -14,7 +14,7 @@ import { platformOffsets } from "../../game/complexes";
 import { passagePrice } from "../../game/upgrades";
 import type { LineInput, StationInput } from "../../game/types";
 import { complexOf, inComplexView, openAlone } from "../../game/complexView";
-import { complexNow, type ComplexNow } from "../../game/complexLive";
+import { complexNow, waitToward, type ComplexNow } from "../../game/complexLive";
 import { LINK_MAX_M } from "../../game/complexes";
 import { linking, linksAmong, unlink } from "../../game/links";
 import { selection, TRAM_PLATFORM } from "../../game/ui";
@@ -91,7 +91,8 @@ function complexRows(members: string[], lines: LineInput[], byId: Map<string, St
     const full = qs.some((q) => q.leftBehind) || (!!p && Math.max(p.side[0], p.side[1]) >= p.room);
     rows.push({
       station, lines: own.map((x) => x.l), built: station.built, waiting, full, boardings, today: todayB,
-      waitTip: waiting === null ? tr("stationInspector.noTrain", { vehicle }) : full ? tr("stationInspector.leftBehind", { vehicle }) : "",
+      waitTip: waiting === null ? tr("stationInspector.noTrain", { vehicle })
+        : [...waitToward(qs).map((w) => (w.to ? tr("complexMap.waitToward", { count: count(w.count), name: w.to }) : tr("complexMap.waitOpen", { count: count(w.count) }))), ...(full ? [tr("stationInspector.leftBehind", { vehicle })] : [])].join("\n"),
     });
   }
   rows.sort((a, b) => b.boardings - a.boardings || a.station.name.localeCompare(b.station.name));
@@ -222,7 +223,7 @@ export function StationInspector({ id }: { id: string }) {
   };
   const construct = async () => {
     const a = await edit({ op: "construct", edges: [], stations: [s.num] });
-    if (a.ok) say(tr("stationInspector.constructed", { name: s.name, price: money(a.charge * 1e6) }));
+    if (a.ok) say(tr("stationInspector.constructed", { name: (world.peek() && stationNames(world.peek()!).get(s.id)) || s.name, price: money(a.charge * 1e6) }));
   };
   // constructed: asks first above the bottom bar (T-096)
   const remove = () => void removeThing({ kind: "station", node: s.num });
@@ -243,7 +244,7 @@ export function StationInspector({ id }: { id: string }) {
           complex's list goes back to it from here */}
       {!asComplex && (
         <div class="sub muted">
-          {s.port ? tr("stationInspector.port") : tr("trackInspector.level", { level: levelLabel(s.level) })}
+          {s.port ? tr("stationInspector.port") : tr("stationInspector.sub", { level: levelLabel(s.level) })}
           {members.length > 1 && (
             <>
               {" · "}
@@ -257,9 +258,9 @@ export function StationInspector({ id }: { id: string }) {
       {asComplex && <div class="sub muted">{tr("stationInspector.complexOfN", { count: members.length })}</div>}
       {linking.value === id && <p class="muted">{tr(mobileDevice() ? "stationInspector.linkingTouch" : "stationInspector.linking", { distance: roughDistance(LINK_MAX_M) })}</p>}
       {!asComplex && !s.built && <Actions><button class="btn text" onClick={construct}>{tr(s.port ? "stationInspector.constructPort" : "stationInspector.constructStation")}</button></Actions>}
-      {/* T-2194: a port has no platform to upgrade */}
-      {!s.port && <div class="h">{tr("stationUpgrades.group")}</div>}
-      {!s.port && <StationUpgrades s={s} members={asComplex ? members : undefined} />}
+      {/* T-3419: a port takes the waiting room only; in a complex view its upgrades are the complex's */}
+      {(!s.port || !asComplex) && <div class="h">{tr("stationUpgrades.group")}</div>}
+      {(!s.port || !asComplex) && <StationUpgrades s={s} members={asComplex ? members : undefined} />}
       {asComplex ? (
         <ComplexSummary id={id} members={members} />
       ) : (

@@ -214,6 +214,14 @@ Web first, so it can be shared as a link.
   hour, and the demand level effects that follow the minute) catches up at the first frame back.
   Hours that pass hidden pay their fares evenly within the hour (no boarding hour was worked out for
   them), with the same whole-hour totals. Station faces and sounds stop while hidden either way.
+- **Editing while paused** [T-3427; `workers/demandClient.ts` `pauseHolds`]: with "Recalculate trips while
+  paused" off (Settings, on by default) and the game paused, the clock worker's network snapshots stop at the
+  demand client, the newest kept; edits still apply, draw and cost as usual. Pressing play (or turning the
+  setting back on) sends the newest one, so one solve covers every edit made meanwhile. A game's own load and a
+  network demand reads the same as the one in hand are never held. Meanwhile the shown figures are from before
+  the edits: edited lines keep their pending label, the status tag says "Trips recalculate when you unpause"
+  with no bar, and the edit note's profit estimate (`game/profitEstimate.ts`) still shows. A save made then
+  holds the edits; its demand cache is the older network's, so loading it solves afresh.
 
 ### Workers
 
@@ -232,7 +240,7 @@ Web first, so it can be shared as a link.
   when a newer route is asked or the pointer leaves real track.
 - **The demand pool** [T-149, T-173, `workers/demandClient.ts`][T-381]: 3 solving workers on 12 or more
   logical threads, 2 on 6 to 11, 1 on fewer; then a phone or tablet (by its user agent), or a device
-  of 4 GB or less, gets 1 (T-2794 adds the same check's lean ways: pixel ratio at most 2, compact outlines; notes/T-2794.md; T-2802: the WASM memories grow 8 MB at a time, not 32, notes/T-2802.md; a phone or tablet by user agent, not a 4 GB desktop, also has no demand cache and no market packs, so no trips between zones, unless Settings "Calculate intercity trips" is on, T-2833, T-2838; a device reporting 4 GB or less gets a note at the bottom of the map, T-2839, `ui/DeviceNote.tsx`) (`workers/deviceMemory.ts` `smallDevice`, T-2122: a phone's tab holds far
+  of 4 GB or less, gets 1 (T-2794 adds the same check's lean ways: pixel ratio at most 2, coarse outlines held only near the view; notes/T-2794.md; T-2802: the WASM memories grow 8 MB at a time, not 32, notes/T-2802.md; a phone or tablet by user agent, not a 4 GB desktop, also has no demand cache and no market packs, so no trips between zones, unless Settings "Calculate intercity trips" is on, T-2833, T-2838; a device reporting 4 GB or less gets a note at the bottom of the map, T-2839, `ui/DeviceNote.tsx`) (`workers/deviceMemory.ts` `smallDevice`, T-2122: a phone's tab holds far
   less than the phone, an iPhone's killed near 2 GB), and unreported memory (desktop Firefox, Safari)
   at most 2; a big game may then drop some by memory [T-1205, below]. Such a small device runs no
   focus pool ([demand-runtime.md](demand-runtime.md) "The focus pool"). The Settings "Use more cores" restores half the threads less one, 1 to 5
@@ -377,12 +385,23 @@ Web first, so it can be shared as a link.
   whose memory is at least 384 MB and 15% above its need is restarted through the panic path above,
   together and without counting as a panic; the network is solved once more, questions wait for that
   final, and a worker is not restarted again until its memory or need has moved by 384 MB. Before
-  each solve the pool drops solving workers while 0.6 GB for the page, each worker's need plus 0.7 GB
+  each solve the pool drops solving workers while 0.6 GB for the page, each worker's need plus 0.15 GB
   for its JS heap (or, on a cross-origin isolated page, `measureUserAgentSpecificMemory`'s measure of
   everything outside the WASM) would pass `memBudget`: 8 GB (Anita's target, T-1199), the device's
-  memory (`deviceGB`) x 0.75 under 8, 6 GB where it is not reported. The periods are dealt again (`periods`, taken up
-  between solves) and every worker composes afresh; no figure changes. It never grows back in a page
-  (T-1366). `?perfOff=cap` turns the shrinking off; check `t1205-memory.mjs`.
+  memory (`deviceGB`) x 0.75 under 8, 6 GB where it is not reported; or while the solving workers
+  together (need plus 0.15 GB each) would pass 17.5% of that budget (`SOLVING_SHARE`, T-3373: 1.4 GB on a
+  reported 8, so New York's real save runs 2 and all of China 1; memory over speed, Anita 2026-11-16; not with
+  Settings' "Use more cores" on, whose player chose speed). The
+  same test runs whenever a zone opens in a solving worker while no solve is out, and a loading save's pool is
+  cut before its packs open, by `memoryCheck`'s estimate of a worker for the zones its stations reach
+  (`capAhead`). The periods are dealt again (`periods`, taken up between solves) and every worker composes
+  afresh; no figure changes. The pool grows back (T-1366) once it is quiet, as for a restart: up to its size at
+  the start, to the most solving workers that fit 95% of both limits, each counted at the most any of them holds
+  or needs, and never within 2 minutes of its last change (doubled by each cut after a growth, so zones opening
+  and closing near the line cannot start and stop workers in turn). A new worker opens what the pool holds as a
+  replacement does and the network is solved once more. `?perfOff=cap` turns the shrinking off, `grow` the growing,
+  `?demandWorkers=N` sets the pool and keeps it (`auto`: the page's own rule, for a check whose core plan would
+  add one); check `t1205-memory.mjs`.
 
 ### Threads, pipeline and determinism
 
@@ -447,7 +466,10 @@ all results are recomputed. Sizes: notes/T-040.md, notes/T-567.md.
   like any other line's. Every zone's track, service and money is in the one
   network [T-116]. The header's `ledger`, `hours` and `regions` (per zone id, "" for outside every
   zone) hold the history charts' data, loaded back as they were, so a reload keeps the charts; money
-  is saved to the dollar and rides to a tenth. Ledger entries' `points` are whole points; the
+  is saved to the dollar and rides to a tenth. The header's `lineDays` [T-2787] keeps each line's last 8 days
+  of fares and running cost, by line id as flat `[day, fares, running]` triples to $100 (a line's panel
+  plots the 7 whole days; a deleted line's go with it at the next hour; absent in older saves, which
+  start empty; days after the save's clock are dropped on load, as settling pays them again). Ledger entries' `points` are whole points; the
   header's `stars` keeps each region's star, the game second it was earned; `achievements` each
   achievement step earned, by key, with its game second and what earned it (T-2124,
   [ui-panels.md](ui-panels.md) "Achievements"); `home` where the game opens, a zone id or `world` for all
@@ -528,8 +550,9 @@ all results are recomputed. Sizes: notes/T-040.md, notes/T-567.md.
   the account's) takes the name of the game it backs up and is a version of that game (T-2037,
   "Versions of one game" below). A tab without its slot's lock must make a copy before leaving a changed
   game. On a test page the game is replaced in the page and owns no slot. A slot that cannot be
-  read on start stays as it is (its bytes also under `unreadable-<time>`) and the new game gets a
-  slot of its own ("Game N"). The start menu's New game always takes a new slot, even with nothing
+  read on start stays as it is (its bytes also under `unreadable-<time>:<slot>`, deleted with the slot) and the new game gets a
+  slot of its own ("Game N"), with no sync record, so nothing of it is uploaded over the account's
+  copy; one that fails as damaged is marked so ("Damaged saves" below). The start menu's New game always takes a new slot, even with nothing
   saved (T-728); the original slot `autosave` is only ever an old one.
 - **Real networks** [T-731]: `packs/real/<id>.save` for New York, London, Paris, Tokyo, Seoul,
   Toronto and Sendai, made by hand from timetables, and [T-3225] the cities in `pipeline/realauto.json`
@@ -566,12 +589,30 @@ all results are recomputed. Sizes: notes/T-040.md, notes/T-567.md.
   about 1 h 10 min), a day and a week of wall time, and backups only follow changes. Past 8 MB in
   all for a slot's tiers the oldest are dropped (tier 0 always stays; a save is usually about
   100 KB). Before the account's copy replaces a slot (`writeFetched`: a newer copy taken in, after
-  giving way, or the slot's side of a fork) the slot as it was goes to `backup:<slot>:pull`.
+  giving way, or the slot's side of a fork) the slot as it was goes to `backup:<slot>:pull`, unless it
+  fails the save check (then it goes to `unreadable-<at>:<slot>`, never into a backup, and is deleted with the slot) [T-3395].
+  `backup:<slot>:good` is the newest copy known to pass the check, outside the tiers and the 8 MB
+  trim: each tier 0 write (or any backup write while it is missing) puts the autosave there too, and a
+  pull that passes and is newer replaces it. It is listed only for a damaged slot.
   Backups from before T-1826 (`:0`, `:1`) seed the tiers at the next backup write. Each slot's
   backups, and the account's of each of its game's account games, are listed among the card's other
   versions (T-2037; ui-panels.md "Saved games"); opening one makes a new slot, a version of the same
   game. A backup keeps the slot's `origin` and `edit`. Deleting a slot deletes them. `?backupMs=`
   sets the 10-minute step for checks, the others scaled with it.
+- **Damaged saves** [T-3395; `checkSave` in workers/saveFile.ts]: the check unpacks the gzip to its end
+  with its checksum, reads the header and, in the clock worker only (the main thread has no track
+  model), decodes the network (`TrackApi.save_stations`). A gzip that fails, a header cut short or a
+  network that does not decode is damaged ("This save is damaged."); no save at all, or one from a newer or
+  retired version, is not, and is left as it is. A check that itself fails (the codec worker does not load,
+  memory runs out) is "unchecked": nothing is marked, kept aside or uploaded, the slot is backed up as before,
+  and a later check tries again; a file opened that way says the load failed (or ran out of memory). A slot found damaged (its load failed so, or the account
+  refused it) is marked `damaged` on its record, bytes unchanged, until it is next written; its newest
+  backup that passes becomes its good copy (`rescueGood`). A damaged slot is never uploaded. Its card
+  says it is damaged, and its other versions start open with the last undamaged copy first: the newer of
+  its good copy and the account's pinned copy (`GET .../pinned`, shonei-server's docs/trainworld-api.md),
+  opened as a new version of the game ("Open a copy") like a backup, the damaged slot kept. With
+  neither, the card says "No undamaged copy of this game is left", except for an account game whose
+  current rev has no `check` (stored before the server's check: its missing pin says nothing yet).
 - **Versions of one game** [T-2037, T-2030; `workers/versions.ts`]: every slot record carries
   `origin`, the id of the game it descends from, and `edit`, the wall time of the latest player
   change in its bytes (an edit, a list order, sandbox: wherever the clock worker marks `edited`; the
@@ -701,11 +742,18 @@ all results are recomputed. Sizes: notes/T-040.md, notes/T-567.md.
     T-2030), at most every 2 wall minutes (`GAP_MS`), a timer sending what the gap held back; the
     page hiding sends at once (best effort) on the same terms. The clock's own saves go up with the
     next player change. A save over 4 MB is never sent (the server closes the connection past 4.6 MB).
+    Every upload checks the slot's bytes first (`checkSave`, once per written copy; in the clock worker with
+    the network decode), whatever the server: a damaged copy is marked and never sent, with the note "This
+    copy is damaged, so your account kept the last good one"; one that could not be checked waits for the
+    next try. A 422 `damaged` (a server with `trainworldSaveCheck`, for damage only its check sees, such as
+    a network cut inside a whole gzip sent from the main thread) leaves the slot as it is: its record keeps
+    the refused copy's `at` (`refused`) and the same note, that copy is never sent again, and the slot is
+    checked here [T-3395].
   - **On load**: the start menu settles every slot it can lock before the worker starts
     (`settleOnStart`), and the worker again on start and on `online` (`settleSlot`): a slot with a
     player change here goes up; one without (the clock's saves at most) takes a newer account copy
-    (slot record from the server's facts and picture, nothing decoded; what it held goes to its
-    `pull` backup); one the account deleted (a tombstone) is deleted if it has no player change
+    (slot record from the server's facts and picture; its bytes pass the check first, else the slot is
+    left as it is and the game is listed as damaged, T-3395; what it held goes to its `pull` backup); one the account deleted (a tombstone) is deleted if it has no player change
     here, else kept as a new account game; deletions made here while offline are sent. The game
     opened is claimed (`claim`); a slot with no player change here behind the account is replaced
     in place (`loadGame` through the game's message queue).

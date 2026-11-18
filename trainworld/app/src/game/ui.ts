@@ -13,6 +13,7 @@ import type { PurposeFilter } from "./purposes";
 import { LEVELS, type BubbleEnd, type Level, type Selection } from "./types";
 import { isLineShape, MODE_SHAPES, type LineShape } from "./lineShape";
 import type { Vehicle } from "./vehicle";
+import type { SnapMode } from "./realFollow";
 
 export type Tab = "build" | "lines" | "stations" | "money" | "cities" | "settings";
 /** Tabs a remembered choice can name. */
@@ -48,16 +49,13 @@ export interface DisplaySettings {
   basemapLabels: boolean;
   /** T-682: faint real-world rail lines from noritetsu's tiles, under the network (map/realNetwork.ts) */
   realNetwork: RealNetworkShown;
+  /** T-3570: small rings on the real stations while the real network shows (map/realStations.ts); off by default */
+  realStations: boolean;
   /** station use circles (T-482): translucent circles behind platforms, area by the riders a day
    * starting a rail trip there, changing lines there, or both (all boardings); or none */
   stationUse: StationUseMode;
   /** T-1448: the map's upper left rows folded down to their icon ("bubbles", "stations", "track") */
   foldedRows: MapRow[];
-  /** trains filled by how full they are: each train's own load from the boarding account (T-164) */
-  trainLoad: boolean;
-  /** riders waiting on platforms (T-164), drawn as each platform filling up (T-219), or not
-   * ("off"). "dots" is the T-164 option T-219 dropped, kept in older browsers' settings: on. */
-  platformCrowds: "patch" | "dots" | "off";
   /** T-686: sound at stations (a chime for an arriving train, pops for riders getting on and off),
    * from the zoom where platforms are drawn; the volume, 0-1 */
   sound: boolean;
@@ -97,6 +95,9 @@ export interface DisplaySettings {
   moreCores: boolean;
   /** T-826: the clock keeps running while the page is hidden (game/clock.ts) */
   runInBackground: boolean;
+  /** T-3427: edits made while the game is paused start a demand solve; off, one solve covers them once
+   * the game runs (workers/demandClient.ts `pauseHolds`) */
+  recalcWhilePaused: boolean;
   /** T-033: the map as the flat map or as a globe (MapLibre's, flat again from zoom 12) */
   projection: "flat" | "globe";
   /** T-3249: satellite imagery under the game instead of the drawn basemap (map/basemap.ts `setSatellite`) */
@@ -110,6 +111,9 @@ export interface DisplaySettings {
   hillshade: boolean;
   /** T-2031: a right-button drag turns the map (map/mapView.ts `followRotation`) */
   rotateMap: boolean;
+  /** T-3480: a bus route drives a one-way street only the way it runs (map/busRoads.ts, map/roadGraph.ts); off, any
+   * street runs both ways. Renkon's change (open-source PR 1). */
+  busOneWay: boolean;
   /** T-3268: the plus and minus buttons at the map's right edge (ui/ZoomButtons.tsx) */
   zoomButtons: boolean;
   /** T-2660: the timetable chart draws other lines' trains where they share its track or cross it */
@@ -137,10 +141,9 @@ const DEFAULT_DISPLAY: DisplaySettings = {
   basemapLabels: true,
   // T-727: faint by default, so the track to snap to is always in sight
   realNetwork: "passenger",
+  realStations: false,
   stationUse: "none",
   foldedRows: [],
-  trainLoad: true,
-  platformCrowds: "patch",
   sound: true,
   soundVolume: 0.6,
   faces: true,
@@ -159,13 +162,15 @@ const DEFAULT_DISPLAY: DisplaySettings = {
   currency: defaultCurrency(),
   moreCores: false,
   runInBackground: false,
+  recalcWhilePaused: true,
   projection: "flat",
   satellite: false,
   lineWidth: 1,
   basemapContrast: 1,
-  hillshade: false,
+  hillshade: true,
   rotateMap: false,
   zoomButtons: true,
+  busOneWay: false,
   chartOtherLines: true,
   mobileIntercity: false,
   modeShapes: { ...MODE_SHAPES },
@@ -186,9 +191,9 @@ export interface DockLayout {
 /** The stored settings' version: 2 since complex view became the default (T-192), 3 since Nunito and
  * 90% did (T-703), 4 since the real network did (T-727), 5 since the ramp went red to blue (T-812), 6 since Train share became the bubble colouring (T-833), 7 since keep placing is on by default (T-942), 8 since unopened zones' dots are light grey (T-976). Settings stored before a version had
  * saved the old default with everything else, so that setting is dropped once and the new default applies; 9 since the ramp's ends are lighter (T-1138); 10 since the track display starts on Line (T-1244); 11 since the station circles start off (T-1585); 12 since lines side by side are on (T-2346); 13 since everyone starts on High map detail (T-2840); 14 since the currency starts from the browser's region (T-2860). */
-const VERSION = 14;
+const VERSION = 15;
 
-function load(): Partial<{ tab: Tab; theme: Theme; shade: Shade; display: Partial<DisplaySettings>; dock: DockLayout; build: Partial<{ level: Level; ramp: boolean; tracks: 1 | 2 | 4; hsr: boolean; tram: boolean; keep: boolean; snap: boolean; streets: boolean; roads: boolean; beside: boolean; design: number; fly: number; advanced: boolean; platform: number; tramPlatform: number; oneTrack: boolean }>; guide: boolean; v: number }> {
+function load(): Partial<{ tab: Tab; theme: Theme; shade: Shade; display: Partial<DisplaySettings>; dock: DockLayout; build: Partial<{ level: Level; ramp: boolean; tracks: 1 | 2 | 4; hsr: boolean; tram: boolean; keep: boolean; snap: boolean; tramSnap: boolean; streets: boolean; roads: boolean; beside: boolean; design: number; fly: number; advanced: boolean; platform: number; tramPlatform: number; oneTrack: boolean }>; guide: boolean; v: number }> {
   try {
     return JSON.parse(localStorage.getItem(STORE) || "{}");
   } catch {
@@ -196,12 +201,12 @@ function load(): Partial<{ tab: Tab; theme: Theme; shade: Shade; display: Partia
   }
 }
 const saved = load();
-const oldDisplay = saved.display as (Partial<DisplaySettings> & { lineLoad?: boolean; intercity?: boolean; stationRiders?: boolean; unbuiltColour?: string; trainLoadBasis?: string; complexView?: boolean; font?: unknown }) | undefined;
+const oldDisplay = saved.display as (Partial<DisplaySettings> & { lineLoad?: boolean; intercity?: boolean; stationRiders?: boolean; unbuiltColour?: string; trainLoadBasis?: string; complexView?: boolean; font?: unknown; trainLoad?: boolean; platformCrowds?: string }) | undefined;
 // `lineLoad` (the old width checkbox) and `intercity` (hide the longer-trip bubbles) are no longer settings (T-222), nor `stationRiders`
 // (the demand circles, T-482), nor `unbuiltColour` (T-1120), nor `trainLoadBasis` (T-164), nor
 // `complexView` (one ridership circle per station complex is the only way since T-1449), nor `font`
-// (Nunito is the only font, T-1524): dropped from storage
-const { lineLoad: _lineLoad, intercity: _intercity, stationRiders: _stationRiders, unbuiltColour: _unbuiltColour, trainLoadBasis: _trainLoadBasis, complexView: _complexView, font: _font, ...migratedDisplay } = oldDisplay ?? {};
+// (Nunito is the only font, T-1524), nor `trainLoad` and `platformCrowds` (train and platform fullness are always drawn, T-3579): dropped from storage
+const { lineLoad: _lineLoad, intercity: _intercity, stationRiders: _stationRiders, unbuiltColour: _unbuiltColour, trainLoadBasis: _trainLoadBasis, complexView: _complexView, font: _font, trainLoad: _trainLoad, platformCrowds: _platformCrowds, ...migratedDisplay } = oldDisplay ?? {};
 // T-703: the size default changed, and settings stored before had saved the old one with
 // everything else, so it is dropped once
 if ((saved.v ?? 1) < 3) delete migratedDisplay.uiScale;
@@ -224,6 +229,8 @@ if ((saved.v ?? 1) < 11) delete migratedDisplay.stationUse;
 if ((saved.v ?? 1) < 12) delete migratedDisplay.lineBands;
 // T-2860: the currency now starts from the browser's region; every earlier player has USD stored, chosen or not, so it is dropped once (a stored other currency stays)
 if ((saved.v ?? 1) < 14 && migratedDisplay.currency === "USD") delete migratedDisplay.currency;
+// Terrain shading became the default (Anita, 2026-11-17); the old default (off) was stored, so it is dropped once
+if ((saved.v ?? 1) < 15) delete migratedDisplay.hillshade;
 // T-1244: Traffic, the default until T-1101, was stored with everything else; Elevation and Max speed stay
 const trackColour = (saved.v ?? 1) < 10
   ? oldDisplay?.trackColour === "height" || oldDisplay?.trackColour === "speed" ? oldDisplay.trackColour : DEFAULT_DISPLAY.trackColour
@@ -236,8 +243,8 @@ export const selection = signal<Selection>(null);
  * nothing is stored, so the player's own come back on the next ordinary load. */
 export const VIDEO = new URLSearchParams(location.search).get("video") === "1";
 const VIDEO_DISPLAY: Partial<DisplaySettings> = {
-  trackColour: "line", trains: true, stationNames: false, capacity: false, basemapLabels: false, realNetwork: "none",
-  stationUse: "none", commuters: false, trainLoad: false, platformCrowds: "patch", sound: true,
+  trackColour: "line", trains: true, stationNames: false, capacity: false, basemapLabels: false, realNetwork: "none", realStations: false,
+  stationUse: "none", commuters: false, sound: true,
 };
 
 // T-3319: each mode's stored shape kept where it is one, the rest from the defaults
@@ -354,9 +361,12 @@ export const keepPlacing = signal((saved.v ?? 1) < 7 || saved.build?.keep !== fa
 /** T-727: the track tool snaps to the real network (noritetsu's lines); while it does, the layer is
  * drawn at full strength */
 export const snapReal = signal(saved.build?.snap === true);
+/** T-3069: tram track snaps to the real network's tram and light rail; its own switch, so a browser's
+ * rail snap leaves the street snap alone. Off by default; it and Snap to streets exclude each other. */
+export const snapRealTram = signal(saved.build?.tramSnap === true);
 /** T-2927: tram track drawn with the track tool follows the streets (street tram track); on unless
  * turned off, and flipped while Ctrl is held (tools.ts) */
-export const snapStreets = signal(saved.build?.streets !== false && !(saved.build?.tram === true && saved.build?.tracks === 4));
+export const snapStreets = signal(saved.build?.streets !== false && saved.build?.tramSnap !== true && !(saved.build?.tram === true && saved.build?.tracks === 4));
 /** T-3129: rail track drawn with the track tool follows the main roads; off by default, and off whenever the real
  * network or beside track is snapped to (the three exclude each other in the bar) */
 export const snapRoads = signal(saved.build?.roads === true && saved.build?.snap !== true && saved.build?.beside !== true);
@@ -455,10 +465,12 @@ export function setTrackType(t: TrackType) {
     }
   });
 }
-/** the real network is being snapped to: the switch on and the track tool in hand */
-/** T-3049: Snap beside is moot while tram track follows the streets, so its switch is hidden and the stored choice kept */
-export const besideOn = computed(() => snapBeside.value && !(tramTrack.value && snapStreets.value));
-export const snapping = computed(() => snapReal.value && tool.value === "track" && !tramTrack.value);
+/** T-3049: Snap beside is moot while tram track follows the streets, so its switch is hidden and the stored choice kept;
+ * T-3069: off too while tram track snaps to the real network (the rail bar's beside switch clears only the rail snap) */
+export const besideOn = computed(() => snapBeside.value && !(tramTrack.value && (snapStreets.value || snapRealTram.value)));
+/** the real network is being snapped to, by which track type: its switch on and the track tool in hand (T-3069) */
+export const snapMode = computed<SnapMode | null>(() => (tool.value !== "track" ? null : tramTrack.value ? (snapRealTram.value ? "tram" : null) : snapReal.value ? "rail" : null));
+export const snapping = computed(() => snapMode.value !== null);
 
 /** The day every demand view shows (T-260, T-464): the setting, the average day by default. Away,
  * Out and Back read as the average while no superholiday is near (T-264, T-1373). */
@@ -507,7 +519,7 @@ if (typeof window !== "undefined") {
 void loadNunito().then(() => document.dispatchEvent?.(new Event("tw-fontchange")));
 effect(() => {
   if (VIDEO) return; // T-2774
-  const s = { tab: tab.value, theme:theme.value, shade: shade.value, display: display.value, dock: dockLayout.value, build: { level: buildLevel.value, ramp: autoRamp.value, hsr: highSpeed.value, tram: tramTrack.value, tracks: countPicked.value, keep: keepPlacing.value, snap: snapReal.value, streets: snapStreets.value, roads: snapRoads.value, beside: snapBeside.value, design: designSpeed.value, fly: flyoverSpeed.value, advanced: buildAdvanced.value, platform: buildPlatform.value, tramPlatform: buildTramPlatform.value, oneTrack: stationOneTrack.value }, guide: guideFinished.value, v: VERSION };
+  const s = { tab: tab.value, theme:theme.value, shade: shade.value, display: display.value, dock: dockLayout.value, build: { level: buildLevel.value, ramp: autoRamp.value, hsr: highSpeed.value, tram: tramTrack.value, tracks: countPicked.value, keep: keepPlacing.value, snap: snapReal.value, tramSnap: snapRealTram.value, streets: snapStreets.value, roads: snapRoads.value, beside: snapBeside.value, design: designSpeed.value, fly: flyoverSpeed.value, advanced: buildAdvanced.value, platform: buildPlatform.value, tramPlatform: buildTramPlatform.value, oneTrack: stationOneTrack.value }, guide: guideFinished.value, v: VERSION };
   try {
     localStorage.setItem(STORE, JSON.stringify(s));
   } catch {

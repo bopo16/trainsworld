@@ -128,7 +128,7 @@ impl TrackApi {
                     net.edge_len[ei]
                 };
                 let len = (reach + 10.0).min(room).max(reach + 1.0);
-                let d = EdgeData { a: n, b: 0, tracks: net.edge_tracks[ei], pis: vec![], built: net.edge_built[ei], off: net.edge_off[ei], thru: vec![], crossover: false, kind: net.edge_kind[ei], sep: net.edge_sep[ei], day: net.edge_day[ei], oneway: net.edge_oneway[ei], join: [0; 2] };
+                let d = EdgeData { a: n, b: 0, tracks: net.edge_tracks[ei], pis: vec![], built: net.edge_built[ei], off: net.edge_off[ei], thru: vec![], crossover: false, kind: net.edge_kind[ei], sep: net.edge_sep[ei], day: net.edge_day[ei], oneway: net.edge_oneway[ei], join: [0; 2], limit: net.edge_limit[ei] };
                 let k = len * kk(net.frame().scaled(), y);
                 let (m, id) = (self.w.net.alloc_node(), self.w.net.alloc_edge());
                 nn.push(m);
@@ -197,7 +197,9 @@ impl TrackApi {
             ports.dedup();
             return Some((vec![], ports, vec![line]));
         }
-        Some((net.line_path(line).iter().map(|&p| p >> 1).collect(), net.line_stops(line).to_vec(), vec![]))
+        let mut edges: Vec<u32> = net.line_path(line).iter().map(|&p| p >> 1).collect();
+        edges.extend(net.back_only_edges(line));
+        Some((edges, net.line_stops(line).to_vec(), vec![]))
     }
 
     pub(super) fn construct_ops(&self, edges: &[u32], stations: &[u32], buses: &[u32]) -> Vec<Op> {

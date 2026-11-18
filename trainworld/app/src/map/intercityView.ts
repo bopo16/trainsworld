@@ -24,6 +24,7 @@
 // meanwhile.
 
 import { t as tr } from "../i18n";
+import { shareOf } from "../game/corridorShares";
 import { tPlace } from "../i18n/places";
 import { computed, effect, signal } from "@preact/signals";
 import { mapBlank, zoneLoads } from "../game/loading";
@@ -45,6 +46,7 @@ import { anchorVersion } from "./anchorVersion";
 import { localModes, modeBar, purposeLines } from "./modeBar";
 import { addFinder, discAt, pointerAt } from "./demandHover";
 import { BUBBLE_BASE, bubbleLevel, LINE, splitEdge, type DemandOverlay } from "./demandOverlay";
+import { labelFont, type LabelFont } from "./labelLayout";
 import { anchor, kAtLat, pxPerUnitAt, toLocal, toLngLat, type Anchor } from "./geo";
 import { hiddenOnGlobe } from "./live";
 import { perfOff } from "../perfFlags";
@@ -207,7 +209,7 @@ function totalsOf(t: CorridorTable): Float64Array {
   m = new Float64Array(Z * 3);
   for (let j = 0; j < t.n; j++) {
     const [a, b] = ends(t.from[j], t.to[j]);
-    const l = t.longer[j], f = l * t.air[j];
+    const l = t.longer[j], f = l * shareOf(t.air[j]);
     if (a >= 0) { m[3 * a] += l; m[3 * a + 2] += f; }
     if (b >= 0) { m[3 * b] += l; m[3 * b + 2] += f; }
   }
@@ -222,12 +224,20 @@ function totalsOf(t: CorridorTable): Float64Array {
 
 /** The market's trips a day for the city view: each zone place's with every other place of the
  * market (`totals`), all modes, by train and (T-378) by plane; and a zone place's with each other
- * zone place (`row`, worked out when a zone is selected). */
-interface MarketPairs { c: Corridors; totals: Float64Array; rows: Map<number, Float64Array> }
-function pairs(c: Corridors): MarketPairs {
-  const b = totalsOf(c.table), totals = new Float64Array(Z * 3);
+ * zone place (`row`, worked out when a zone is selected). T-3503: `totals` take each zone place's
+ * everyday outings across its lines too (`everyday`), and `walk` their walking. */
+interface MarketPairs { c: Corridors; totals: Float64Array; walk: Float64Array; rows: Map<number, Float64Array> }
+function pairs(c: Corridors, everyday: number[] = []): MarketPairs {
+  const b = totalsOf(c.table), totals = new Float64Array(Z * 3), walk = new Float64Array(Z);
+  for (let i = 0; i + 3 < everyday.length; i += 4) {
+    const z = zoneOf(everyday[i]);
+    if (z < 0) continue;
+    totals[3 * z] += everyday[i + 1];
+    totals[3 * z + 1] += everyday[i + 2];
+    walk[z] += everyday[i + 3];
+  }
   for (let z = 0; z < Z; z++) {
-    totals[3 * z] = b[3 * z] * c.longerScale + b[3 * z + 1] * c.commuteScale;
+    totals[3 * z] += b[3 * z] * c.longerScale + b[3 * z + 1] * c.commuteScale;
     totals[3 * z + 2] = b[3 * z + 2] * c.longerScale;
   }
   // the pairs with rail: their rail, and their longer trips by rail no longer by plane
@@ -236,7 +246,7 @@ function pairs(c: Corridors): MarketPairs {
     const j = c.railAt[k], r = c.longerRail[k] + c.commuteRail[k], f = c.longerRail[k] * air[j];
     for (const z of ends(from[j], to[j])) if (z >= 0) { totals[3 * z + 1] += r; totals[3 * z + 2] -= f; }
   }
-  return { c, totals, rows: new Map() };
+  return { c, totals, walk, rows: new Map() };
 }
 function rowOf(p: MarketPairs, za: number): Float64Array {
   let m = p.rows.get(za);
@@ -249,6 +259,33 @@ function rowOf(p: MarketPairs, za: number): Float64Array {
   });
   p.rows.set(za, m);
   return m;
+}
+
+const discLngLats = new WeakMap<Marks, Float64Array>();
+function lngLats(m: Marks): Float64Array {
+  let a = discLngLats.get(m);
+  if (a) return a;
+  const n = m.discs.length / DISC;
+  a = new Float64Array(2 * n);
+  for (let i = 0; i < n; i++) {
+    const ll = toLngLat(m.discs[i * DISC], m.discs[i * DISC + 1], m.anchor);
+    a[2 * i] = ll[0]; a[2 * i + 1] = ll[1];
+  }
+  discLngLats.set(m, a);
+  return a;
+}
+
+/** [west, south, east, north] of the discs whose labels can still be on the page (a screen's width
+ * beyond each side, plus the biggest disc's radius), when the map is flat and north-up; else null. */
+function flatBox(map: MlMap, W: number, H: number, m: Marks, k: number): [number, number, number, number] | null {
+  if (map.getBearing() !== 0 || map.getPitch() !== 0 || (map.getProjection()?.type ?? "mercator") !== "mercator") return null;
+  let rMax = 0;
+  for (let i = 0; i < m.discs.length / DISC; i++) rMax = Math.max(rMax, m.discs[i * DISC + 2]);
+  rMax *= k;
+  const nw = map.unproject([-W - rMax, -H - rMax]), se = map.unproject([2 * W + rMax, 2 * H + rMax]);
+  // a view that wraps past the antimeridian, or out of the poles, is left to the full pass
+  if (nw.lng < -180 || se.lng > 180 || !(se.lat > -85) || !(nw.lat < 85)) return null;
+  return [nw.lng, se.lat, se.lng, nw.lat];
 }
 
 export function startIntercityView(view: DemandOverlay, map: MlMap) {
@@ -271,12 +308,18 @@ export function startIntercityView(view: DemandOverlay, map: MlMap) {
       // T-871: a label off screen is passed over unmeasured, since each measure after a write lays
       // the page out again
       const W = map.getContainer().clientWidth, H = map.getContainer().clientHeight;
+      let font: LabelFont | null | undefined;
+      const lls = lngLats(marks), k = pxPerUnitAt(map.getZoom()) * view.bubbleSize;
+      // T-2749: on the flat north-up map the discs beyond the margin below are found from their
+      // longitude and latitude, before any is projected
+      const box = flatBox(map, W, H, marks, k);
       for (const i of order) {
         if (used.length >= MAX_LABELS) break;
-        const ll = toLngLat(marks.discs[i * DISC], marks.discs[i * DISC + 1], marks.anchor);
+        const ll: [number, number] = [lls[2 * i], lls[2 * i + 1]];
+        if (box && (ll[0] < box[0] || ll[0] > box[2] || ll[1] < box[1] || ll[1] > box[3])) continue;
         if (hiddenOnGlobe(ll[0], ll[1])) continue;
         const p = map.project(ll);
-        const r = marks.discs[i * DISC + 2] * pxPerUnitAt(map.getZoom()) * view.bubbleSize;
+        const r = marks.discs[i * DISC + 2] * k;
         if (used.some((a) => Math.hypot(a.px - p.x, a.py - p.y) < LABEL_SEPARATION) || p.x < -r - W || p.x > W + r + W || p.y < -r - H || p.y > H + r + H) continue;
         let el = labels.children[used.length] as HTMLElement | undefined;
         if (!el) {
@@ -286,7 +329,9 @@ export function startIntercityView(view: DemandOverlay, map: MlMap) {
         }
         const tx = texts[i], text = typeof tx === "function" ? (texts[i] = tx()) : tx;
         if (el.textContent !== text) el.textContent = text;
-        const w = el.offsetWidth, h = el.offsetHeight;
+        const f = (font ??= labelFont(labels));
+        // the canvas gives the size without the layout that a read after a write forces (T-2749); 2 px of padding each side
+        const w = f ? Math.round(f.ctx.measureText(text.trim()).width) + 4 : el.offsetWidth, h = f ? f.h : el.offsetHeight;
         const positions = [[p.x + r + 5, p.y - h / 2], [p.x - w - r - 5, p.y - h / 2], [p.x - w / 2, p.y + r + 5], [p.x - w / 2, p.y - h - r - 5]];
         const at = positions.find(([x, y]) => x >= 0 && y >= 0 && x + w <= W && y + h <= H && !used.some(a => x < a.x + a.w + LABEL_GAP_X && x + w + LABEL_GAP_X > a.x && y < a.y + a.h + LABEL_GAP_Y && y + h + LABEL_GAP_Y > a.y));
         if (at) {
@@ -331,6 +376,8 @@ export function startIntercityView(view: DemandOverlay, map: MlMap) {
     // (only ever the selected zone's pairs)
     const pair = (a: number, b: number) => at(zoneOf(a) === ownZone ? row : null, zoneOf(b));
     const total = (a: number) => at(totals, zoneOf(a));
+    // T-3503: a zone's everyday outings across its lines on foot
+    const interWalk = (a: number) => (pairsIn && zoneOf(a) >= 0 ? pairsIn.walk[zoneOf(a)] : 0);
     // T-276: zoomed out, a zone is one bubble as if it were one place: its local trips (the city
     // view's, or with no rail the pipeline's count for a zone not opened) and the regional
     // layer's trips to and from it (commutes between zones and longer trips)
@@ -351,7 +398,7 @@ export function startIntercityView(view: DemandOverlay, map: MlMap) {
         // T-576: a zone's local walking is green; a zone not opened has no walk split (its walk is
         // inside `all`, so it draws as the rest)
         const v = local.get(c.id), lm = localModes(v);
-        t = { all: t.all + (v ? v.tripsPerDay : c.localTrips ?? 0), rail: t.rail + (v ? v.railTripsPerDay : 0), air: t.air, walk: lm?.walk ?? 0, none: lm?.none ?? 0 };
+        t = { all: t.all + (v ? v.tripsPerDay : c.localTrips ?? 0), rail: t.rail + (v ? v.railTripsPerDay : 0), air: t.air, walk: (lm?.walk ?? 0) + interWalk(c.place), none: lm?.none ?? 0 };
       }
       // T-421: a zone still loading has its bar instead
       // T-975: the overview leaves out the realms not shown; a selection's far ends draw everywhere
@@ -369,7 +416,8 @@ export function startIntercityView(view: DemandOverlay, map: MlMap) {
         const localBar = lm ? modeBar(lm.train, lm.walk, lm.drive, lm.none) : "";
         const inter = !own || isOwn ? total(c.place) : t;
         const interLine = tr("intercityView.interCity", { count: count(inter.all), when: day, name: tPlace(c.id, c.name) });
-        const interBar = modeBar(inter.rail, 0, Math.max(0, inter.all - inter.rail));
+        const iw = !own || isOwn ? interWalk(c.place) : 0;
+        const interBar = modeBar(inter.rail, iw, Math.max(0, inter.all - inter.rail - iw));
         // T-3074: before any market result the inter-city figure is unknown, not 0: leave its row out
         return !own
           ? [localLine, localBar, ...(pairsIn ? [interLine, interBar] : []), ...(tier ? [tr("intercityView.startTier", { tier })] : [])]
@@ -537,7 +585,7 @@ export function startIntercityView(view: DemandOverlay, map: MlMap) {
   effect(() => {
     const r = intercityDemand.value;
     if (!r) return;
-    market = pairs(r.corridors);
+    market = pairs(r.corridors, r.everyday);
     if (cityMode()) render();
   });
 

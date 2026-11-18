@@ -28,13 +28,14 @@
 // The tool owns no map layer: the route and stops are an SVG over the map in screen pixels, like
 // the station ghost (map/tools.ts, which holds the tool's pointer events and the shared tag).
 
+import { hiddenOnGlobe } from "./live";
 import { t } from "../i18n";
 import { signal } from "@preact/signals";
 import type { Map as MlMap, MapMouseEvent } from "maplibre-gl";
 import { lngLatToPack } from "../game/coords";
 import { distance, length, moneyShort } from "../game/format";
 import { editBusRoute, newBusLine, nextFreeColour } from "../game/lineActions";
-import { ask, loopTap, renameLinePrompt, selection, tool } from "../game/ui";
+import { ask, display, loopTap, renameLinePrompt, selection, tool } from "../game/ui";
 import { edit, say, world } from "../game/world";
 import { keyIsTheirs } from "../ui/keys";
 import { BUS_KEY } from "../ui/toolKeys";
@@ -178,7 +179,7 @@ export class BusDraw {
   private svg: SVGSVGElement;
 
   constructor(private map: MlMap, box: HTMLElement, private tag: HTMLElement, private client: ClockClient, private overlay: Overlay, private host: { exit(): void }) {
-    this.roads = new BusRoads(map, () => this.loaded());
+    this.roads = new BusRoads(map, () => this.loaded(), undefined, () => display.peek().busOneWay);
     this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     this.svg.setAttribute("class", "bus-draw");
     this.svg.style.cssText = "position:absolute;left:0;top:0;overflow:visible;display:none";
@@ -215,9 +216,9 @@ export class BusDraw {
     return tool.peek() === "bus";
   }
 
-  /** the pointer is on a point's handle, or drags one */
+  /** the pointer is on a point's handle or the route's path (T-3370), or drags a point */
   get onHandle() {
-    return this.active && (this.over >= 0 || this.drag !== null);
+    return this.active && (this.over >= 0 || this.overPath !== null || this.drag !== null);
   }
 
   /** Start the tool: a new line (`line` null) or the route of line number `line` as `routeLL`
@@ -1331,7 +1332,7 @@ export class BusDraw {
     const show = (rows: HTMLElement[], bad = false) => {
       tag.className = "tool-tag build-tag" + (bad ? " bad" : "");
       tag.replaceChildren(...(this.overPath && !this.drag ? [row(t("busDraw.dragAdd")), ...rows] : rows));
-      tag.style.display = "";
+      tag.style.display = hiddenOnGlobe(at!.lng, at!.lat) ? "none" : "";
       const s = this.map.project([at!.lng, at!.lat]);
       tag.style.transform = `translate(${Math.round(s.x + 14)}px, ${Math.round(s.y + 12)}px)`;
     };

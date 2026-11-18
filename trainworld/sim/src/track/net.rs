@@ -172,6 +172,9 @@ pub struct EdgeData {
     /// the left, 2 the right. Single track only; read only where the node has double track on the
     /// end's other side (`Network::join_away`).
     pub join: [u8; 2],
+    /// T-3405: the player's speed limit on this piece, km/h; 0 none. Never on a crossover, never above
+    /// the kind's top speed (`Network::set_edge` keeps it so).
+    pub limit: u16,
 }
 
 /// T-3332: `StationData::one` for trains travelling heading `th`: 1 eastward (northward where the
@@ -266,6 +269,37 @@ pub struct LineData {
     /// T-3333: the line runs on both pairs of quad track (`Parent`), or is the hidden twin that runs
     /// the other pair for one (`Of`).
     pub twin: super::twin::Twin,
+    /// T-3521: the line's trains on weekends (`params::WEEKEND`). Saved in `LWE1`.
+    pub weekend: Weekend,
+}
+
+/// T-3521: how a line runs on weekends and public holidays. The default, 100% and no counts of its
+/// own, runs the weekdays' trains and costs no settle of its own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Weekend {
+    /// A percent of the weekdays': counts rounded up, a headway line's headway divided by it and
+    /// rounded down to a whole minute (`TrackWorld::weekend_counts`). Kept under `counts`, so the
+    /// panel shows the percent the line had.
+    pub share: u16,
+    /// Whole trains at high, medium and low demand set by hand, in place of the share.
+    pub counts: Option<[u32; 3]>,
+    /// T-3557: the headway the player stepped a headway line's weekends to, seconds per level, 0 where
+    /// none; read only beside `counts`, which then hold the trains that run it.
+    pub headways: [u32; 3],
+}
+
+impl Default for Weekend {
+    fn default() -> Self {
+        Weekend { share: 100, counts: None, headways: [0; 3] }
+    }
+}
+
+/// T-3521: a headway on weekends at `share` percent of the weekdays': `headway_s` divided by the
+/// share, rounded down to a whole minute (a headway under a minute to the second); 0 stays none.
+pub fn weekend_headway(headway_s: u32, share: u16) -> u32 {
+    if headway_s == 0 || share == 0 { return 0; }
+    let raw = headway_s as u64 * 100 / share as u64;
+    (if raw >= 60 { raw / 60 * 60 } else { raw.max(1) }).min(u32::MAX as u64) as u32
 }
 
 /// A line group's bullet set by hand (T-1813): its text (empty for the name's own) and its colour
@@ -351,6 +385,8 @@ pub enum Issue {
     StationInUse { node: u32, line: u32 },
     LineStops { line: u32 },
     LinePath { line: u32 },
+    /// A line's return run has no track to come back on: one-way track runs against it (T-3094).
+    NoWayBack { line: u32 },
     /// One-way single track (T-3094) that a line cannot go round: it has no other way between its stations.
     OneWayNoWay { line: u32 },
     /// T-3332: a line stops at a one-track station only on runs that pass it on the other track, or
@@ -409,6 +445,8 @@ pub struct Touch {
     pub stations: Vec<u32>,
     pub lines: Vec<u32>,
     pub schedules: Vec<u32>,
+    /// T-3521: lines whose weekend setting changed (`set_weekend`), which settle only the weekends
+    pub weekend: Vec<u32>,
     pub paths_changed: bool,
 }
 
@@ -417,8 +455,8 @@ pub struct Touch {
 pub struct Derived {
     pub edges: Vec<u32>,
     pub nodes: Vec<u32>,
-    /// Positions of crossings removed or added.
-    pub crossings: Vec<[f64; 2]>,
+    /// Positions of crossings removed or added, and their tram tracks (`crossing_trams`).
+    pub crossings: Vec<[f64; 3]>,
     /// Single track whose way (`Network::edge_way`) changed (T-3137); also in `edges`.
     pub ways: Vec<u32>,
 }
@@ -478,6 +516,8 @@ pub struct Network {
     pub edge_sep: Vec<bool>,
     pub edge_oneway: Vec<u8>,
     pub edge_join: Vec<[u8; 2]>,
+    /// T-3405: `EdgeData::limit`.
+    pub edge_limit: Vec<u16>,
     /// Derived (T-3137): the way single track's run takes by itself (`lanes.rs` `derive_ways`): 0
     /// both, 1 a to b, 2 b to a.
     pub edge_infer: Vec<u8>,
@@ -505,6 +545,17 @@ pub struct Network {
     pub line_hand: Vec<bool>,
     pub line_one_way: Vec<bool>,
     pub line_limit: Vec<u16>,
+    /// T-3521: `LineData::weekend`.
+    pub line_weekend: Vec<Weekend>,
+    /// T-3521: each line's settled rates on weekends, as `line_tph` on weekdays
+    /// (`TrackWorld::settle_counts`): every line's, since a line running its weekday trains then
+    /// still shares the track with lines that do not. Read only where `rest_solved` says so.
+    pub line_tph_rest: Vec<[f32; 3]>,
+    /// T-3521: weekends were settled on their own, as some line runs other trains then. Otherwise
+    /// every line runs its weekday rates then, at no settle's cost.
+    pub rest_solved: bool,
+    /// `settle_kept` of the weekend settle.
+    pub settle_kept_rest: Vec<(u32, usize, u32, u64, u32)>,
     /// T-3333: `LineData::twin`.
     pub line_twin: Vec<super::twin::Twin>,
     pub line_name: Vec<String>,
@@ -724,6 +775,20 @@ impl Network {
         }
     }
 
+    /// T-3521: a line's trains an hour at level `lev` on kind of day `row` (`params::WEEKDAYS`,
+    /// `WEEKEND`): the weekdays' `line_tph`, or the weekends' settled rate when there was one.
+    pub fn line_tph_on(&self, l: usize, row: usize, lev: usize) -> f32 {
+        if row == WEEKEND && self.rest_solved {
+            self.line_tph_rest.get(l).map_or(0.0, |t| t[lev])
+        } else {
+            self.line_tph.get(l).map_or(0.0, |t| t[lev])
+        }
+    }
+
+    /// T-3521: whether any line's weekend setting is other than the weekdays' trains at 100%.
+    pub fn any_weekend(&self) -> bool {
+        self.line_weekend.iter().any(|w| *w != Weekend::default())
+    }
     /// T-1925: a line's departure phase per level, seconds (`line_phase`; 0 where none is set).
     pub fn line_phase_of(&self, l: u32) -> [f32; 3] {
         self.line_phase.get(l as usize).copied().unwrap_or([0.0; 3])
@@ -827,6 +892,7 @@ impl Network {
             edge_sep: vec![],
             edge_oneway: vec![],
             edge_join: vec![],
+            edge_limit: vec![],
             edge_infer: vec![],
             edge_len: vec![],
             edge_pieces: vec![],
@@ -848,6 +914,10 @@ impl Network {
             line_hand: vec![],
             line_one_way: vec![],
             line_limit: vec![],
+            line_weekend: vec![],
+            line_tph_rest: vec![],
+            rest_solved: false,
+            settle_kept_rest: vec![],
             line_twin: vec![],
             line_name: vec![],
             line_symbol: vec![],
@@ -1069,6 +1139,7 @@ impl Network {
         self.edge_sep.push(false);
         self.edge_oneway.push(0);
         self.edge_join.push([0; 2]);
+        self.edge_limit.push(0);
         self.edge_infer.push(0);
         self.edge_len.push(0.0);
         self.edge_pieces.push(Span::default());
@@ -1088,6 +1159,7 @@ impl Network {
         self.line_stops.push(Span::default());
         self.line_path.push(Span::default());
         self.line_tph.push([0.0; 3]);
+        self.line_tph_rest.push([0.0; 3]);
         self.line_trains.push(None);
         self.line_auto.push(None);
         self.line_dwell.push(DEFAULT_DWELL_S);
@@ -1104,6 +1176,7 @@ impl Network {
         self.line_hand.push(false);
         self.line_one_way.push(false);
         self.line_limit.push(0);
+        self.line_weekend.push(Weekend::default());
         self.line_twin.push(Default::default());
     }
     fn claim_node(&mut self, id: u32) {
@@ -1148,7 +1221,7 @@ impl Network {
     pub fn edge_data(&self, e: u32) -> Option<EdgeData> {
         self.edge_ok(e).then(|| {
             let i = e as usize;
-            EdgeData { a: self.edge_a[i], b: self.edge_b[i], tracks: self.edge_tracks[i], pis: self.pis.get(self.edge_pis[i]).to_vec(), built: self.edge_built[i], off: self.edge_off[i], thru: self.edge_thru[i].clone(), crossover: self.edge_crossover[i], kind: self.edge_kind[i], sep: self.edge_sep[i], day: self.edge_day[i], oneway: self.edge_oneway[i], join: self.edge_join[i] }
+            EdgeData { a: self.edge_a[i], b: self.edge_b[i], tracks: self.edge_tracks[i], pis: self.pis.get(self.edge_pis[i]).to_vec(), built: self.edge_built[i], off: self.edge_off[i], thru: self.edge_thru[i].clone(), crossover: self.edge_crossover[i], kind: self.edge_kind[i], sep: self.edge_sep[i], day: self.edge_day[i], oneway: self.edge_oneway[i], join: self.edge_join[i], limit: self.edge_limit[i] }
         })
     }
     pub fn station_data(&self, n: u32) -> Option<StationData> {
@@ -1181,6 +1254,7 @@ impl Network {
                 one_way: self.line_one_way[i],
                 limit: self.line_limit[i],
                 twin: self.line_twin[i],
+                weekend: self.line_weekend[i],
             }
         })
     }
@@ -1344,10 +1418,10 @@ impl Network {
     pub fn one_platform(&self, n: u32) -> bool {
         self.node_ok(n) && self.node_platform[n as usize] > 0 && (self.node_one[n as usize] != 0 || (self.node_tracks(n) == 1 && self.node_upgrades[n as usize] & crate::track::upgrades::PASSING == 0))
     }
-    /// T-3332: a one-track station where trains cannot pass: on single track.
-    /// T-3352: so is a tram stop on single track, drawn and run as one platform with no loop.
+    /// T-3332: a one-track station where trains cannot pass: on single track. A tram stop is the
+    /// same (T-3563): one placed as a passing station is a loop its trams meet at.
     pub fn no_passing(&self, n: u32) -> bool {
-        self.node_ok(n) && self.node_tracks(n) == 1 && (self.one_track(n) || (self.node_platform[n as usize] > 0 && self.node_kind(n).spec().family != 0))
+        self.node_ok(n) && self.node_tracks(n) == 1 && self.one_track(n)
     }
     /// Whether the node's heading points along the axis a one-track station's way is stored against
     /// (`one_for_travel`).
@@ -1411,11 +1485,24 @@ impl Network {
     /// A station's upgrades, US$M (`upgrades::cost` at its level, water, platform and track).
     pub fn station_upgrades_price(&self, n: u32, bits: u8, wet: bool) -> f64 {
         let i = n as usize;
-        super::upgrades::cost(bits, self.node_level[i], wet, self.node_platform[i], self.node_hsr(n))
+        super::upgrades::cost(bits, self.node_level[i], wet, self.node_platform[i], self.node_price_kind(n))
     }
-    /// The speed limit an edge puts on every piece of it, m/s: `V_CROSSOVER` on a crossover, 320
-    /// km/h on high-speed track, 160 on any other (T-817).
+    /// The kind a station's upgrades are priced at: high speed if any of its track is, else its track's.
+    pub fn node_price_kind(&self, n: u32) -> TrackKind {
+        if self.node_hsr(n) { TrackKind::HighSpeed } else { self.node_kind(n) }
+    }
+    /// The speed limit an edge puts on every piece of it, m/s: its kind's (`v_kind_cap`) under the
+    /// player's limit on it (T-3405).
     pub fn v_cap(&self, e: u32) -> f64 {
+        let cap = self.v_kind_cap(e);
+        match self.edge_limit[e as usize] {
+            0 => cap,
+            lim => cap.min(lim as f64 / 3.6),
+        }
+    }
+    /// The speed limit of an edge's kind of track, m/s: `V_CROSSOVER` on a crossover, 320 km/h on
+    /// high-speed track, 160 on other rail, the tram kinds' own (T-817).
+    pub fn v_kind_cap(&self, e: u32) -> f64 {
         if self.edge_crossover[e as usize] { V_CROSSOVER } else { self.edge_kind[e as usize].v_cap() }
     }
     /// A line's trains' top speed, m/s: high-speed trains or ordinary ones (T-817).
@@ -1503,8 +1590,8 @@ impl Network {
             if d.a == d.b {
                 return Err(Issue::EdgeLoop { edge: id });
             }
-            // T-3352: high-speed and tram track may be single; neither has a crossover
-            if (d.tracks != 1 && d.tracks != 2) || (d.kind.spec().family != 0 && d.crossover) || (d.kind.is_hsr() && d.crossover) {
+            // T-3352: high-speed track has no crossover; T-3575: tram track takes them as rail does
+            if (d.tracks != 1 && d.tracks != 2) || (d.kind.is_hsr() && d.crossover) {
                 return Err(Issue::Tracks { edge: id });
             }
             for (node, which) in [(d.a, 0u32), (d.b, 1u32)] {
@@ -1539,6 +1626,7 @@ impl Network {
                 self.edge_sep[i] = d.sep;
                 self.edge_oneway[i] = if d.tracks == 1 { d.oneway } else { 0 };
                 self.edge_join[i] = if d.tracks == 1 { d.join } else { [0; 2] };
+                self.edge_limit[i] = if d.crossover || d.limit == 0 { 0 } else { d.limit.clamp(EDGE_LIMIT_MIN, (d.kind.v_cap() * 3.6).round() as u16) };
                 self.node_ports[d.a as usize].add(id << 1);
                 self.node_ports[d.b as usize].add(id << 1 | 1);
                 self.touch_node(d.a);
@@ -1561,6 +1649,7 @@ impl Network {
                 self.edge_sep[i] = false;
                 self.edge_oneway[i] = 0;
                 self.edge_join[i] = [0; 2];
+                self.edge_limit[i] = 0;
                 self.edge_infer[i] = 0;
                 self.edge_free.push(id);
             }
@@ -1580,6 +1669,15 @@ impl Network {
                 for l in 0..self.line_count() as u32 {
                     if self.line_ok(l) && self.line_stops(l).contains(&node) {
                         return Err(Issue::StationInUse { node, line: l });
+                    }
+                }
+                // T-3348: nor where a run stops in place of a stop of its line (the platform on its own
+                // track beside it): without it the line has no way back
+                if self.way_limited(node) {
+                    for l in 0..self.line_count() as u32 {
+                        if self.line_ok(l) && self.way_stops(self.line_stops(l), self.line_path(l)).is_some_and(|(f, b)| f.contains(&node) || b.contains(&node)) {
+                            return Err(Issue::StationInUse { node, line: l });
+                        }
                     }
                 }
                 self.node_platform[i] = 0;
@@ -1670,6 +1768,7 @@ impl Network {
                 self.line_hand[i] = d.hand && d.bus.is_none() && d.ferry.is_none();
                 self.line_one_way[i] = d.one_way;
                 self.line_limit[i] = d.limit;
+                self.line_weekend[i] = d.weekend;
                 self.line_twin[i] = if d.bus.is_some() || d.ferry.is_some() { Default::default() } else { d.twin };
                 self.line_bus[i] = d.bus;
                 self.line_ferry[i] = d.ferry;
@@ -1687,6 +1786,7 @@ impl Network {
                 self.line_hand[i] = false;
                 self.line_one_way[i] = false;
                 self.line_limit[i] = 0;
+                self.line_weekend[i] = Weekend::default();
                 self.line_twin[i] = Default::default();
                 self.line_bus[i] = None;
                 self.line_ferry[i] = None;
@@ -1728,6 +1828,16 @@ impl Network {
         self.line_trains[id as usize] = trains;
         self.line_auto[id as usize] = auto.filter(|_| trains.is_some());
         self.touch.schedules.push(id);
+        Ok(old)
+    }
+
+    /// T-3521: a line's weekend trains (`LineData::weekend`); returns the old setting.
+    pub fn set_weekend(&mut self, id: u32, weekend: Weekend) -> Result<Weekend, Issue> {
+        if !self.line_ok(id) {
+            return Err(Issue::NoSuchLine { line: id });
+        }
+        let old = std::mem::replace(&mut self.line_weekend[id as usize], weekend);
+        self.touch.weekend.push(id);
         Ok(old)
     }
 
@@ -1863,7 +1973,7 @@ impl Network {
     /// it crosses at ground level (T-1929).
     fn edge_price(&self, i: usize, vert: &[[f64; 2]], wet: &[[f64; 2]], terrain: &[[f64; 3]], cross: &[[f64; 2]]) -> f64 {
         if self.edge_crossover[i] {
-            cost::junction_cost(self.node_level[self.edge_a[i] as usize], false, !wet.is_empty())
+            cost::crossover_cost(self.node_level[self.edge_a[i] as usize], !wet.is_empty(), self.edge_kind[i])
         } else {
             cost::track_cost_t(self.edge_len[i], vert, wet, terrain, self.edge_tracks[i], self.edge_kind[i]) + roads::charge(vert, cross).1
         }
@@ -1871,7 +1981,7 @@ impl Network {
 
     pub fn take_touch(&mut self) -> Touch {
         let mut t = std::mem::take(&mut self.touch);
-        for v in [&mut t.nodes, &mut t.edges, &mut t.stations, &mut t.lines, &mut t.schedules] {
+        for v in [&mut t.nodes, &mut t.edges, &mut t.stations, &mut t.lines, &mut t.schedules, &mut t.weekend] {
             v.sort_unstable();
             v.dedup();
         }
@@ -1981,9 +2091,9 @@ impl Network {
         let before = self.crossings.len();
         let is_touched = |e: u32| edges.binary_search(&e).is_ok();
         let mut kept = Vec::with_capacity(before);
-        for c in self.crossings.drain(..) {
+        for c in std::mem::take(&mut self.crossings) {
             if is_touched(c.e1) || is_touched(c.e2) {
-                d.crossings.push([c.x, c.y]);
+                d.crossings.push([c.x, c.y, self.crossing_trams(c.e1, c.e2) as f64]);
             } else {
                 kept.push(c);
             }
@@ -2078,7 +2188,7 @@ impl Network {
         self.node_ports[i] = p;
     }
 
-    fn find_crossings(&mut self, e: u32, f: u32, changed: &mut Vec<[f64; 2]>) {
+    fn find_crossings(&mut self, e: u32, f: u32, changed: &mut Vec<[f64; 3]>) {
         let (ie, i_f) = (e as usize, f as usize);
         if self.edge_sep[ie] && self.edge_sep[i_f] {
             return;
@@ -2112,8 +2222,14 @@ impl Network {
             };
             let (e1, s1, e2, s2) = if e <= f { (e, s1, f, s2) } else { (f, s2, e, s1) };
             self.crossings.push(Crossing { e1, s1, e2, s2, x, y, kind });
-            changed.push([x, y]);
+            changed.push([x, y, self.crossing_trams(e1, e2) as f64]);
         }
+    }
+
+    /// T-3062: the tram tracks (0 to 2) of a crossing of edges `e1` and `e2`. At a flat crossing a tram
+    /// gives way to a train, and the map draws its stroke of the mark broken.
+    pub fn crossing_trams(&self, e1: u32, e2: u32) -> u8 {
+        [e1, e2].into_iter().filter(|&e| self.edge_kind[e as usize].spec().family == 1).count() as u8
     }
 
     fn rebuild_edge_lines(&mut self) {
@@ -2357,7 +2473,8 @@ impl Network {
         let i = n as usize;
         if let Some(b) = self.node_berth[i] {
             // a port's landing is on the shore, which the coarse masks may call water
-            if self.node_ports[i].n > 0 || self.node_upgrades[i] != 0 || self.node_level[i] != 0 {
+            // T-3419: a waiting room is the one upgrade a port takes
+            if self.node_ports[i].n > 0 || self.node_upgrades[i] & !super::upgrades::WAITING_ROOM != 0 || self.node_level[i] != 0 {
                 out.push(Issue::NotAtPort { node: n });
             }
             if !super::ferry::berth_ok(self, [self.node_x[i], self.node_y[i]], b) {
@@ -2463,33 +2580,38 @@ impl Network {
             return Err(Issue::LineStops { line: l });
         }
         let turns = self.stop_reversals(path);
-        let Some(at) = match_stops(&nodes, stops, &turns) else {
+        let Some((at, _)) = self.match_run(&nodes, stops, &turns) else {
             return Err(if turns.is_empty() { Issue::LineStops { line: l } } else { Issue::LinePath { line: l } });
         };
-        // the return run goes round one-way track when the path back is against it (T-3094)
+        // the return run goes round one-way track when the path back is against it (T-3094), and each
+        // run stops at the platform on its own track (T-3348)
         let back = if once { None } else {
-            match self.back_path_of(stops, path) {
+            match self.back_run_of(stops, path) {
                 Some(b) => Some(b),
-                None => return Err(Issue::LinePath { line: l }),
+                None => return Err(Issue::NoWayBack { line: l }),
             }
         };
-        if stops.iter().any(|&s| self.one_side(s).is_some()) {
-            self.check_one_track(l, stops, path, &at, back.as_deref())?;
+        let fwd = self.fwd_stops_of(stops, path);
+        let one = |s: &[u32]| s.iter().any(|&s| self.one_side(s).is_some());
+        if one(stops) || one(&fwd) || back.as_ref().is_some_and(|b| one(&b.0)) {
+            let at = if fwd == stops { at } else { self.match_run(&nodes, &fwd, &turns).map(|m| m.0).ok_or(Issue::LinePath { line: l })? };
+            self.check_one_track(l, stops, path, &at, back.as_ref().map(|b| (&b.0[..], &b.1[..])))?;
         }
         Ok(nodes)
     }
 
     /// T-3332: a line's stops at one-track stations on double track: each stopped at by at least one of
-    /// its runs, and its ends (a loop's first stop too) arrived at on the platform's track.
-    fn check_one_track(&self, l: u32, stops: &[u32], path: &[u32], at: &[usize], back: Option<&[u32]>) -> Result<(), Issue> {
+    /// its runs, and its ends (a loop's first stop too) arrived at on the platform's track. `at`
+    /// places run 0's stop nodes on `path`; `back` is run 1's stop nodes in its order and its path
+    /// (T-3348).
+    fn check_one_track(&self, l: u32, stops: &[u32], path: &[u32], at: &[usize], back: Option<(&[u32], &[u32])>) -> Result<(), Issue> {
         let circle = self.loop_kind(stops, path) == LoopKind::Circle;
         let idx: Vec<u32> = at.iter().map(|&k| k as u32).collect();
         let fwd = self.run_passes(path, &idx, circle);
         let rev = match back {
-            Some(b) => {
+            Some((rs, b)) => {
                 let nodes: Vec<u32> = std::iter::once(self.path_nodes(b[0]).0).chain(b.iter().map(|&p| self.path_nodes(p).1)).collect();
-                let rs: Vec<u32> = stops.iter().rev().copied().collect();
-                let ra = match_stops(&nodes, &rs, &self.stop_reversals(b)).ok_or(Issue::LinePath { line: l })?;
+                let ra = self.match_run(&nodes, rs, &self.stop_reversals(b)).map(|m| m.0).ok_or(Issue::LinePath { line: l })?;
                 let mut r = self.run_passes(b, &ra.into_iter().map(|k| k as u32).collect::<Vec<_>>(), circle);
                 r.reverse();
                 Some(r)
@@ -2497,7 +2619,7 @@ impl Network {
             None => None,
         };
         let n = stops.len();
-        let turns = self.stop_reversals(path);
+        let turns = self.path_reversals(path);
         for j in 0..n {
             // a turn back partway arrives on the same track both ways
             let end = j == 0 || j + 1 == n || turns.contains(&at[j]);
@@ -2522,14 +2644,24 @@ impl Network {
     }
 
     /// A track end with no station (T-797 B3): a train may reverse there without stopping for
-    /// riders, as in a headshunt.
+    /// riders, as in a headshunt. T-3541: an end of constructed track with only blueprint beyond
+    /// it is still one, so blueprint drawn on from it never moves a running line's turn there.
     pub fn bare_end(&self, n: u32) -> bool {
-        self.node_ports[n as usize].n == 1 && self.node_platform[n as usize] == 0
+        self.node_platform[n as usize] == 0 && self.turn_end(n)
     }
 
-    /// `path_reversals` that must fall on a stop: all but those at a bare track end.
+    /// T-3595: a track end, station or not (one constructed end, as `bare_end`): a train may turn back
+    /// there without stopping. A station there that is no stop of the line is run into and out of;
+    /// building on from a loose end to a station so never leaves a line with nowhere to turn.
+    pub fn turn_end(&self, n: u32) -> bool {
+        let p = &self.node_ports[n as usize];
+        p.n == 1 || (p.n > 1 && self.built_ports(n) == 1)
+    }
+
+    /// `path_reversals` that must fall on a stop: all but those at a track end (`turn_end`), where a
+    /// train turns back whether the line stops there or not.
     pub fn stop_reversals(&self, path: &[u32]) -> Vec<usize> {
-        self.path_reversals(path).into_iter().filter(|&k| !self.bare_end(self.path_nodes(path[k]).0)).collect()
+        self.path_reversals(path).into_iter().filter(|&k| !self.turn_end(self.path_nodes(path[k]).0)).collect()
     }
 
     /// What kind of loop stops and a path make (T-798).
@@ -2593,6 +2725,9 @@ impl Network {
             // kind 12: ports (T-2193), a flat price
             if self.node_platform[n] > 0 && !self.node_built[n] && !self.node_off[n] && self.node_berth[n].is_some() {
                 add(12, 0, 0, false, 0, 1.0, PORT_COST);
+                if self.node_upgrades[n] != 0 {
+                    add(8, level, 0, false, 0, 1.0, self.station_upgrades_price(n as u32, self.node_upgrades[n], false));
+                }
             } else if self.node_platform[n] > 0 && !self.node_built[n] && !self.node_off[n] {
                 let (tracks, wet) = (self.station_tracks(n as u32), is_wet());
                 add(1, level, tracks, wet, 0, 1.0, cost::station_cost_k(self.node_kind(n as u32), level, self.node_platform[n], self.station_tracks(n as u32), wet));
@@ -2666,7 +2801,7 @@ impl Network {
             let is_wet = || self.node_is_wet(n);
             let level = self.node_level[n];
             if self.node_platform[n] > 0 && !self.node_built[n] {
-                let price = if self.node_berth[n].is_some() { PORT_COST } else {
+                let price = if self.node_berth[n].is_some() { PORT_COST + self.upgrades_cost(n) } else {
                     let wet = is_wet();
                     let ups = self.node_upgrades[n];
                     cost::station_cost_k(self.node_kind(n as u32), level, self.node_platform[n], self.station_tracks(n as u32), wet) + if ups != 0 { self.station_upgrades_price(n as u32, ups, wet) } else { 0.0 }
@@ -2859,7 +2994,22 @@ impl Network {
             return r.built && self.line_stops(l).iter().all(|&s| self.node_ok(s) && self.node_built[s as usize]);
         }
         self.line_path(l).iter().all(|&p| self.edge_ok(path_edge(p)) && self.edge_built[path_edge(p) as usize])
+            && self.back_only_edges(l).iter().all(|&e| self.edge_ok(e) && self.edge_built[e as usize])
             && self.line_stops(l).iter().all(|&s| self.node_ok(s) && self.node_built[s as usize])
+    }
+
+    /// The edges only a rail line's return run takes, round one-way track such as a flyover's other
+    /// leg (T-3422): they must be constructed for it to run, as its path's are.
+    pub fn back_only_edges(&self, l: u32) -> Vec<u32> {
+        let path = self.line_path(l);
+        if self.line_runs_once(l) || path.iter().all(|&p| self.dir_ok(p ^ 1)) {
+            return vec![];
+        }
+        let Some(back) = self.back_path(l) else { return vec![] };
+        let mut out: Vec<u32> = back.iter().map(|&p| path_edge(p)).filter(|e| !path.iter().any(|&p| path_edge(p) == *e)).collect();
+        out.sort_unstable();
+        out.dedup();
+        out
     }
 
     /// The point of an edge nearest to (x, y): chainage and distance, m.
@@ -2881,15 +3031,10 @@ impl Network {
     }
 
     /// The path of a line's return run (T-3094): its path run backward, or where that runs against a
-    /// one-way track, the route back through its stops in reverse order. None when there is no way
-    /// back.
+    /// one-way track, the route back through its run 1 stops (`back_run_of`, T-3348). None when
+    /// there is no way back.
     pub fn back_path_of(&self, stops: &[u32], path: &[u32]) -> Option<Vec<u32>> {
-        let back: Vec<u32> = path.iter().rev().map(|p| p ^ 1).collect();
-        if back.iter().all(|&p| self.dir_ok(p)) {
-            return Some(back);
-        }
-        let stops: Vec<u32> = stops.iter().rev().copied().collect();
-        self.route_hops(&stops).ok()
+        self.back_run_of(stops, path).map(|r| r.1)
     }
 
     pub fn back_path(&self, l: u32) -> Option<Vec<u32>> {
@@ -2899,7 +3044,10 @@ impl Network {
     /// Rail lines whose return run takes a way of its own, round one-way track: their tracks are not
     /// all on `lines_on_edge`, so an edit rebuilds them whatever it touches.
     pub fn back_lines(&self) -> Vec<u32> {
-        if (0..self.edge_count() as u32).all(|e| self.edge_way(e) == 0) {
+        // T-3348: a run may stop at a station beside a stop whose platform is not on its way, which
+        // may leave the path, and an edit anywhere near may add or take one
+        let beside = |l: u32| self.line_stops(l).iter().any(|&s| self.node_ok(s) && self.way_limited(s));
+        if (0..self.edge_count() as u32).all(|e| self.edge_way(e) == 0) && !self.node_one.iter().any(|&o| o != 0) {
             return vec![];
         }
         (0..self.line_count() as u32)
@@ -2907,7 +3055,7 @@ impl Network {
                 self.line_ok(l)
                     && self.line_bus.get(l as usize).map_or(true, |b| b.is_none())
                     && self.line_ferry.get(l as usize).map_or(true, |f| f.is_none())
-                    && self.line_path(l).iter().any(|&p| !self.dir_ok(p ^ 1))
+                    && (self.line_path(l).iter().any(|&p| !self.dir_ok(p ^ 1)) || beside(l))
                     && !self.line_runs_once(l)
             })
             .collect()
@@ -2916,8 +3064,8 @@ impl Network {
     /// Fastest path from `from` to `to` over valid moves, by speed-limit running time. `arrived`
     /// is the side the train came in on at `from`, or None at a line's first stop. It leaves on
     /// the other side, or turns back there at `REVERSAL_SEARCH_S` extra; on the way it may turn
-    /// back at a bare track end at the same cost (T-797: never at a station it passes or a
-    /// junction). Returns the path and the side it arrives on at `to`.
+    /// back at a track end at the same cost, a station there or not (T-797, T-3595: never at a
+    /// through station it passes or a junction). Returns the path and the side it arrives on at `to`.
     pub fn find_path(&self, from: u32, to: u32, arrived: Option<u8>) -> Option<(Vec<u32>, u8)> {
         self.find_path_side(from, to, arrived, None)
     }
@@ -2957,15 +3105,15 @@ impl Network {
                 path.reverse();
                 return Some((path, arr_side));
             }
-            let bare = self.bare_end(node);
-            if bare {
-                // a train may turn back at a track end with no station (T-797 B3)
-                on |= self.dir_ok(p.end[0]) as u8;
+            // a train may turn back at a track end (T-797 B3, T-3595), the way it came
+            let back = if self.turn_end(node) { arr.or(Some(0)) } else { None };
+            if let Some(i) = back {
+                on |= (self.dir_ok(p.end[i]) as u8) << i;
             }
             for k in ends_in(on) {
                 let nst = p.end[k];
                 let e = nst >> 1;
-                let nd = d + self.edge_time[e as usize] + if bare { REVERSAL_SEARCH_S } else { 0.0 };
+                let nd = d + self.edge_time[e as usize] + if back == Some(k) { REVERSAL_SEARCH_S } else { 0.0 };
                 if nd < dist[nst as usize] {
                     dist[nst as usize] = nd;
                     prev[nst as usize] = st;
@@ -2983,8 +3131,17 @@ impl Network {
     }
 
     /// `route` over stops that are all stations, or the first hop with no path (T-2895: hop k runs
-    /// from stop k to stop k + 1).
+    /// from stop k to stop k + 1). Past a one-way station on the way back's track (T-3565,
+    /// `route_legs`).
     pub fn route_hops(&self, stops: &[u32]) -> Result<Vec<u32>, usize> {
+        if let Some(p) = self.route_legs(stops) {
+            return Ok(p);
+        }
+        self.route_hops_plain(stops)
+    }
+
+    /// `route_hops` through every stop.
+    pub fn route_hops_plain(&self, stops: &[u32]) -> Result<Vec<u32>, usize> {
         let mut path: Vec<u32> = vec![];
         let mut side = None;
         let closes = stops.len() >= 3 && stops[0] == stops[stops.len() - 1];
@@ -3266,9 +3423,9 @@ impl Network {
                 t2.push(*p);
             }
         }
-        let join = self.edge_join[i];
-        let a = EdgeData { a: self.edge_a[i], b: u32::MAX, tracks, pis: p1[1..p1.len() - 1].to_vec(), built, off, thru: t1, crossover: false, kind, sep, day: self.edge_day[i], oneway, join: [join[0], 0] };
-        let b = EdgeData { a: u32::MAX, b: self.edge_b[i], tracks, pis: p2[1..p2.len() - 1].to_vec(), built, off, thru: t2, crossover: false, kind, sep, day: self.edge_day[i], oneway, join: [0, join[1]] };
+        let (join, limit) = (self.edge_join[i], self.edge_limit[i]);
+        let a = EdgeData { a: self.edge_a[i], b: u32::MAX, tracks, pis: p1[1..p1.len() - 1].to_vec(), built, off, thru: t1, crossover: false, kind, sep, day: self.edge_day[i], oneway, join: [join[0], 0], limit };
+        let b = EdgeData { a: u32::MAX, b: self.edge_b[i], tracks, pis: p2[1..p2.len() - 1].to_vec(), built, off, thru: t2, crossover: false, kind, sep, day: self.edge_day[i], oneway, join: [0, join[1]], limit };
         Ok((node, a, b))
     }
 }

@@ -6,8 +6,9 @@ import { PROFIT_STOPS, rgb, SPEED_STOPS } from "../game/palette";
 import { PSI_PER_UNIT } from "./geo";
 import { BAND_M_RANGE, BAND_RANGE, BAND_SHARE } from "./lineBands";
 import { PROJECT_GLSL } from "./gl";
+import { LEVEL_FADE, LEVEL_SHOWN_GLSL } from "./visibility";
 import { TURNBACK_M } from "./terminalBays";
-import { ONE_BULGE_K, PASS_LEAD_M, PLATFORM_POINTS, SEL_GLOW_PX, SEL_OUTLINE_PX, SHAPE_GLSL, ST_BUILDING, ST_FLIP, ST_BUFFER, ST_ONE, ST_ONE_NEG, ST_PASSING, ST_ROOM, ST_TERMINAL, ST_TRAM, TERMINAL_CAP, TERMINAL_EAR } from "./stationGeometry";
+import { ONE_BULGE_K, PASS_LEAD_M, PLATFORM_POINTS, SEL_GLOW_PX, SEL_OUTLINE_PX, SHAPE_GLSL, ST_BUILDING, ST_FLIP, ST_BUFFER, ST_ONE, ST_ONE_MID, ST_ONE_NEG, ST_PASSING, ST_ROOM, ST_SINGLE, ST_TERMINAL, ST_TRAM, TRAM_BOX, TERMINAL_CAP, TERMINAL_EAR } from "./stationGeometry";
 
 /** T-2926: tram track and the lines over it as a share of a rail line's width; a tram stop's dot as a share of a station's */
 const TRAM_WIDTH = 0.75, TRAM_DOT = 0.7;
@@ -144,6 +145,7 @@ uniform float u_band;        // T-1799: how far lines sharing track are drawn si
 uniform int u_band_traffic;  // 1: the Traffic view's bands, each its riders' width (a_wmul.yz)
 uniform float u_band_gap;    // T-2126: px of casing between bands side by side
 uniform float u_band_m;     // T-2132: px a metre of ground is drawn, for a band's metres to its ribbon's middle
+uniform int u_level_hide;   // T-3420: the levels not drawn, a bit each from level -3; a line not drawn has its colour's alpha 0
 in vec4 a_seg;
 in uint a_colour;
 in uint a_edge;
@@ -168,6 +170,7 @@ out float v_along;          // T-2184: px along the stroke's run, so dashes keep
 flat out vec4 v_inner;      // T-2184: a band's red edges over its neighbours: its colour's half width, the red's and the rim's px, strength; 0 none
 flat out float v_aa;        // T-2183: a band's colour's half width (px), its sides smoothed so the gap between bands keeps its width; 0 none
 ${SEL_GLSL}
+${LEVEL_SHOWN_GLSL}
 void main() {
   v_inner = vec4(0.0);
   v_aa = 0.0;
@@ -181,6 +184,14 @@ void main() {
   v_wire_hw = 0.0;
   v_dash = u_full_pass == 1 ? u_full_dash : 0.0;
   if (int(a_edge) == u_hide.x || int(a_edge) == u_hide.y) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  // T-3420: a line the player hid, and track and lines on a hidden level, a ramp fading toward it
+  if (u_kind == 1 && texelFetch(u_line_colours, ivec2(int(a_colour) % ${LINES_W}, int(a_colour) / ${LINES_W}), 0).a < 0.5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  float shown0 = 1.0, shown1 = 1.0;
+  if (u_level_hide != 0 && u_kind != 2) {
+    float hq = floor(a_level / 256.0);
+    shown0 = levelShown(hq / 32.0 - 4.0);
+    shown1 = levelShown((a_level - hq * 256.0) / 32.0 - 4.0);
+  }
   bool sel = (u_kind == 1 && selectedLine(int(a_colour))) || (u_kind == 0 && int(a_edge) == u_sel_edge);
   bool blueprint = (flags & 1) != 0;
   bool placement = (flags & 32) != 0;
@@ -224,7 +235,9 @@ void main() {
   bool tBand = u_band_traffic == 1 && u_cap <= 0.0;
   float wmul = shared && u_cap > 0.0 ? 1.0 : a_wmul.x;
   float bandW = tBand ? 1.0 : 1.0 - bandOn * mix(a_band.z, a_band.w, along);
-  float grow = u_lanes.z * max(0.0, lfw * (G + lt) - core * (bpShape ? 1.0 : wmul));
+  // (T-3533: bare track is never drawn narrower than its two tracks' outer edges, G + lt, from the first zoom
+  // they would be; a line keeps the ramp, its width is its riders' in the Traffic view)
+  float grow = (u_kind == 0 ? 1.0 : u_lanes.z) * max(0.0, lfw * (G + lt) - core * (bpShape ? 1.0 : wmul));
   float extra = sel ? u_width.y : 0.0;
   bool muted = u_kind == 1 && u_mute.x > 0.0 && !sel;
   if (muted) bandW *= u_mute.x;
@@ -330,7 +343,7 @@ void main() {
   // segments overlap at every joint and see-through blueprint would show a bead there. Lines
   // that do not run (faded) stay see-through.
   bool bp = blueprint && !placement;
-  v_alpha = (!placement && !bp && (flags & 2) != 0 ? 0.55 : 1.0) * faint * (u_kind == 1 && !sel ? u_dim : 1.0);
+  v_alpha = (!placement && !bp && (flags & 2) != 0 ? 0.55 : 1.0) * faint * (u_kind == 1 && !sel ? u_dim : 1.0) * (along < 0.5 ? shown0 : shown1);
   // the height at this end (levelCode in network.ts), its colour blended between the whole levels either side
   float lq0 = floor(a_level / 256.0);
   float lh = clamp(3.0 - ((along < 0.5 ? lq0 : a_level - lq0 * 256.0) / 32.0 - 4.0), 0.0, 6.0);
@@ -466,7 +479,7 @@ uniform float u_pixel;
 in vec3 a_st;
 in vec2 a_axis;          // half the platform along its track at its middle, local units
 in vec4 a_shape;         // the platform's middle from the node (xy), half the turn along it (z, not read), half its true width (w), local units
-in float a_sel;          // 1 drawn selected
+in float a_sel;          // 1 drawn selected, -1 not drawn (on a hidden level, T-3420)
 in vec4 a_crowd;         // riders waiting (T-219): how full the platform's + and - side is (0-1),
                          // and whether that side is full (zw)
 in vec2 a_dcrowd;        // zoomed out (T-228): the station's fullest platform side, 0-1, and 1 if
@@ -482,6 +495,7 @@ flat out vec4 v_scr;     // a dot's frame on the screen (T-553): where its x and
 flat out float v_lane;   // 1 on double track: a platform each side of its two tracks close in (T-658); 2 with passing tracks (T-2249);
                          // a one-track station (T-3332): +-(10 + how far its band's middle is off the centre line, px), + or - its side
 uniform vec3 u_one;      // T-3332: a one-track station's bar: its middle off the centre line, half width, and how far its bulge sticks out, px
+uniform vec3 u_one_mid;  // T-3540: the same on track drawn as one (ST_ONE_MID), centred on it
 flat out vec2 v_bulge;   // a one-track station's bulge: how far it sticks out and its half length, px, 0 none
 uniform highp int u_hot_st[${HOT_STATIONS}]; // the hovered stations (T-730), u_hot_n of them
 uniform highp int u_hot_n;
@@ -504,6 +518,8 @@ vec2 centreAt(vec2 q[${PLATFORM_POINTS}], float t) {
 void main() {
   v_hot = 0.0;
   for (int k = 0; k < ${HOT_STATIONS}; k++) if (k < u_hot_n && u_hot_st[k] == gl_InstanceID) v_hot = 1.0;
+  // T-3420, T-3560: a station on a switched-off level (a_sel -1) is drawn faint, without its crowd
+  float lvFade = a_sel < -0.5 ? ${LEVEL_FADE.toFixed(2)} : 1.0;
   v_dot = 0.0;
   v_bulge = vec2(0.0);
   v_scr = vec4(1.0, 0.0, 0.0, 1.0);
@@ -511,18 +527,20 @@ void main() {
   int flags = int(a_st.z + 0.5);
   // 2: double track with passing tracks (T-2249)
   v_lane = (flags & 16) != 0 ? ((flags & ${ST_PASSING}) != 0 ? 2.0 : 1.0) : 0.0;
-  v_alpha = (flags & 8) != 0 ? 0.3 : (flags & 2) != 0 ? 0.6 : 1.0; // 8: a blueprint switched off (T-333)
+  v_alpha = ((flags & 8) != 0 ? 0.3 : (flags & 2) != 0 ? 0.6 : 1.0) * lvFade; // 8: a blueprint switched off (T-333)
   vec2 half_vp = u_viewport * 0.5;
   vec2 corner = vec2(float(gl_VertexID & 1) * 2.0 - 1.0, gl_VertexID < 2 ? -1.0 : 1.0);
   bool boxes = u_boxes > 0.5;
   bool sel = a_sel > 0.5;
-  bool noCrowd = !boxes || (flags & 2) != 0 || max(a_crowd.x, a_crowd.y) <= 0.0;
+  bool noCrowd = !boxes || (flags & 2) != 0 || max(a_crowd.x, a_crowd.y) <= 0.0 || lvFade < 1.0;
   bool noAnnex = u_room > 0 && (!boxes || (flags & ${ST_ROOM}) == 0);
   bool inBld = (flags & ${ST_BUILDING}) != 0;
   if ((u_pass == 1) != sel || (u_layer == 2 && noCrowd) || noAnnex || (u_bld == 1 && inBld) || (u_bld == 2 && !inBld)) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
   // zoomed out a dot's pie is its platforms' crowd (T-228, T-553): the fullest side's share, and
   // whether it is full
   if (!boxes) v_crowd = vec4(a_dcrowd, 0.0, 0.0);
+  // T-3540: a station on single track has one platform, filled as its fuller side (as its dot is)
+  else if ((flags & ${ST_SINGLE}) != 0) v_crowd = vec4(vec2(max(a_crowd.x, a_crowd.y)), vec2(max(a_crowd.z, a_crowd.w)));
   vec2 mid = a_st.xy + a_shape.xy;
   vec4 c = project(mid);
   vec4 e = project(mid + a_axis);
@@ -539,6 +557,9 @@ void main() {
   // it keeps one shape from there in; further out it keeps that width on screen (T-553)
   float perLoc = axisLoc > 1e-9 ? len / axisLoc : 0.0;
   float hw = max(max(a_shape.w, u_fixed.x * u_fixed.y) * perLoc, boxes ? u_fixed.x : 0.0);
+  // T-3540: a tram stop's box narrower
+  bool tramBox = (flags & ${ST_TRAM}) != 0;
+  if (tramBox) hw *= ${TRAM_BOX.toFixed(2)};
   // wide enough for its outer tracks' trains (T-2233)
   if (boxes && (flags & ${ST_PASSING}) != 0) hw = max(hw, u_pass_half);
   // a dot covers a plain line through it as drawn now
@@ -577,11 +598,17 @@ void main() {
     // T-3332: a one-track station: a thin bar on its track with a bulge at the middle on its side (the
     // fragment shader moves the band and adds the bulge; the quad keeps room for both)
     float room = hw;
+    // (a one-platform station's bar: its middle across, signed, and half width; its waiting room joins it)
+    vec2 oneBar = vec2(0.0, hw);
     if ((flags & ${ST_ONE}) != 0) {
-      v_size.y = u_one.y;
-      v_bulge = vec2(u_one.z, ${ONE_BULGE_K.toFixed(2)} * hl);
-      v_lane = ((flags & ${ST_ONE_NEG}) != 0 ? -1.0 : 1.0) * (10.0 + u_one.x);
-      room = u_one.x + u_one.y + u_one.z;
+      // (T-3540: centred on track drawn as one; a tram stop's bulge narrower)
+      vec3 bar = (flags & ${ST_ONE_MID}) != 0 ? u_one_mid : u_one;
+      bar.z *= tramBox ? ${TRAM_BOX.toFixed(2)} : 1.0;
+      v_size.y = bar.y;
+      v_bulge = vec2(bar.z, ${ONE_BULGE_K.toFixed(2)} * hl);
+      v_lane = ((flags & ${ST_ONE_NEG}) != 0 ? -1.0 : 1.0) * (10.0 + bar.x);
+      room = bar.x + bar.y + bar.z;
+      oneBar = vec2(((flags & ${ST_ONE_NEG}) != 0 ? -1.0 : 1.0) * bar.x, bar.y);
     }
     lo = mn.y - room - ext - 1.0;
     hi = mx.y + room + ext + 1.0;
@@ -605,7 +632,7 @@ void main() {
       if (nl.y * ((flags & ${ST_FLIP}) != 0 ? 1.0 : -1.0) < 0.0) nl = -nl;
       float l = clamp(0.35 * hl, 1.2 * hw, 2.5 * hw), d = hw, at = 0.0;
       float edge = min(min(dot(centreAt(q, at - l) - qm, nl), dot(centreAt(q, at) - qm, nl)), dot(centreAt(q, at + l) - qm, nl));
-      vec2 rc = qm + dl * at + nl * (edge + hw - 2.0 * u_ring - u_pixel + d);
+      vec2 rc = qm + dl * at + nl * (edge + dot(nl, vec2(0.0, oneBar.x)) + oneBar.y - 2.0 * u_ring - u_pixel + d);
       shift = along * rc.x + across * rc.y;
       ra = along * dl.x + across * dl.y;
       rn = along * nl.x + across * nl.y;
@@ -931,6 +958,8 @@ uniform float u_bands;             // px a band's shift of one line width is dra
 uniform float u_bands_m;           // and of a metre to its ribbon's middle (T-2132)
 uniform vec2 u_passing;            // T-2233: px from the centre line to a passing station's outer track, 1 drawn there
 uniform float u_keep;              // T-3297: 1 where trains keep right of their travel, -1 left
+uniform int u_level_hide;          // T-3420: the levels not drawn (the strokes' u_level_hide), and per sample its height in levels
+uniform highp sampler2D u_slevel;
 out float v_alpha;
 in vec2 a_load;               // this trip's first load in u_loads or -1, seconds to its last stop
 in vec4 a_stand;              // its stand at the terminal (T-1785): from, until - epoch (s), the next
@@ -938,6 +967,7 @@ in vec4 a_stand;              // its stand at the terminal (T-1785): from, until
 in vec4 a_bay;                // where it stands at its ends (T-2980, terminalBays.ts \`assignBays\`)
 ${SEL_GLSL}
 ${POS_GLSL}
+${LEVEL_SHOWN_GLSL}
 out vec2 v_uv;
 flat out float v_k;
 out vec2 v_px;
@@ -1010,6 +1040,8 @@ void main() {
   // the selected train is drawn last, over the others, with its halo under it (T-242)
   bool chosen = u_sel_trip.x >= 0.0 && abs(a_trip.x - u_sel_trip.x) < 0.5 && abs(a_trip.y - u_sel_trip.y) < 0.01;
   if ((u_pass == 0) == chosen || !trainDist(L, d, line)) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  // T-3420: a hidden line's trains
+  if (texelFetch(u_line_colours, ivec2(line % ${LINES_W}, line / ${LINES_W}), 0).a < 0.5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
   float rawCars = texelFetch(u_cars, tc(line, ${LINES_W}), 0).x;
   // a tram (T-2926): its sections as a whole number plus a half; 2.4 m across, sections end to end
   bool tram = rawCars >= 1.0 && fract(rawCars) > 0.25;
@@ -1037,6 +1069,12 @@ void main() {
   d = centre;
   float offsetM = u_detail ? (float(car) + 0.5) * pitchM - totalM * 0.5 : 0.0;
   float carD = u_detail ? centre + offsetM : d;
+  // T-3420, T-3560: a car on a switched-off level is drawn faint
+  float lvShown = 1.0;
+  if (u_level_hide != 0) {
+    int sl = int(L.x + clamp(floor(clamp(carD, 0.0, L.z) / max(L.w, 1e-6)), 0.0, max(L.y - 1.0, 0.0)));
+    lvShown = levelShown(texelFetch(u_slevel, tc(sl, ${TEX_W}), 0).x);
+  }
   vec2 p = lineAtX(L, carD);
   // local units per metre of ground where the train is (T-307: mercator's scale, 1 / cos(lat))
   float kM = cosh(u_psi0 - p.y * ${PSI_PER_UNIT.toExponential(9)});
@@ -1113,7 +1151,7 @@ void main() {
   v_px = px;
   vec3 lc = texelFetch(u_line_colours, ivec2(line % ${LINES_W}, line / ${LINES_W}), 0).rgb;
   v_color = lc * 0.48;
-  v_alpha = selectedLine(line) ? 1.0 : u_dim;
+  v_alpha = (selectedLine(line) ? 1.0 : u_dim) * lvShown;
   // How full it is (T-084): the stretch it runs, from the sample ahead of it on its way.
   int run = (int(a_trip.x + 0.5) / 3) % 2;
   float i = floor(clamp(d, 0.0, L.z) / L.w) + (g_run == 0 ? 1.0 : 0.0);

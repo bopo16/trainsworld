@@ -34,16 +34,26 @@ roads and under its labels, so under our own network (which is drawn on the over
 everything). Three classes by colour and width, in both themes (`realMain`, `realOther`, `realMetro`
 in `game/shadeTable.ts`): main line, other passenger rail, metro. Light rail is drawn as other rail: the tiles carry no usage, so
 S-Bahn and S-tog track come with Stadtbahn, US light rail, the DLR and Metrolink [T-3285]. Trams, monorails,
-funiculars, narrow gauge, heritage lines and track no line runs over are drawn only under All, which shows every feature the tiles carry; yards, sidings and freight-only track are not in the tiles (dropped when they are built), so there is no freight. Snapping goes only to passenger track, so while it is on the layer shows only that, whatever the setting says. Lines appear
+funiculars, narrow gauge, heritage lines and track no line runs over are drawn only under All, which shows every feature the tiles carry, and also freight (usage freight or industrial, yards, sidings, spurs) and abandoned or disused rail from a second archive per region, `<cc>_extra.pmtiles`, built by `pipeline/real_extra.py` [T-3464]: drawn under the region's passenger layer, freight a thin solid line (`realFreight`) and abandoned a thinner dashed one (`realAbandoned`), only for regions `extra.json` lists, never in Passenger or while snapping. Until the worldwide rebuild runs, All shows no freight. While the track tool snaps, the layer shows only what that track type follows (all but tram rail for train track, all but monorail for tram track, under All; the passenger track under Passenger, with every tram line for tram track) [T-3495, T-3069, ui-building.md "Snapping to the real network"]. Lines appear
 from zoom 6 [T-2748: from zoom 4 a view of Europe drew 41 regions' tiles, most of a frame's cost on
 the map a new game picks a city on]; each region's tiles are added when the view first touches it, nearest first, and
 nothing is fetched while it is hidden. The lines are noritetsu's per-region tiles (OSM and
 the national registers, one `track` layer); the tiles carry no line type or name at low zoom, so
 there is no high-speed class and no hover yet.
 
+**Real stations** [T-3570, `map/realStations.ts`]: "Show stations" under the Real world network buttons, off by
+default, draws a small filled dot on each real station (`realMetro` purple, 36% opaque in light,
+42% in dark, `realStationOpacity`) from zoom 10, over the lines and under the labels, whenever the lines show
+(by the setting or while snapping). Hovering a dot shows the station's name and nothing else (the name the
+station tool would give it, else the local name). A station whose every line is a tram, funicular, monorail or
+narrow gauge one shows only where those lines do: under All, or while tram track snaps. The stations are
+noritetsu's model's (`data/<cc>/stations.json`, junction points left out; the tram test reads the region's
+`lines.json`), fetched per region when the view at zoom 10 or closer first touches it with the setting on.
+Snapping is unchanged.
+
 ## Terrain (hill shading)
 
-**Terrain**, off by default [T-1270], switched by the mountain button beside the Build tab's price per km
+**Terrain**, on by default (Anita, 2026-11-17; a stored off from before was dropped once) [T-1270], switched by the mountain button beside the Build tab's price per km
 (T-1394) or Settings > Show: MapLibre's hillshade over the land cover and
 under roads, from the Terrain Tiles on AWS Open Data (Terrarium PNG, 256 px, fetched to zoom 12 and
 stretched past it; `map/basemap.ts`). The water is drawn again over it (`water_over_shade`), so the
@@ -115,7 +125,8 @@ has no hover of its own; the track tool's tag names the class and its factor [T-
 - **Double track as its two tracks, close in** [T-658, `laneState` in `map/renderer.ts`, design
   notes/T-658.md]: drawing only; the track stays one piece. Where 4 m on the ground is 4 px on
   screen, a double track's stroke starts growing to its two tracks' width (4 m plus a track's
-  2.4 m), which it reaches at 7 px; from there to 10 px a stripe opens down its middle, widening
+  2.4 m), which it reaches at 7 px (bare track is never drawn narrower than its tracks' outer edges, 4 m plus its own
+  width, so its stroke follows the ground from about 2.9 px, zoom 15.5 in New York, T-3533; a line's ramp is as above); from there to 10 px a stripe opens down its middle, widening
   to 1.6 m while the outline stays the same, each track half of what is left, until the tracks'
   centres are 4 m apart and each is 2.4 m wide; from 10 px on everything is to scale, except that
   from 10 to 16 px each track narrows to 1.92 m (80%; `LANE_NARROW`, T-713) so the riders waiting
@@ -166,10 +177,10 @@ has no hover of its own; the track tool's tag names the class and its factor [T-
   station, two-way single track splits into two tracks as double track's are [T-3212,
   `singleSplitEnds` in `map/terminalBays.ts`]: two along the platform (half of it each side of a
   through station, all of a dead end's), easing back to one over 60 m past each end, carried on
-  through plain nodes. It shows only once double track's two tracks part (from 4 m at 7 px), opening out of single track's width; further
+  through plain nodes; tram stops split too, their trams meeting there (T-3540, T-3563). It shows only once double track's two tracks part (from 4 m at 7 px), opening out of single track's width; further
   out the track and its lines keep single track's width through the station (`F_SPLIT`; Anita,
   2026-11-11: no thickening before the tracks show). Trains of opposite directions meet there (the capacity's passing points),
-  and stand on the two tracks; the station has a platform each side, as on double track. A split
+  and stand on the two tracks; the station has a platform each side, as on double track (T-3564). A split
   that reaches double track within its 60 m stays two tracks to it, and double track meeting
   single at such a station does not narrow; one that reaches a junction first eases over what
   room there is. One-way single track, and single track joining one track of a double at the
@@ -405,7 +416,9 @@ has no hover of its own; the track tool's tag names the class and its factor [T-
     Elevation colour of the level the meeting is on [T-673]. A junction is built once three of its ends are, a crossing
     once both tracks are. A crossing the model refuses (on a ramp, the tracks less than a level
     apart; [track-and-service.md](track-and-service.md) "The graph") is a red X, hover "Tracks cross
-    on a ramp less than a level apart" [T-2226].
+    on a ramp less than a level apart" [T-2226]. Where tram track crosses rail, the X's tram stroke stops short
+    either side of the rail's, and where two tram tracks cross both stop short of the centre (hover "Trams yield
+    here"), on built track and in the drawing tool's preview alike (`Network::crossing_trams`) [T-3062, T-3535].
   - **One-way track no train can use** [T-3164, `Network::node_unusable`]: at a node with no station
     and two or more track ends, one-way single track pointing in with no move on, or pointing out
     with no move into it, gets a red badge with two arrows, pointing at each other or apart, sized
@@ -442,8 +455,8 @@ picked; the same line joins two bus lines' stops within 100 m of each other, one
 its vehicles go and sticking out both sides of the route, twice as wide as they are long (their casing only
 off the route), none in the Speed and Profit displays (T-2991, `oneWayMarks.ts`). Its street rings are half filled, the half on the right of the way the buses go, where the sim serves the stop one way (`line_stop_ways`, T-3147), and the bus stop hover has the line's chevron after its bullet. In stop editing, the hover over a stop served one way has "One way stop" above "Click to remove the stop" (T-3211). A train loop run one way
 has a tiny white chevron on the line instead, on the edges its path runs once (a balloon's tail runs both
-ways), from zoom 12 where the line or its band is at least 4.5 px wide, in the Line view only. Both are
-placed every 100 m along the route (bus and ferry arrows 125 m); at each zoom every 2^n-th is drawn so they are at least 150 px apart (arrows 190 px),
+ways), from zoom 13 where the line or its band is at least 4.5 px wide, in the Line view only. Both are
+placed every 100 m along the route (bus and ferry arrows 125 m); at each zoom every 2^n-th is drawn so they are at least 300 px apart (arrows 190 px),
 and none closer to a stop than its mark (14 px from a station). Selecting the line draws its 300 m
 corridor as a 1 px outline in the line's colour at 75% (the outline of the union of its segments, made
 with the stencil; `busLayer.ts`, T-1490); hovering draws nothing, and nothing is shaded. Hovering the route gives a rail line's tag: the line's
@@ -490,7 +503,8 @@ number) and shows n as its symbol.
   never shorter than it is wide. Further out, to zoom 14, it keeps that 11.25 px on screen (white 7.25 px
   across) while its length keeps shrinking with the ground, about 40-55 px at zoom 14. The same
   width in every mode: a wide traffic line or a ribbon of lines side by side can be wider than its
-  stations (T-1821). Everything that draws or
+  stations (T-1821). A tram stop's box, and the bulge of its one platform, are 0.7 of that width
+  (`TRAM_BOX`, T-3540; Anita: 30% narrower). Everything that draws or
   tests a platform (box, crowd fill, track stencil, picking, placement ghost, selection
   outline, the cut-out in the bubbles) uses that one line (`polyFrame` in the shaders,
   `stationShape`, `stationPath`). Blueprint stations are drawn as blueprint track is (T-2930): a light blue
@@ -500,15 +514,24 @@ number) and shows n as its symbol.
 - **Inside the white** [T-236], over the crowd fill: the track and line strokes run through the
   box (drawn where a stencil marks the white, no wider than 30% of it, without casing). No platform
   edges are drawn [T-1121].
-- **A platform each side, close in** [T-658c]: on a double-track station, or one where single track splits (T-3212; flag 16 in the station
-  buffer), as the two tracks part ("Lines and track") each direction's riders stand on their own
+- **A platform each side, close in** [T-658c]: on a double-track station, or one where single track splits (T-3212, T-3564; flag 16 in the
+  station buffer), as the two tracks part ("Lines and track") each direction's riders stand on their own
   platform, from the outer edge of its track out to the rim [T-1121], instead of filling half the box:
   the + side is the right of the platform axis, so with trains keeping right those travelling along the
   axis stand there, and with trains keeping left those travelling against it (T-3297). At a station with passing tracks the platform is an island between
   the running track and the outer track (where trains on both stop, T-2248), so its riders stand
   from the running track's outer edge to the outer track's inner edge [T-2249, `u_pass_in`]; from
-  zoom 14 to where the tracks part, from the middle to the outer track. A single-track station is
-  unchanged.
+  zoom 14 to where the tracks part, from the middle to the outer track.
+- **One platform on single track** [T-3540, `map/stationSide.ts`; Anita, 2026-11-17]: a station whose
+  track is single both ways and does not split round a passing loop (a one-track stop, one-way single track,
+  single track joining one track of a double), rail or tram, is drawn as a one way station on double
+  track is (T-3332): a thin bar centred on its track (`ST_ONE_MID`) with the bulge on one side, filled as
+  its fuller side (`ST_SINGLE`), and a waiting room on that side joined to the bar. A passing station keeps
+  a platform each side (T-3564, Anita: "drawing can go back for this case"). The side is the outside: (1) followed through plain nodes up to 3 km, where the track
+  leaves one track of a double (its join), the side that track is on, so the two legs of a split double
+  face away from each other; (2) else on one-way track the side trains keep to; (3) else south-east of
+  the track (east of north-south track, south of east-west), south-west where trains keep left (the
+  mirror image). Drawing only.
 - **A player link's bridge** [T-197]: a straight white band 3 px wide at zoom 15 (fixed on the
   ground) with the 2 px rim along both sides, between the nearest points of the two platforms'
   centre lines, at least 6 px inside each platform's ends; overlapping platforms get one inside
@@ -752,8 +775,10 @@ those who got on, less the load carried on.
   round mouth, a z) 4% on happy and tired faces; crying (eyes shut, a wailing mouth, two streams of
   tears) 8% and knocked out (cartoon X eyes, a tongue out) 3% on sad ones; a bucket hat, a
   baseball cap or sunglasses 2.5% each on any face (no sunglasses over shut or X'd eyes, and no z
-  under a hat); short hair 10% and long hair 10%, in one of four colours (brown, black, auburn,
-  honey), on a face with no hat [T-1852]; and a child, drawn at 72% size, 6%. In a country the
+  under a hat); short hair 14%, long 12%, a ponytail 8% and wavy 10%, in one of four colours (brown, black,
+  auburn, honey), on a face with no hat [T-1852, T-2906]; wavy is drawn 1.8 times as often in
+  Africa and Europe (1.5 to 1.6 in the Americas and Oceania) and a quarter to 0.4 times as often in
+  East and Southeast Asia (`wavy` in `map/faceTones.ts`); and a child, drawn at 72% size, 6%. In a country the
   table in `map/faceTones.ts` lists (the station's zone's country), a face is one of six plain skin
   tones instead of the mood's yellow, drawn from the country's weights, tired ones mixed 35% towards
   drained yellow and sad ones 45% towards blue, and its hair colour is drawn from the country's weights (black
@@ -921,7 +946,10 @@ those who got on, less the load carried on.
   first.
 - **Reversal icons** [T-797, T-1581; `map/reversalMarks.ts`]: over every station where a line's trains
   reverse partway (`LineStats.reversals`, from `TrackApi::line_reversals`) and every bare track end
-  they reverse at (`LineStats.endTurns`, `TrackApi::line_end_turns`), a badge in the built flat
+  they reverse at (`LineStats.endTurns`, `TrackApi::line_end_turns`); a loop that turns back at its
+  first stop and at one other stop, nowhere else, runs out and back between them (over a one-way pair,
+  say), so both are its ends and neither is marked, nor given the stop list's turn icon
+  (`partwayReversals` in `game/turnedLine.ts`, T-3538). The icon is a badge in the built flat
   junction badge's style: the casing colour inside, a 1 px amber ring and an amber U-turn arrow
   (#c98a00, #e8b020 in the dark theme), at 0.9 opacity, floating on a 1 px stem 6 px long just
   above the place so the stop editing marker on it stays clickable. Its diameter is twice the

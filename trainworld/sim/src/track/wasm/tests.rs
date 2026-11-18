@@ -429,20 +429,34 @@ fn crossing_and_junction_marks() {
     // a route across it: the preview names the crossing, nothing is made
     assert_eq!(a.preview_route(&line(500.0, -300.0, 500.0, 300.0), &[], 2, false)[0], 1.0);
     let m = a.preview_marks();
-    assert_eq!(m.len(), 3, "{m:?}");
-    assert!((m[0] - 500.0).abs() < 1.0 && m[1].abs() < 1.0 && m[2] == 0.0);
+    assert_eq!(m.len(), 4, "{m:?}");
+    assert!((m[0] - 500.0).abs() < 1.0 && m[1].abs() < 1.0 && m[2] == 0.0 && m[3] == 0.0, "rail over rail: no trams {m:?}");
     assert!(a.crossings_info().is_empty());
     assert_eq!(a.add_route(&line(500.0, -300.0, 500.0, 300.0), &[], 2, false), 0);
     let c = a.crossings_info();
-    assert_eq!(c.len(), 5);
-    assert_eq!(&c[2..], &[0.0, 0.0, 0.0], "a flat crossing at level 0, not built");
+    assert_eq!(c.len(), 6);
+    assert_eq!(&c[2..], &[0.0, 0.0, 0.0, 0.0], "a flat crossing at level 0, not built, no trams");
+    // T-3535: tram track across rail: the preview's crossing counts the tram as the placed one does
+    a.set_route_kind(TrackKind::Tram as u8);
+    assert_eq!(a.preview_route(&line(800.0, -300.0, 800.0, 300.0), &[], 2, false)[0], 1.0, "{}", a.issues());
+    let m = a.preview_marks();
+    assert!(m.chunks(4).any(|r| (r[0] - 800.0).abs() < 1.0 && r[2] == 0.0 && r[3] == 1.0), "tram over rail: one tram {m:?}");
+    assert_eq!(a.add_route(&line(800.0, -300.0, 800.0, 300.0), &[], 2, false), 0, "{}", a.issues());
+    assert!(a.crossings_info().chunks(6).any(|r| (r[0] - 800.0).abs() < 1.0 && r[5] == 1.0), "placed: one tram");
+    // tram across tram: two
+    assert_eq!(a.preview_route(&line(700.0, 150.0, 900.0, 150.0), &[], 2, false)[0], 1.0, "{}", a.issues());
+    assert!(a.preview_marks().chunks(4).any(|r| (r[0] - 800.0).abs() < 1.0 && r[3] == 2.0), "tram over tram: two");
+    a.set_route_kind(TrackKind::Regular as u8);
+    // rail track across tram: one
+    assert_eq!(a.preview_route(&line(700.0, 200.0, 900.0, 200.0), &[], 2, false)[0], 1.0, "{}", a.issues());
+    assert!(a.preview_marks().chunks(4).any(|r| (r[0] - 800.0).abs() < 1.0 && r[3] == 1.0), "rail over tram: one");
     // a route leaving the first track: a flat junction at its start, flying none
     let e = a.edges_info()[0];
     let from_edge = [2.0, e, 200.0, 0.0, 0.0];
     let ends: Vec<f64> = from_edge.iter().chain(free(200.0, -600.0).iter()).copied().collect();
     assert_eq!(a.preview_route(&ends, &[], 2, false)[0], 1.0);
     let m = a.preview_marks();
-    assert!(m.chunks(3).any(|r| r[2] == 1.0 && (r[0] - 200.0).abs() < 1.0), "{m:?}");
+    assert!(m.chunks(4).any(|r| r[2] == 1.0 && (r[0] - 200.0).abs() < 1.0), "{m:?}");
 }
 
 #[test]
@@ -1502,7 +1516,7 @@ fn t079_track_keeps_its_shape_until_reshaped() {
     // as T-079 stored it: fitted PIs with set radii, and the point clicked
     let fitted = vec![Pi::new(1200.0, 380.0, 1500.0, 0), Pi::new(2800.0, 380.0, 1500.0, 0)];
     let clicks = vec![Pi::new(2000.0, 300.0, 0.0, 0)];
-    let op = Op::Edge { id: e, data: Some(EdgeData { a: n0, b: n1, tracks: 2, pis: fitted.clone(), built: false, off: false, thru: clicks.clone(), crossover: false, kind: TrackKind::Regular, sep: false, day: 0, oneway: 0, join: [0; 2] }) };
+    let op = Op::Edge { id: e, data: Some(EdgeData { a: n0, b: n1, tracks: 2, pis: fitted.clone(), built: false, off: false, thru: clicks.clone(), crossover: false, kind: TrackKind::Regular, sep: false, day: 0, oneway: 0, join: [0; 2], limit: 0 }) };
     assert!(a.w.apply(op).is_ok());
     let bytes = a.save();
     assert_eq!(&bytes[..4], b"TWT4");
@@ -1677,6 +1691,62 @@ fn a_station_past_a_headshunt_reverses_at_the_track_end() {
     assert!((split[1] - 4.0 * 180.0).abs() < 1e-9, "two ends and the track end both ways: {split:?}");
 }
 
+/// T-3541: blueprint drawn on from the bare end a running line turns at leaves it turning there and
+/// running; once that track is built the line turns at its new end, still running.
+#[test]
+fn blueprint_past_a_headshunt_leaves_the_line_running() {
+    use super::super::tests::{line, reversal_fixture_with};
+    let mut a = api();
+    let (w, [x, _, _, m, br]) = reversal_fixture_with(false);
+    a.w = w;
+    let id = line(&mut a.w, &[m, br], [6.0, 3.0, 0.0]);
+    assert_eq!(a.line_end_turns(id), vec![x as f64]);
+    let ends = [1.0, x as f64, 0.0, 0.0, 0.0, 0.0, 0.0, -4000.0, 0.0, 0.0];
+    assert_eq!(a.add_route(&ends, &[], 2, false), 0, "{}", a.issues());
+    let ls = &a.w.svc.lines[id as usize];
+    assert!(ls.ok && ls.running, "a blueprint past X stops the line");
+    assert_eq!(a.line_end_turns(id), vec![x as f64]);
+    assert_eq!(a.construct_all(), 0, "{}", a.issues());
+    let ls = &a.w.svc.lines[id as usize];
+    assert!(ls.ok && ls.running, "built past X, the line no longer runs");
+    assert_ne!(a.line_end_turns(id), vec![x as f64], "X is no track end once built past");
+}
+
+/// T-3595: as above, but the new track ends at a station the line does not stop at. Built, X is no
+/// track end; the line turns at the station's end instead, running in and out without stopping.
+#[test]
+fn built_past_a_headshunt_to_a_station_leaves_the_line_running() {
+    use super::super::tests::{line, reversal_fixture_with, station};
+    let mut a = api();
+    let (w, [x, _, _, m, br]) = reversal_fixture_with(false);
+    a.w = w;
+    let id = line(&mut a.w, &[m, br], [6.0, 3.0, 0.0]);
+    let ends = [1.0, x as f64, 0.0, 0.0, 0.0, 0.0, 0.0, -4000.0, 0.0, 0.0];
+    assert_eq!(a.add_route(&ends, &[], 2, false), 0, "{}", a.issues());
+    let net = &a.w.net;
+    let far = (0..net.node_count() as u32).filter(|&n| net.node_ok(n)).min_by(|&p, &q| {
+        let d = |n: u32| (net.node_x[n as usize] + 4000.0).hypot(net.node_y[n as usize]);
+        d(p).total_cmp(&d(q))
+    }).unwrap();
+    station(&mut a.w, far, 200);
+    let ls = &a.w.svc.lines[id as usize];
+    assert!(ls.ok && ls.running, "a station on blueprint past X stops the line");
+    assert_eq!(a.construct_all(), 0, "{}", a.issues());
+    let ls = &a.w.svc.lines[id as usize];
+    assert!(ls.ok && ls.running, "built past X to a station, the line no longer runs");
+    assert_eq!(a.line_end_turns(id), vec![far as f64], "it turns at the new end, the station");
+    assert!(!ls.runs.iter().any(|r| r.stop_idx.iter().any(|&k| r.nodes[k as usize] == far)), "and does not stop there");
+    // built on again past that station: the line turns at the newer end, still running
+    let fx = a.w.net.node_x[far as usize];
+    let on = [1.0, far as f64, fx, 0.0, 0.0, 0.0, 0.0, fx - 1500.0, 0.0, 0.0];
+    assert_eq!(a.add_route(&on, &[], 2, false), 0, "{}", a.issues());
+    assert_eq!(a.construct_all(), 0, "{}", a.issues());
+    let ls = &a.w.svc.lines[id as usize];
+    assert!(ls.ok && ls.running, "built past the station too, the line no longer runs");
+    let turns = a.line_end_turns(id);
+    assert!(turns.len() == 1 && turns[0] as u32 != far, "it turns at the newest end, {turns:?}");
+}
+
 /// T-798: on a ring the first stop's marker closes the line into a circle, then opens it; a
 /// closed line takes new stops inside the loop only.
 #[test]
@@ -1708,6 +1778,19 @@ fn the_first_stop_closes_and_opens_a_loop() {
     let id = b.new_line_id();
     assert_eq!(b.set_line(id, &ns[..2], 6.0, 4.0, 2.0, 30.0, 180.0, 0, 0, "L".into()), 0);
     assert_eq!(b.stop_tiers(id).chunks(3).find(|c| c[0] as u32 == ns[0]).unwrap()[1], 5.0, "the ring leads round");
+}
+
+/// T-3042: a junction a looped route passes twice is one mark, at its first pass.
+#[test]
+fn a_junction_passed_twice_is_one_mark() {
+    let mut a = api();
+    let (w, [s0, m, _, k]) = super::super::tests::balloon_fixture();
+    a.w = w;
+    let id = a.new_line_id();
+    assert_eq!(a.set_line(id, &[s0, m, k, m, s0], 6.0, 4.0, 2.0, 30.0, 180.0, 0, 0, "L".into()), 0, "{}", a.issues());
+    let marks = a.line_marks(id);
+    assert_eq!(marks.len(), 6, "{marks:?}");
+    assert_eq!((marks[0], marks[1]), (4.0, 1.0), "the junction, after the second stop");
 }
 
 /// T-244: the corners of a stroke, and the same stroke as one edge (set directly).
@@ -2275,7 +2358,7 @@ fn a_station_spans_several_short_segments() {
     let mid = segs[2];
     let (x, y, _) = geom::pos_at(a.w.net.edge_pieces(mid), a.w.net.edge_len[mid as usize] / 2.0);
     assert_eq!(a.add_station(2, mid, x, y, 400, "Long".into()), 0, "{}", a.issues());
-    assert!(a.w.net.node_platform.iter().any(|&p| p == 400));
+    assert!(a.w.net.node_platform.contains(&400));
     assert_eq!(a.undo(), 0);
     assert_eq!(live_edges(&a).len(), 6);
 }
@@ -3655,4 +3738,38 @@ fn a_complex_rename_does_not_flag_the_station() {
     assert_eq!(a.named_stations(), vec![n]);
     assert_eq!(a.set_station_name(n, "Again".into()), 0);
     assert_eq!(a.named_stations(), vec![n]);
+}
+
+/// T-3412: a station placed within a split's 5 m of a bare end of track goes on the end; at a junction it is still refused.
+#[test]
+fn a_station_near_a_bare_end_goes_on_the_end_and_a_junction_still_refuses() {
+    for (x, platform) in [(2.0, 200u16), (2998.0, 200), (3.0, 60), (2997.0, 100)] {
+        let mut a = api();
+        let mut ends = free_at(0.0, 0.0, 0);
+        ends.extend(free_at(3000.0, 0.0, 0));
+        assert_eq!(a.add_route(&ends, &[], 2, false), 0, "{}", a.issues());
+        let e = edge_under(&a, 1500.0, 0.0);
+        let before = a.w.net.edge_count();
+        assert_eq!(a.add_station(2, e, x, 0.0, platform, "End".into()), 0, "at {x}: {}", a.issues());
+        assert_eq!(a.w.net.edge_count(), before, "at {x}: no split, the end node is the station");
+        let n = (0..a.w.net.node_count() as u32).find(|&n| a.w.net.node_ok(n) && a.w.net.node_platform[n as usize] > 0).expect("a station");
+        assert_eq!(a.w.net.node_ports[n as usize].n, 1, "at {x}: on the bare end");
+        assert_eq!(a.undo(), 0);
+        assert!(!(0..a.w.net.node_count() as u32).any(|n| a.w.net.node_ok(n) && a.w.net.node_platform[n as usize] > 0));
+    }
+    // a junction: three pieces meet, a station within 5 m of it is refused as before
+    let mut a = api();
+    let mut ends = free_at(0.0, 0.0, 0);
+    ends.extend(free_at(1000.0, 0.0, 0));
+    assert_eq!(a.add_route(&ends, &[], 2, false), 0, "{}", a.issues());
+    let j = (0..a.w.net.node_count() as u32).find(|&n| a.w.net.node_ok(n) && (a.w.net.node_x[n as usize] - 1000.0).abs() < 1.0 && a.w.net.node_y[n as usize].abs() < 1.0).unwrap();
+    for to in [(2000.0, 0.0), (1000.0, 1000.0)] {
+        let mut e2 = vec![1.0, j as f64, 0.0, 0.0, 0.0];
+        e2.extend(free_at(to.0, to.1, 0));
+        assert_eq!(a.add_route(&e2, &[], 2, false), 0, "{}", a.issues());
+    }
+    assert_eq!(a.w.net.node_ports[j as usize].n, 3);
+    let e = edge_under(&a, 500.0, 0.0);
+    assert_ne!(a.add_station(2, e, 998.0, 0.0, 100, "J".into()), 0);
+    assert!(a.issue_kinds().contains("SplitPoint"), "{}", a.issue_kinds());
 }

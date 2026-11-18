@@ -53,7 +53,7 @@ Full design, numbers and sources: `notes/T-008.md`.
   7,183 at 320; any speed from 20 to 320 km/h (T-3121), so 253 m at 60 and 29 m at 20, never under
   the track kind's smallest radius (`design_radius`, `TrackApi::set_design_speed`, `DESIGN_MIN_KMH`).
   It also sizes the lead-in curves of a drawn segment (`lead_in_capped`). Above 160, a corner the
-  tool makes whose curve comes out wider than 1,796 m gets that radius set, since an auto radius is
+  tool makes or the player clicks whose curve comes out wider than 1,796 m gets that radius set (T-3421), since an auto radius is
   always capped at 1,796 m; under 160, every auto corner of the route, clicked ones too, gets the
   design radius set where its curve would come out wider (T-3121: a low target lays tight curves),
   and so do the corners a reshape or node drag makes. So drawn track keeps its shape and existing
@@ -99,7 +99,8 @@ Full design, numbers and sources: `notes/T-008.md`.
   no charge and no refund, and lines, trains, levels and curve radii carry over unchanged. Joints that cannot be joined
   (a different track count, high speed beside ordinary, constructed beside blueprint, blueprint switched on beside off) stay, and a platform that
   reaches one is refused as "the end of a piece of track"; a station clicked within 5 m of one
-  goes on the joint itself (T-1964). A platform may not reach a crossing
+  goes on the joint itself (T-1964), and within 5 m of a bare end of track on that end, its platform
+  running back from it (T-3412); a junction stays refused. A platform may not reach a crossing
   with track on the same level (a flat crossing, 6.2), within 1 m of its ends, nor lie on a ramp
   (a split on a ramp is refused as the platform's ramp).
 - **Reshaping blueprint track** (T-064, T-092, T-071): a selected stretch of blueprint track shows its PIs
@@ -158,6 +159,12 @@ Full design, numbers and sources: `notes/T-008.md`.
   crossing between levels, track on top of track), and so does any flat crossing on the piece
   (`PlatformCrossing`): a crossing that close would sit at the platform's end. A station's name
   suggestions (T-534, `map/stationNames.ts`, worked out when asked and never stored) are:
+  - **the real station** [T-3571]: the real station (noritetsu's, `map/realStations.ts`) nearest the spot
+    within 150 m, in Latin letters as the game writes place names: its own name where that is in them,
+    else its English one, else Cyrillic transliterated; one with none of those (some of Japan's,
+    China's, Greece's) or a name in use gives no suggestion. A ferry port never takes one. The region's
+    stations are fetched when the station tool is picked; a click before they arrive names as if there
+    were none;
   - **the cross street**: the nearest named street on the basemap within 400 m ("W 42nd St"), when
     the map is at zoom 13 or closer (further out the tiles hold only the bigger roads), skipping
     any street whose direction where it comes nearest is within 30° of the track's there (the
@@ -174,7 +181,7 @@ Full design, numbers and sources: `notes/T-008.md`.
   a stop's own label in OSM) is suggested; the next candidate takes its place. A city, town,
   village or hamlet keeps its name even then (Huntington Station is a place) [T-568].
 
-  A new station takes the cross street, else the neighbourhood, else the nearest place of any kind
+  A new station takes the real station, else the cross street, else the neighbourhood, else the nearest place of any kind
   on the place list (neighbourhoods within 2.5 km of their label point, towns 5 km), else a place
   on the loaded tiles, else "Station N". A place name in use gives way to another place at most
   800 m further, else the way the station lies from it ("North Williamsburg"), else a number
@@ -232,8 +239,8 @@ Full design, numbers and sources: `notes/T-008.md`.
   edit for each run it touches, and on load): the single-track pieces through nodes where only two of
   them meet. Each run end votes: a join gives the way trains keep to on that track (the right track
   looking out along the piece carries trains away from the node with right-hand running), a bare track
-  end says nothing, and anything else says both ways (a station, double track or a crossover end to
-  end, a junction end with no join). A station anywhere on the run also says both. The run runs one way
+  end says nothing, and anything else says both ways (a station at a bare end, double track or a crossover end to
+  end, a junction end with no join). A station inside the run, or at a join that counts, says nothing (T-3386). The run runs one way
   where its join votes agree (at least one) and nothing says both; otherwise both ways, so a branch to
   a terminus runs both ways and a hand-laid flyover's legs, joined the way their trains come, each one
   way. The track inspector's "Run trains one way" switch shows the way the piece runs, taken by itself included (hover "Set by the track it joins" then). Switched on it stores the way (the run's own, else 1), off it stores 3 where the run gives a way (pinned both ways) and 0 where it does not; "Use automatic way", shown only where the stored way differs from the run's, stores 0 again; "Reverse direction" turns it
@@ -304,11 +311,13 @@ Full design, numbers and sources: `notes/T-008.md`.
   trains use; ordinary trains run on it at 160. The track inspector shows the limit.
 - **Tram track** (T-2921, T-2926; design notes/T-2921.md): a third kind of track, `TrackKind::Tram` (the table
   `TRACK_SPECS` in params.rs holds every kind's figures; `game/trackKinds.ts` copies them for the app).
-  Single, double or quad (T-3352: single tram is 0.6x its price and upkeep, a stop on it is one platform with no passing loop; T-3166: quad is two tram doubles 8 m apart, off-street, so priced 0.5x at ground twice over), curves down to 18 m (`TRAM_MIN_RADIUS`, T-2997), 80 km/h cap, priced by level at 0.1x (on streets,
+  Single, double or quad (T-3352: single tram is 0.6x its price and upkeep, a stop on it is a passing station or one with no passing loop as a rail station is, and its trams meet at one as trains do (T-3563: trams path as trains in every way); T-3166: quad is two tram doubles 8 m apart, off-street, so priced 0.5x at ground twice over), curves down to 18 m (`TRAM_MIN_RADIUS`, T-2997), 80 km/h cap, priced by level at 0.1x (on streets,
   T-2927), 0.5x (off street) of the 75M a km, viaducts and tunnels 0.4 under rail's, plus a quarter of what hills
   and mountains add (`TRAM_TERRAIN`, T-3004), and it pays no road crossings. The track bar's
   Tram type (`TrackApi::set_route_kind(3)`, also the Build tab's Tram button) lays it at ground level; the ramp
-  switch and target speed do not apply. Tram track and train track never meet at a node
+  switch and target speed do not apply. Snapped to the real network (its own switch, T-3069; ui-building.md
+  "Snapping to the real network") it follows real tram and light rail and is laid as this off-street kind, curves
+  fitted to the rail at 10 m (25 m where that fails) down to the 18 m radius. Tram track and train track never meet at a node
   (`TrackFamily`: "Tram track and train track can't join. They can cross."), so while one is picked the other's
   track and stations are not snap targets; they cross flat and hold each other in capacity at the train's 120 s.
   A stop is a station with a 20 to 80 m platform (default 40, remembered apart from rail's), at a flat US$2M
@@ -341,7 +350,7 @@ Full design, numbers and sources: `notes/T-008.md`.
   within 100 m draws ordinary tram track; no street path is refused as the bus tool's are; no fit says "The streets
   are too tight here. Add a point on the way." Street track reshaped by hand becomes tram track. Both kinds look
   alike on the map: 0.75 of rail's width, lines over them too, with two thin wires along the middle, white in light
-  and near white in dark (`tramWire`, T-3006), once a stroke is wide enough, one along each track once they part (blueprint's only then).
+  and near white in dark (`tramWire`, T-3006), once a stroke is wide enough, one along each track once they part (blueprint's only then); a single tram track keeps its wire close in (Anita, 2026-11-17).
 - **Snap to roads** (T-3129, rail with Regular or High speed; notes/T-3129.md): a switch in the track bar beside the
   real-network and beside-track ones, off by default, remembered, and off whenever either of those is on (and they
   turn it off). While it is on the roads rail may follow are tinted orange over the map (motorway, trunk, primary,
@@ -404,7 +413,9 @@ Full design, numbers and sources: `notes/T-008.md`.
   drawing tool's side is [ui-building.md](ui-building.md) "Drawing track".
 - **Crossovers** (T-338, design notes/T-334.md): a crossover joins a track to the track running
   beside it. The game never places them (T-1688, above) and the player has no tool for them
-  (T-733): they come only from saves, which keep theirs, and from checks. `TrackApi::add_crossover` finds the nearest other track whose centre line is 6-15 m
+  (T-733): they come only from saves, which keep theirs, and from checks. Tram track takes them as rail does (T-3575,
+  Anita 2026-11-17; high-speed track has none): the diagonals are tram track, priced as a junction at the tram kind's
+  level table. `TrackApi::add_crossover` finds the nearest other track whose centre line is 6-15 m
   from the click and parallel there (quad's other pair, or a separate route drawn alongside), splits
   both 60 m either side of the click (or uses a plain joint within 8 m of that point), and joins
   the four new nodes with two diagonals in an X, one each way, so a train can change track in
@@ -497,7 +508,11 @@ Full design, numbers and sources: `notes/T-008.md`.
   check: street tram track rebuilt as tram track or rail at ground level over water is refused.
   Bridges and tunnels over or under water cost 2x (6.4). The mask is 25 m pixels in the city
   pack; water narrower than ~50 m (creeks, ditches, small ponds) is not in it, since a railway
-  crosses those at grade (notes/T-030.md). Outside every pack's mask the world's coarse mask
+  crosses those at grade (notes/T-030.md). A point counts as water where the 0/1 values of the four cells around it, weighted by closeness to
+  their centres, add to 0.8 or more (`WATER_READ`, T-3553, which replaced T-3524's 12 m margin): the pixels
+  reach up to ~15 m past the drawn coast, and this keeps track along a shore on land. A 50 m channel keeps a
+  band about 35 m wide, which the sampling finds, and the raster's own edge repeats its last cell (it is not a
+  shore). The world's coarse mask is read by its cell, without this. Outside every pack's mask the world's coarse mask
   decides (T-1285, zones.md 6): the sea and large lakes in cells of 1/60 degree, so open sea between
   zones is water like water inside them. Ground level means within half a level (4 m) of the
   ground, so the low end of a ramp counts too: bridge and tunnel approaches start on land.
@@ -606,15 +621,17 @@ Full design, numbers and sources: `notes/T-008.md`.
   not the physical side, so the running side picks the track and a running-side switch turns the way
   round to keep the platform on its track (listed after the switch). On double track it is drawn as a thin bar
   over its track with a small bulge at the middle on the platform's side, so it does not read as a box; the bulge is 0.18 of the platform half length each way, so it keeps its place against the box at every zoom. On two-way single track it is a
-  stop where trains cannot pass: drawn as plain single track (no T-3212 split) and the single-track
+  stop where trains cannot pass: drawn as plain single track (no T-3212 split), its bar centred on the track (T-3540, as every station on single track: ui-map.md "Stations"), and the single-track
   section runs on through it (6.2); on one-way single track it is the one platform that track's
   station naturally is (players, 2026-11-13). Placed only on track running through, the same tracks
-  both sides (`OneTrackHere`). Priced as a single-track station; switching a built one to both
+  both sides, or at the end of single track (`OneTrackHere`; T-3411). Priced as a single-track station; switching a built one to both
   tracks pays the difference (the button's hover says "Costs $X", or "Free"), to one track is free with nothing back; a blueprint one switches free and
   undoes; a built station's switch plays the upgrade sound. A one-track station has no terminal and no passing tracks (they go when it switches). Single
   track rebuilt double makes it an ordinary station; double rebuilt single keeps it one-track (no
   passing). Its twin on the other pair of quad (6.3) must serve the same way. Demand: a pass boards,
-  alights and changes nobody (`span` -1 for that route node, demand-kernel.md 4.3).
+  alights and changes nobody (`span` -1 for that route node, demand-kernel.md 4.3). A station of the
+  same complex, or within 300 m, on the other way's track makes the pass a stop there instead (6.3
+  "Per-direction stops").
 - **Station buildings** (T-2217, `track/building.rs`, `wasm/buildings.rs`, `game/buildings.ts`;
   design notes/T-2208.md 3): an outline of 3 to 24 corners the player draws round stations. Its
   members are every station whose platform touches it, at any level, constructed or not: the
@@ -656,7 +673,8 @@ Full design, numbers and sources: `notes/T-008.md`.
     Slower lines that stop there wait for faster ones to pass (6.2, "Behind slower trains"). Priced
     as the platform plus 0.4 km of double track at the station's level, 1.5 times on high-speed
     track, twice over water (`upgrades::price`): US$22.5M for a 200 m ground station, US$45M for a
-    400 m high-speed one. Works on double track only. `TrackApi::passing_spots(line)`: the
+    400 m high-speed one. A tram stop has the terminal and passing tracks too (T-3574, Anita 2026-11-17), at the tram
+    kind's level table instead of rail's (the terminal US$37.5M off street at grade, US$7.5M on a street; a tram stop with a terminal turns 30 an hour, without one 15); park and ride stays rail's. Works on double track only. `TrackApi::passing_spots(line)`: the
     stations where a line's trains get passed or would pass a slower line's, without them yet.
   - **Park and ride**: a ride to or from the station costs 10 perceived minutes less ([demand-mode.md](demand-mode.md),
     `kernel::ride_fixed`); a P after the station's name. Drawn as a car park beside the complex (below).
@@ -674,7 +692,8 @@ Full design, numbers and sources: `notes/T-008.md`.
     The waiting room joins one box's side at its middle, one outline and one white round box and
     annex: of the stations with one and both sides of each, the spot with the fewest other
     platforms, tracks, car parks and the name label's patch nearby, else outside the platform's
-    bend. The car park is a lot of its own outside the boxes (`map/parkingLots.ts`), drawn under
+    bend; a station with one platform (a one way station, a single-track station with no passing loop) has it on
+    the platform's side, joined to its bar (T-3540). The car park is a lot of its own outside the boxes (`map/parkingLots.ts`), drawn under
     the track and stations, true to size: a 6 m aisle with a row of 2.5 by 5 m spaces either side
     (a bay, 16 m), one bay for each station with park and ride up to three, as long as the
     longest such platform within 80-300 m, rounded to whole spaces, along a platform of the
@@ -701,7 +720,7 @@ Full design, numbers and sources: `notes/T-008.md`.
 - **Train length** (T-733, `TrackApi::set_line_cars`, `build_line` in `service.rs`): each line
   stores its cars, 0 for the most its shortest platform fits; a new line starts at the length last
   set on any line in the game (5 cars until one is set, `NEW_LINE_CARS`, so a crowded line is the player's cue to
-  lengthen it, Anita T-2271; the save keeps it, `newCars` in its header, and a save from before T-1094 starts at 5 too) [T-1094]; a set length
+  lengthen it, Anita T-2271; the save keeps it, `newCars` in its header, and a save from before T-1094 starts at 5 too) [T-1094]; headways the player made the default in the schedule window ([ui-panels.md](ui-panels.md#schedule-panel), `newHeadway` in the header) are put on each new line after it is made [T-3543]; a set length
   runs as set, at most that cap. A platform later shortened below it caps the trains while the
   setting stays, so lengthening the platform brings the set length back. Riders a train holds
   (160 a car at its rated load, 100%, and 240 at crush, 150%, T-2186), the cars the fleet needs and the running cost (US$4 a train-km plus US$2 a car-km) follow the cars
@@ -729,7 +748,7 @@ together. The node's **move table**, derived on every edit with its ports, says 
 arriving through each end may leave by: any end on the other side, with a lane running each way
 the move needs. Routing, a line's check, the badge, junction capacity and the train guard all
 read it. A line's path turns back (arrives and leaves on the same side) only at a station it stops
-at or at a bare track end, one with no station (T-797, 6.3). In a **junction**, two moves conflict
+at or at a track end, a station there or not (T-797, T-3595, 6.3). In a **junction**, two moves conflict
 when their paths cross at the same level (their lanes' positions in opposite order on the two
 sides); merges and diverges do not, as track capacity counts them. A plain double-track Y has one
 crossing pair. Single track joined to the double's track beside it and running that track's way
@@ -798,11 +817,18 @@ lines is plain track for capacity: a branch no train uses yet does not cut the s
 **Delay per train** (seconds), Kingman's queueing formula with a small variability term because
 trains are timetabled:
 
-    mix = 1 - sum over (line, direction) streams of (share of trains)²
+    mix = 1 - sum over (line, direction) streams of (share of trains)²   (a line on two-way single track: one stream)
     W   = 0.2 x mix x s x rho / (1 - rho)        rho <= 0.9; straight-line continuation above
         + 1800 x (1 - 1/rho)                     when rho > 1 (the queue builds for an hour)
 
-One line alone has no queueing delay (its trains are evenly spaced) until it is over capacity. A
+One line alone has no queueing delay (its trains are evenly spaced) until it is over capacity. On
+two-way single track that holds for both its directions together: they are timetabled to meet, the
+margin being the meeting, so a line alone there waits for nothing and the trains past what the stretch
+carries are held at the ends, as at a terminal (T-3526, Anita 2026-11-17). The lie: a real pair of
+trains also waits at the meeting station whenever the round trip is not a whole number of headways
+(two trains on 5 km of single track in a 15 km line: about 3 minutes a round trip); the game counts
+the running trains' round trip without it and holds part of a train instead, so trains an hour are
+right and ride times a little short. Different lines on one stretch still queue. A
 90 s junction shared by two equal lines: 27 s at 75%, 81 s at 90%, ~3 min at 100%, ~7 min at 110%.
 
 **Behind slower trains** (T-1924, notes/T-1900.md N1; Anita 2026-11-02). A faster line on a stretch
@@ -893,7 +919,9 @@ in proportion to the rate its fleet would give, until the first resource it uses
 (the hand-over below sends them out of service), so a fleet past capacity buys no shorter headway
 and no rider waits longer than at 100%. So the shortest headway a line can have is its fullest
 resource's `s`, 1m47s on track at 80 km/h. A count level held this way counts as settled, so
-an edit elsewhere leaves it to the bit.
+an edit elsewhere leaves it to the bit, except past full on single track only that line runs over:
+only its own rate can do that (a lone train's, which keeps no margin, when a second comes), so it is
+cut to the stretch (T-3526).
 
 **Settled in the clock worker before demand runs.** Whole-line train allocations derive their
 frequencies from capacity-adjusted round trips with a bounded, damped solve on edits (T-104).
@@ -902,7 +930,9 @@ delays on resources used by count schedules. Each level settles on its own (leve
 capacity): a level whose fleets already match their counts within 0.0001 trains is not stepped,
 so its rates and run times stay the same to the bit (T-415). On an edit, a line within 0.0001
 trains of its fleet is left as it is while the rest of its level steps (T-1787: on shared track
-each line moved re-times its neighbours), and the step's 1% probe reads each round trip's rise
+each line moved re-times its neighbours), and only lines that share track with what the edit changed,
+directly or through others, are stepped at all: the rest keep their rates and run times to the bit
+(T-1863). The step's 1% probe reads each round trip's rise
 from the capacity solve alone, as the change in the line's hold delays, so the run profiles are
 worked out once a round instead of twice. A save carries the settled rates to the bit, so a load
 settles from them with an edit's settle and changes nothing; a save without them (older ones, or
@@ -961,13 +991,21 @@ line panel's round-trip split, waiting at busy track among it: [ui-inspectors.md
   takes 67.5 s. The whole train must be under a limit before it may speed up again, so where
   high-speed track meets ordinary track the train brakes to 160 before the joint as for a curve.
   The line panel's stop times carry a hover with the top speed reached from the stop before and
-  what limits it (the trains, ordinary track, curves or a crossover; `TrackApi.line_stretch_speeds`).
+  what limits it (the trains, ordinary track, curves, a crossover or a piece's speed limit; `TrackApi.line_stretch_speeds`).
   **A line's speed limit** (T-2987; Anita 2026-11-10, for realism on metro lines): a rail line may carry a limit,
   40 km/h up to its kind's top speed in whole km/h (`LineData::limit`, 0 none; `TrackApi.set_line_limit`), that
   takes the place of the trains' top speed in `build_run` (`Network::line_run_top`, the lowest of curve, track cap and
   this), so run times, round trip, fleet for headway lines, capacity and demand all follow; the stop-time hover
   names it as "the trains". Saved in the `LSL1` block (count, then line index and km/h), save level 13; old saves load
   with none. Bus and ferry lines ignore it.
+  **A piece's speed limit** (T-3405; Anita 2026-11-15 and 2026-11-17): any piece of track but a crossover may carry
+  a limit, 40 km/h up to its kind's top speed in whole km/h (`EdgeData::limit`, 0 none, kept in range by `set_edge`;
+  `TrackApi.set_edges_limit`, free, one undoable edit, constructed or blueprint). It lowers the piece's cap
+  (`Network::v_cap`; the kind's own is `v_kind_cap`), so every train on it, the run times, headway fleets, routing
+  times, the map's speed colours and the stop-time hover ("A speed limit on the track") follow; with a line's limit
+  too, the lower holds. The track panel's "Slowest curve" and the curve labels stay the curves'. A split keeps it on
+  both halves; pieces join under a new station only where their limits match (`unjoin_near`, as for one-way track).
+  Saved in the `LPS1` block (count, then edge index and km/h), save level 20; old saves load with none.
 - **Both pairs of quad track** (T-3333, Anita 2026-11-12; notes/T-3333.md; `track/twin.rs`, `wasm/twin.rs`): a rail
   line can run its trains on both pairs of quad track, a switch in its panel ("Run trains on two pairs of tracks",
   `set_line_pairs`), offered only where it can (`line_pairs_ok`) or while it is on. It can where every stop has a
@@ -1005,6 +1043,40 @@ line panel's round-trip split, waiting at busy track among it: [ui-inspectors.md
   `unjoin_near`), in the same edit (T-1299). A line may pass a station without stopping, and may stop at a station
   twice, never twice in a row: stops that would repeat in a row count once (`distinct_stops` in
   `sim/src/track/wasm/lines.rs`), so taking out a loop's only middle stop leaves a one-stop line.
+- **Per-direction stops** (T-3348 stage 1, notes/T-3348.md; `track/perdir.rs`): a line stops at a station, and
+  each run stops at the platform on its own track. Where a stop between the ends serves one way only (a one-track
+  station on double track; a one-way station, below, never stands for another) and a run goes the other way, that run stops instead at the nearest
+  station of the stop's complex, else within 300 m (the walk riders change on), whose platform its trains pass on
+  their own track running roughly its way (within 60 degrees), not already a stop of the line (`way_stops`). The
+  line still lists one stop; its return run goes round by the other station (`back_run_of`, which the T-3094 way
+  back now is); ends and stops where trains turn back keep their own. Run 0 takes another station only where its
+  path passes it. Nothing is saved: an edit works it out again (lines with such a stop are rebuilt on every
+  edit, `back_lines`). Capacity, boarding, money and the stop ways read each run's own stations; a stop served
+  both ways this way has no half dot. A click adding a station that serves one way (`best_slot`) also tries the
+  others of its group that do, and keeps the one whose route costs least (the clicked one on a tie), so a click on
+  either leg of a split adds the one the line runs out along. Demand follows: the snapshot
+  gives a line's return-run stations where they differ (`backStops`, `TrackApi::line_back_stops`), demand's
+  return-run route node stands at that station (`demand::Network::back_stops`, `set_back_stops`), so its riders
+  board and alight there and it counts as the line's station for access; the figures credit each run's riders
+  to its own station. The map draws the return run's station as a stop of the line, and a station a run stops
+  at this way can be taken out only with the line's stop (`StationInUse`, as a listed stop).
+- **One-way stations** (T-3565, notes/T-3565.md; `track/perdir.rs` `leg_stop`, `track/wasm/legs.rs`): a station on
+  one-way single track (both its pieces single and one way; a one-track station on double track is none) is a
+  one-way station. A line stopping at one is served there once a round trip, by the run whose track passes it, where
+  that run passes it; the other run goes by on its own track, neither turning back nor looping to reach it. Routing
+  skips the one-way stations on the other run's track (`route_legs`, first in `route_hops`); one neither run's track
+  passes is routed through as any stop. The other run keeps the stop in its per-stop arrays as a pass (`run.pass`,
+  `Run::away`; placed at its path's node nearest the station; no dwell, no riders, no departures there). A one-way
+  station's place in the stop list comes from the track, never from click order: the line's other stops are a
+  skeleton in the line's order (a click puts a new one where `best_slot` puts it), its one-way stations a set, each
+  put in the skeleton's gap where the run passing it does, run 0's in its order, then run 1's reversed (`flatten`);
+  those past the skeleton's ends go in where they cost least, the skeleton tried both ways round. So the same
+  stations make the same line whatever order they were clicked in, up to its direction. Every stop edit (click, set,
+  drop, end, sort, a passed station stopped at) and every line of a loaded save go through it; a line ordered by hand
+  (T-2895) keeps the player's order and is still served once at each. A one-way station is never paired with one on the
+  other leg, however close (T-3605, Anita 2026-11-17): it is a stop of its own (no way_group), so the stop list and
+  its half dot say where trains stop, and taking one of two side by side out leaves the other served one way. Any
+  number may sit on a leg, none on the other included. Half dots and the departures board show each one way.
 
 #### Line groups
 
@@ -1032,10 +1104,15 @@ line panel's round-trip split, waiting at busy track among it: [ui-inspectors.md
   turns back at the stop, at a loop's ends, below two stops, and for a bus line (a bus or ferry loop is 6.7).
   A line with one stop or none is inactive: no route, no trains, nothing refused (T-1242).
   **Reversing partway** (T-797, notes/T-797.md): a line's path may turn back at a stop or at a
-  bare track end (a node with one edge end and no station, such as a headshunt), nowhere else.
+  track end (a node with one edge end, such as a headshunt; or one with one constructed edge end and
+  only blueprint beyond, so blueprint drawn on from an end never moves a running line's turn there,
+  T-3541), nowhere else. A station at a track end that is no stop of the line is turned at the same
+  way, without stopping (T-3595: so building on from a loose end a line turns at, to a station, never
+  leaves it nowhere to turn; Network::turn_end). An edit that builds past a line's track end
+  routes the line again through its same stops in the same edit, never with more turns back.
   Nothing stores it: a reversal is two path entries arriving at and leaving a node on the same
-  side, and stops are matched to the path so every reversal not at a bare end falls on one. The
-  route search may reverse at a hop's first stop, or at a bare end on the way, for 600 s of search
+  side, and stops are matched to the path so every reversal not at a track end falls on one. The
+  route search may reverse at a hop's first stop, or at a track end on the way, for 600 s of search
   time each (`REVERSAL_SEARCH_S`), and the stop insertion counts each reversal as twice the
   route's length, at least 5 km (`order_cost`, `REVERSAL_INSERT_M`, T-1899), so a route without one
   wins unless it is over three times as long. A reversing train
@@ -1043,7 +1120,7 @@ line panel's round-trip split, waiting at busy track among it: [ui-inspectors.md
   arrival and leaves from d past it in the run's unfolded offsets (`Run::jump`, the same place on
   the ground; d is half the train at a through station, half the platform at a dead end, half the
   train plus 20 m at a bare end, each at most half the way to the next place a train stands), so
-  it is drawn jumping once as it stops. A bare end is no stop: the profile stands the turnaround
+  it is drawn jumping once as it stops. A turn back at no stop is no stop: the profile stands the turnaround
   there (`Run::ends`) and leaves it out of the stop times, so riders through it pay the stand in
   their ride. The stand is inside the run's duration, so the round trip, fleet
   and demand need nothing new; trains still enter and leave only at the two ends.
@@ -1121,8 +1198,28 @@ line panel's round-trip split, waiting at busy track among it: [ui-inspectors.md
 - **Scheduling** (T-104, Anita): every line sets a whole number of trains on the entire line,
   both directions together, for **high, medium and low demand** (the column header is "Demand").
   High runs 6-20 (the morning peak, midday and evening peak), medium 20-24, low 0-6
-  (`PERIOD_LEVEL`; Anita, 2026-10-27, T-1536) on every kind of day, weekends and holidays too
-  (T-2335, [demand-timing.md](demand-timing.md) "Kinds of day"). New rail lines start at 0 / 0 / 0 and each level is
+  (`PERIOD_LEVEL`; Anita, 2026-10-27, T-1536) on every kind of day. **Weekends** (T-3521, from
+  GabrielMoraez's PR 13; `LineData::weekend`): Saturday and Sunday (a country's own weekend) and
+  public holidays run a line's weekend trains; a superholiday's days and the weekend days a country
+  works run its weekday ones (`rowOfIn` in `game/holidayCalendar.ts`, sent per line as
+  `service::Cal`; `Boarding::kind_row` agrees). A line's weekends are a **percent** of its weekdays,
+  10% to 200% in 5% steps, 100% at first: a count line's counts times the percent rounded up, a
+  headway line's headway divided by it and rounded down to a whole minute, its count from the
+  weekday round trip (and under 100% never more than its weekday count), and it keeps that headway
+  as the weekdays keep theirs, its trains standing at the ends for the rest; a weekday edit moves the
+  weekends with it. Or **counts set by hand**, kept whatever the weekdays do, the percent kept
+  for the panel, run as a count line's (a headway line's too); picking a percent again drops them.
+  One edit sets every line's percent (`set_weekend_share_all`). Every line runs at once on weekends
+  too, so where any line's weekend counts or headways differ from its weekday ones the weekends are settled on their own after the weekdays'
+  (`TrackWorld::settle_weekend`: the same settle on the weekend counts, rates in
+  `Network::line_tph_rest`, `rest_solved`), on a weekend service kept between edits (`svc_rest`,
+  following each edit's rebuild; not saved, worked out again at the first edit after a load); the
+  weekdays' figures and service are left to the bit. With no line's weekends other than 100% there
+  is no weekend settle and every day runs the weekday pattern. A weekend-only edit settles only the
+  weekends (no weekday settle, no demand solve). The fleet a line needs is its most trains on
+  either kind of day (`cars_needed`); running cost is per kind of day (`running_cost` 3-5). Saved
+  in a trailing `LWE1` block (save level 21) with the weekend rates to the bit; a save without it
+  runs every line's weekends at 100%. New rail lines start at 0 / 0 / 0 and each level is
   set on its own, so a line given trains at high alone stops at 20:00 (T-2123; the tutorial's last
   steps ask for trains at every level); bus lines start with buses at every level; zero means no new departures. The panel shows the integer allocation and resulting headway.
   Frequency is derived from the capacity-adjusted round trip, with a bounded solve on edits (at
@@ -1139,10 +1236,17 @@ line panel's round-trip split, waiting at busy track among it: [ui-inspectors.md
   (`PACE_SLACK`), so a round trip drifting by a second keeps them together; their trains stand the
   time over at their ends as a headway line's do (`Network::line_pace`, derived on every settle and
   saved with the settled rates in `LPC1`, so a load keeps it rather than pacing again, T-3233; the
-  spacing places where it stands, 6.3 "Departures"). A headway line there counts with its
+  spacing places where it stands, 6.3 "Departures"). The pacing holds still (T-3388, `PACE_HOLD`):
+  a merge's lines at one level are paced again only when one of them has moved, its headway by more
+  than 0.5% or past its pace, or joined or left, or the merge filled or emptied; then a line that
+  has not moved stays in its set, and a set that ran one pace keeps it while every line can run it
+  and it is within 0.5% of the new one. The move a pacing makes in the paced lines' own round trips
+  counts as part of that pacing, not as a move. Without this London's 130 lines at one merge paced each
+  other back and forth on every edit. A load takes the saved pacing and its sets as they are. A headway line there counts with its
   set headway and is never moved. Where a merge is full (98%, `PACE_FULL_RHO`) its count lines share
-  it evenly: each that could run more often keeps the even share of their trains an hour together,
-  so the queue is no one line's. So two branches of different lengths take even turns at the merge
+  it evenly: each that could run more often keeps the even share of their trains an hour together
+  (a line left at its own headway counts at the rate it now runs, so the share is the same on every
+  edit and a line's rate does not fade, T-3252), so the queue is no one line's. So two branches of different lengths take even turns at the merge
   all day, for at most 3% fewer trains an hour on the faster.
   A loop's lap is a run and its closing stand; its round trip is twice the longer lap, and its count
   is even, half each way (the stepper moves by 2, headway mode doubles each way's count, an odd
@@ -1170,7 +1274,9 @@ line panel's round-trip split, waiting at busy track among it: [ui-inspectors.md
   A hand-set count is held by the panel to one train (a loop's two) more than the whole trains the
   limit allows: it refuses a rise at that and clamps a typed number to it (ui-inspectors.md; T-3165),
   so one train is held and shows as such; a count past it is lowered when a game loads and otherwise
-  kept until it is lowered.
+  kept until it is lowered. The limit the count is held to counts single track's margin even for a
+  lone train (`line_held`'s last three figures, `line_limits_lone`; T-3526), so a line of one train is
+  capped by what two would meet, not by its lone figure (T-3201).
   Every edit that changes the line, its track or shared track settles the counts
   again (`TrackWorld::settle_train_counts`: count from the round trip, settle the rates, repeat up
   to 5 rounds), and whole trains that full track would keep waiting at the ends (6.2) are dropped,
@@ -1185,8 +1291,8 @@ line panel's round-trip split, waiting at busy track among it: [ui-inspectors.md
   trailing `LAU1` block of the track save (line index and three headways, only when a line has
   them); a save without it loads every line by hand.
 - **Departures** (`Service::run_deps`): per stretch of one level (consecutive periods at the same
-  level: high demand's 6-20 is one stretch, `level_stretches`, T-1536; every kind of day the same,
-  T-2335) of the line's local time (T-309: its first
+  level: high demand's 6-20 is one stretch, `level_stretches`, T-1536; each day at its kind's
+  trains, `Lattice::levels_on` and `slot`, T-3521) of the line's local time (T-309: its first
   stop's region's, `Lattice::shift`; a New York to Toronto line is on one offset, a London to
   Paris line would run on London's), the first departure half a one-way run before the stretch's
   start and then one a headway, until half a run before its end (T-835, `Lattice::lead`: the mean
@@ -1394,10 +1500,10 @@ money: it pays, and the cash may go below zero (the cash is not shown; docs/ui-p
   `0.4 + 0.6 x length / 200`.
 - Junction: 0.25 km of track at its level; a flyover adds 0.6 km one level away; flat
   crossing 0.1 km (cheap to build, dear in delay). Station upgrades (6.1, T-1281): a terminal
-  1 km of track at the station's level (US$37.5M at grade, US$120M at -2, 2x over water), passing
+  1 km of track at the station's level (US$37.5M at grade, US$120M at -2, 2x over water; a tram stop's at the tram kind's table, T-3574: the same US$37.5M off street at grade, US$7.5M on a street), passing
   tracks the platform plus 0.4 km of it, 1.5x on high-speed track (US$22.5M for a 200 m station at
   grade, US$72M at -2; T-2231), park and ride US$20M, waiting room US$5M, a passage US$10M plus US$90M a km, a station building US$2,000 a m² of floor (T-2217). A crossover: two junctions, all told (6.1,
-  T-338); the blueprint breakdown counts it as two junction switches.
+  T-338); the blueprint breakdown counts it as two junction switches. A tram crossover is priced at the tram kind's level table (T-3575).
 
 #### Blueprint, trains and running costs
 
@@ -1638,8 +1744,16 @@ is over `FARE_MAX`, curve US$1,000 (T-3303: a typed 90 billion once went into ev
   high-speed multiplier (`Fares.hsr`, default `HSR_FARE` 1.25 [was 1.5 until T-3338], 0 to 5, saved in the header; a save
   without one charges the default, a save with one keeps it); the base stays once a trip; a ferry line likewise with the Ferry multiplier
   (`Fares.ferry`, default `FERRY_FARE` 1.00, `lineFareMul`, T-2195) and a bus line with the Bus multiplier
-  (`Fares.bus`, default `BUS_FARE` 1.00, 0 to 5 as the others, T-3028; the Money tab's row shows once a bus line exists). So a trip pays base + (curve(km) - base) x
-  (1 + (m - 1) x its share of km on high-speed lines). Demand takes it as each route node's
+  (`Fares.bus`, default `BUS_FARE` 1.00, 0 to 5 as the others, T-3028; the Money tab's row shows once a bus line exists).
+  **A line's own multiple** [T-3567]: `Fares.lines` (line id to multiple, 0 to `LINE_FARE_MAX` 3 in hundredths,
+  only lines set off 1, saved in the header; an older save has none), set in the line's panel, times the line's
+  kind's multiple in `lineFareMul`, so it rides the same path everywhere, and it scales the base too [T-3578]: a
+  trip pays the base times the largest own multiple among its lines (`set_base_mul`, `Graph::rn_base_mul`, taken per
+  station pair by `trip_base_mul` into the route cost; in income the base pool takes it, `base_extra` and
+  `baseTrips`; docs/demand-worldwide.md).
+  A quad-track twin carries its line's; a deleted line's is kept in hand, not saved, until an undo brings the line
+  back or a new line takes its id [T-3581] (the clock's `tidyLineFares`). So a trip pays base x M + (curve(km) - base) x
+  (1 + (m - 1) x its share of km on high-speed lines), M its lines' largest own multiple. Demand takes it as each route node's
   multiplier (`set_fare_mul`, `Graph::rn_fare_mul`): ride edges charge their rate times it, a
   station pair's curve extra is times the strategy's expected high-speed-weighted km over its km,
   and the assignment spreads the extra over each km times its multiplier; the market's income
@@ -1668,7 +1782,7 @@ is over `FARE_MAX`, curve US$1,000 (T-3303: a typed 90 billion once went into ev
   Stations tabs' place), and "" for anything outside every zone, so the regions add up to the
   network. Settling divides each running line's hour: fares by the line's day of riders, the base
   part by the region of each boarding stop and the per-km part by passenger-km, each stretch
-  between two stops half to each stop's region; running cost by route km, split the same way.
+  between two stops half to each stop's region (a bus route by its own points, about 200 m at a time to the region there); running cost by route km, split the same way.
   A paid edit's construction goes to regions by the cost of the track it newly built in each
   (track midpoint's region; with no track, its new stations' regions, evenly; with neither, a station
   building's by the region of its outline's middle, T-2218); its new trains by the
@@ -1682,8 +1796,7 @@ is over `FARE_MAX`, curve US$1,000 (T-3303: a typed 90 billion once went into ev
   period's share of passenger-km, each hour's as above (when riders set out), counted within the
   hour as its fares are paid, and divided between regions by the region of each ride's boarding stop.
 - **Points** (T-684, T-694, `app/src/game/points.ts`): a measure per region of how good its
-  network is: the points it earned in the past 24 whole game hours (fewer while the hour ledger is
-  younger), recomputed once a game hour; never a running total. 20 a rail trip and 1 a
+  network is: the points its network earns on a forecast weekday, from the current solve (`pointsPerDay`'s weekday row, `pointsScore`), so an edit moves it as soon as the solve answers and the clock, weekends and holidays never do; before the first solve, what it earned in the past 24 whole game hours; never a running total. 20 a rail trip and 1 a
   passenger-km, not scaled by the economy, unlocking nothing yet. A trip is a rider's whole rail
   journey (changes of line and walks between stations within it included), counted in the region
   it starts in: each region's rail trips a day are the solve's (its own demand's, plus half of each
@@ -1710,8 +1823,8 @@ is over `FARE_MAX`, curve US$1,000 (T-3303: a typed 90 billion once went into ev
   with 18 stations plus its trains (about $4.2B).
 - **A fare edit pays when its riders show** (T-2266, `game/fareInEffect.ts`): the fare controls
   change at once, but a line's income keeps the fares its riders were solved with (`solvedFares`)
-  until riders solved with the new ones show, whether the change raised or cut them; a solve
-  overtaken by a later edit never switches them. A result that did not solve the regional market
+  until riders solved with the new ones show, whether the change raised or cut them. An edit made
+  while a solve runs waits for it, so that solve's own final shows its lines at its own fares before the later edit's solve. A result that did not solve the regional market
   (the local solve after an edit, a cluster without the market) holds its lines' longer trips as
   last solved, so it never replaces a shown line solved at other fares: that line keeps its figures
   and fares until the whole solve's final (T-3303). Nothing of this is saved: a loaded game solves its
@@ -1901,7 +2014,7 @@ crowding rounds. There are no signals (SPEC 2.1).
 
 A bus line (T-1464, T-1465; design notes/T-1445.md) is a line with no track: the player clicks points
 and between two clicks the route follows the basemap's roads, motorways and their bridges and tunnels
-included (T-2469); the app refuses a point they do not reach (T-2451, T-2467). Any road in the basemap data
+included (T-2469), a one-way street only the way it runs when Settings > "Buses obey one-way streets" is ticked, off by default (T-3480; ui-building.md "Drawing a bus line"); the app refuses a point they do not reach (T-2451, T-2467). Any road in the basemap data
 counts (T-3172): streets of every class, service ways of every kind, tracks, bus guideways and pedestrian
 streets. Footways, cycleways, steps, bridleways, platforms, raceways, piers, rail and ferries do not. Street
 trams use the same roads without motorways. It shares lines' ids, schedules (buses or a headway per
@@ -2050,7 +2163,7 @@ searches water.
 - **Shape**: the cells are simplified (Douglas-Peucker at 25 m, or a quarter of the room, never off sailable
   water), then every corner but a port's gets the widest arc that fits its two sides and stays sailable, at
   most 300 m. Where pieces of a leg meet, two corners either side take the turn so the route passes straight.
-- **Speeds**, one a point: 32 km/h 200 m or more from land (T-2450), 10 km/h at 20 m or less, straight between, at
+- **Speeds**, one a point: 45 km/h 200 m or more from land (T-2450, T-3435), 10 km/h at 20 m or less, straight between, at
   most √(0.3 m/s² x radius) on a bend; points every 25 m or so where the speed changes. Acceleration (0.15
   m/s²) and stops are the sim's.
 - **Cost**: 0.2 to 1 s a leg in the browser once its tiles are in (`checks/t2192-ferry-routes.mjs`). Tiles,
@@ -2080,10 +2193,10 @@ ports stations, a boat two cars). Code: `track/ferry.rs`, exports `wasm/ferry.rs
   line stops at cannot be removed.
 - **The route** is points in the network frame, each with a kind (0 route, 1 a port's berth, 2 a
   waypoint passed without stopping) and the most the boat may do there, m/s (kept on a mm/s grid,
-  0.25 to 8.889). Its stops are the line's ports, in order, one per kind 1 point, each within 50 m of
+  0.25 to 12.5). Its stops are the line's ports, in order, one per kind 1 point, each within 50 m of
   that port's berth; the first and last points are ports. At most 8,000 points, at least 100 m.
 - **Run**: between two points the boat runs at most the lower of their two speeds; it accelerates and
-  brakes at 0.15 m/s² (`ferry::BOAT_A`, 59 s and 263 m to reach 32 km/h), stops at every port, stands
+  brakes at 0.15 m/s² (`ferry::BOAT_A`, 83 s and 521 m to reach 45 km/h), stops at every port, stands
   the line's dwell at the ports between its ends and the turnaround at the ends. Out and back like a
   bus line. No capacity holds. A boat is two train cars: 320 riders at the rated load, 480 at crush
 (`BOAT_CRUSH`; demand's 2 cars, T-2195).
@@ -2092,15 +2205,15 @@ ports stations, a boat two cars). Code: `track/ferry.rs`, exports `wasm/ferry.rs
   `fleet_ferry`) with spares shared between ferry lines; running US$40 a boat-km (real, `ECONOMY`
   times in the game). The route is free, and redrawing it is free; removing a ferry line leaves its
   ports and is undoable. The Construct quote lists ports as kind 12, boats as kind 13 and the route's
-  metres (free) as kind 14. A new ferry line starts at a boat every 20 and 30 minutes at high and
-  medium demand and none at low (T-2273), 60 s dwell, 300 s
+  metres (free) as kind 14. A new ferry line starts at a boat every 20, 30 and 60 minutes at high, medium
+  and low demand (T-2273, T-3400), 60 s dwell, 300 s
   turnaround (`NEW_LINE.ferry` in app/src/game/newLine.ts, which the app passes).
 - **Loops** (T-2899; `ferry::is_closed`): a line of four stops or more whose last port is its first is a loop,
   as for a bus line (6.7): a circle in the service, one way unless set both ways (T-2981). The route runs from the first
   port's berth round to it again, so its first and last `K_PORT` points are that berth. The port is named
   twice in the stop list and is built, paid for and kept once.
-- **Saves**: a trailing `LFR2` block (save level 5) holds the ports' berths (as mm deltas from their
+- **Saves**: a trailing `LFR3` block (save level 19) holds the ports' berths (as mm deltas from their
   landings) and each ferry line's route (points, kinds, speeds) and whether it is constructed. A save
-  without it has no ports or ferries and loads as before. An `LFR1` block (level 3) is the same with
-  its speeds searched at 25 km/h in open water: each speed over 10 km/h loads at the same share of the
-  way from 10 to 32 (`ferry::v_from_lfr1`; a bend's limit rises with it, T-2450).
+  without it has no ports or ferries and loads as before. An `LFR2` block (level 5, speeds searched at 32 km/h) and an `LFR1` block (level 3, at 25) are the same:
+  each speed over 10 km/h loads at the same share of the way from 10 to 45 (`ferry::v_from_lfr2`,
+  `v_from_lfr1`; a bend's limit rises with it, T-2450, T-3435).

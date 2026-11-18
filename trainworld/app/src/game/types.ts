@@ -115,8 +115,10 @@ export interface TrackEdge {
   lengthM: number;
   /** build cost, US$ */
   cost: number;
-  /** lowest curve speed limit on it, km/h */
+  /** lowest curve speed limit on it, km/h (the kind's cap at most; never the player's limit) */
   vminKmh: number;
+  /** T-3405: the player's speed limit on it, km/h; absent for none */
+  limit?: number;
   levelMin: Level;
   levelMax: Level;
   /** lines whose path uses it */
@@ -206,6 +208,8 @@ export interface LineStats {
   stopS: [number[], number[]];
   /** its edges first stop to last, `edge << 1 | direction` (T-2420) */
   path: number[];
+  /** the return run's path where it is not `path` backward, last stop to first (T-3117), else absent */
+  back?: number[];
   /** dwell at each intermediate stop, and the layover at each end, s */
   dwellS: number;
   turnaroundS: number;
@@ -220,6 +224,9 @@ export interface LineStats {
   /** T-3122: the stations it serves one way only (station id to the heading of its trains there, radians, world
    * frame, `TrackApi::line_stop_ways`): the half dots, the stop list and the hover chevrons all read this */
   oneWayAt: Record<string, number>;
+  /** T-3348: the stations the return run stops at, first stop to last, where one is a platform beside
+   * the listed stop (`TrackApi::line_back_stops`) */
+  backStops?: string[];
   /** T-2895: the player set its stop order by hand (`TrackApi::line_hand`) */
   hand: boolean;
   /** a loop (T-798): its last stop is its first; a circle carries on round there, a balloon turns
@@ -229,6 +236,12 @@ export interface LineStats {
   oneWay: boolean;
   /** T-2987: the player's speed limit for the line's trains, km/h; 0 for none */
   limit: number;
+  /** T-3521: the line's weekends (`ClockLine.weekend`): its percent, 1 where its counts are set by
+   * hand, then its whole trains on weekends, high, medium, low, then the headways stepped to in
+   * seconds (0 none); absent: the weekdays' at 100% */
+  weekend?: number[];
+  /** T-3521: trains an hour on weekends, high, medium, low (`ClockLine.restTph`) */
+  restTph?: number[];
   /** T-3333: the switch to run on both pairs of quad track is on: 1 it runs on both (the figures here
    * are its own pair's; its hidden twin, `twin`, runs the other, and its panel adds the two), 2 on one
    * pair for now */
