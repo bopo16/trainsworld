@@ -1,5 +1,7 @@
 # Melbourne metro: directional City Loop
 
+This report describes the earlier `melbourne-metro-city-loop.save`. The generator now also applies the geometry cleanup described in [GEOMETRY.md](GEOMETRY.md), so the rebuild command below produces the newer geometry save instead of the hash at the end of this document.
+
 Import `melbourne-metro-city-loop.save` with Trainsworld's **Load a file** command. This is an alternative to the earlier saves. It prioritises legibility and through-running over a complete timetable or a surveyed track layout.
 
 ## Network and operations

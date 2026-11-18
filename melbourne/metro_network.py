@@ -468,6 +468,8 @@ def main():
     if a.city_loops:
         import city_loop
         city_loop.build(out)
+        import loop_geometry
+        loop_geometry.align(out)
     subprocess.run(['cargo','run','--release','--features','demand','--bin','realsave','--','--city','mel','--out',str(out),'--shared','--left'], cwd=TW/'sim', check=True)
     sys.argv = ['realnet.py','gamesave','mel']; realnet.cmd_gamesave()
     subprocess.run([sys.executable, str(ROOT / 'melbourne/validate_metro.py'), str(out / 'mel_real.save')] + (['--city-loops'] if a.city_loops else []), check=True)

@@ -6,8 +6,38 @@ import unittest
 
 import pandas as pd
 from metro_network import join_tunnel, service_ids, simplify_services, ordered_shape, single_track_stony_point
+from loop_geometry import merge_redundant_platforms, remove_short_station_joints
 
 class MetroTests(unittest.TestCase):
+    def test_short_station_joint_preserves_service_path(self):
+        nodes = [{'xy':[0,0], 'level':0, 'station':{'name':'Southern Cross'}},
+                 {'xy':[40,0], 'level':0, 'station':None},
+                 {'xy':[300,0], 'level':0, 'station':None}]
+        edges = [{'a':0,'b':1,'tracks':1,'oneway':1,'lead_a':[10,0],'lead_b':[30,0],'line':[]},
+                 {'a':2,'b':1,'tracks':1,'oneway':2,'lead_a':[280,0],'lead_b':[60,0],'line':[]}]
+        model = {'nodes':nodes,'edges':edges,'lines':[{'path':[0,3], 'stops':[0]}]}
+        remove_short_station_joints(model)
+        self.assertEqual(model['lines'][0]['path'], [3])
+        self.assertEqual(edges[1]['b'], 0)
+
+    def test_redundant_platforms_keep_paths_connected(self):
+        station = {'name':'Example', 'key':'example'}
+        nodes = [{'xy':[0,0], 'station':None}, {'xy':[10,0], 'station':station},
+                 {'xy':[10,8], 'station':station.copy()}, {'xy':[20,0], 'station':None}]
+        edges = [{'a':0,'b':1}, {'a':1,'b':3}, {'a':2,'b':0}, {'a':3,'b':2}]
+        model = {'nodes':nodes, 'edges':edges,
+                 'lines':[{'path':[0,2], 'stops':[1]}, {'path':[5,7], 'stops':[2]}]}
+        self.assertEqual(merge_redundant_platforms(model), {2,3})
+        self.assertEqual(model['lines'][1]['path'], [0,2])
+        self.assertEqual(model['lines'][1]['stops'], [1])
+        self.assertIsNone(nodes[2]['station'])
+
+    def test_directional_platforms_are_not_merged(self):
+        nodes = [{'xy':[0,0], 'station':None}, {'xy':[10,0], 'station':{'name':'Example','key':'x'}},
+                 {'xy':[10,8], 'station':{'name':'Example','key':'x'}}, {'xy':[20,0], 'station':None}]
+        edges = [{'a':0,'b':1}, {'a':1,'b':3}, {'a':0,'b':2,'oneway':1}, {'a':2,'b':3}]
+        self.assertEqual(merge_redundant_platforms({'nodes':nodes,'edges':edges,'lines':[]}), set())
+
     def test_calendar_additions_and_removals(self):
         cal = pd.DataFrame([{'service_id':'a','wednesday':'1','start_date':'20261101','end_date':'20261130'},
                             {'service_id':'b','wednesday':'1','start_date':'20261101','end_date':'20261130'}])
