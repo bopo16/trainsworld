@@ -27,17 +27,17 @@ SYMBOLS = {'Alamein':'ALM', 'Belgrave':'BEG', 'Cranbourne':'CBE', 'Craigieburn':
 
 # Groups follow the route colours in the Victorian GTFS feed. IDs are stable.
 GROUPS = {
-    **{x: (1, 'Blue · Burnley', 'BLU') for x in ('Alamein','Belgrave','Glen Waverley','Lilydale')},
-    **{x: (2, 'Red · Clifton Hill', 'RED') for x in ('Hurstbridge','Mernda')},
-    **{x: (3, 'Yellow · Northern', 'YEL') for x in ('Craigieburn','Upfield')},
-    **{x: (4, 'Green · Frankston', 'GRN') for x in ('Frankston','Stony Point')},
-    **{x: (5, 'Pink · Cross-city', 'PNK') for x in ('Sandringham','Werribee','Williamstown')},
-    **{x: (6, 'Light blue · Metro Tunnel', 'TUN') for x in ('Cranbourne','Pakenham','Sunbury')},
-    'Flemington Racecourse': (7, 'Special events', 'EVT'),
+    **{x: (1, 'Burnley Group', 'BLU') for x in ('Alamein','Belgrave','Glen Waverley','Lilydale')},
+    **{x: (2, 'Clifton Hill Group', 'RED') for x in ('Hurstbridge','Mernda')},
+    **{x: (3, 'Northern Group', 'YEL') for x in ('Craigieburn','Upfield')},
+    **{x: (4, 'Caulfield Group', 'GRN') for x in ('Frankston','Stony Point')},
+    **{x: (5, 'Cross-City Group', 'PNK') for x in ('Sandringham','Werribee','Williamstown')},
+    **{x: (6, 'Metro Tunnel', 'TUN') for x in ('Cranbourne','Pakenham','Sunbury')},
+    'Flemington Racecourse': (7, 'Special Events', 'EVT'),
 }
 TERMINALS = {name: ('East Pakenham' if name == 'Pakenham' else 'Showgrounds' if name == 'Flemington Racecourse' else name) for name in SYMBOLS}
 
-def simplify_services(net):
+def simplify_services(net, city_loops=False):
     """Choose a main pattern per route, add only variants needed for stop coverage.
 
     Frequencies of removed patterns are assigned to the kept pattern that shares
@@ -88,7 +88,7 @@ def simplify_services(net):
         eligible = eligible or ids
         # Keep a few direct city approaches to avoid piling every line onto the
         # same loop; the remaining patterns still represent the City Loop.
-        direct_preferred = {'Alamein', 'Glen Waverley', 'Mernda', 'Lilydale', 'Frankston', 'Upfield'}
+        direct_preferred = {'Alamein', 'Glen Waverley', 'Mernda', 'Lilydale', 'Upfield'}
         if name in direct_preferred:
             direct = [i for i in eligible if not any(stations[x]['name'] in ('Parliament', 'Melbourne Central', 'Flagstaff') for x in original[i]['stops'])]
             if direct: eligible = direct
@@ -120,6 +120,16 @@ def simplify_services(net):
         line['trips_day'] = sum(original[i].get('trips_day', 0) for i in sources)
         line['merged_patterns'] = len(sources)
         result.append(line)
+    if city_loops:
+        # Temporary geometry guide: a low-frequency Frankston direct pattern is
+        # removed after its city approach is used to close the Caulfield loop.
+        direct = [i for i, l in enumerate(original) if l['name'] == 'Frankston' and not any(stations[x]['name'] in ('Parliament','Melbourne Central','Flagstaff') for x in l['stops']) and stations[l['stops'][-1]]['name'] == 'Frankston']
+        if not direct: raise ValueError('Missing Frankston direct geometry guide')
+        best = max(direct, key=lambda i:len(selected_stops(i)))
+        guide = deepcopy(original[best])
+        if expanded[best] is not None: guide['stops'], guide['t0'], guide['t1'] = expanded[best]
+        guide['name'] = 'Frankston geometry guide'; guide['tph'] = [0.05,0.05,0.05]; guide['trips_day'] = 0
+        result.append(guide)
     net['lines'] = result
     # Keep the upstream demand snapshot consistent with the selected network.
     d = {'st_xy':[v for st in stations for v in (st['x'],st['y'])], 'line_n':[], 'stops':[], 'times':[], 'tph':[], 'cars':[]}
@@ -208,6 +218,30 @@ def fit_ordered_shapes(out, feed, realnet):
             hops.append(piece[1:-1].round(1).tolist())
         geo['lines'][li] = {'nodes': shape[indexes].tolist(), 'hops': hops}
         chosen += 1
+    # Frankston's combined all-stops/Loop pattern can lack one matching GTFS
+    # shape. Compose its city portion and direct branch from observed shapes,
+    # rather than allowing a closest-point match to double back around the Loop.
+    by_name = {line['name']: i for i, line in enumerate(net['lines'])}
+    if all(name in by_name for name in ('Frankston','Frankston geometry guide','Belgrave')):
+        f,g,b = (by_name[name] for name in ('Frankston','Frankston geometry guide','Belgrave'))
+        fs,gs,bs = (net['lines'][i]['stops'] for i in (f,g,b))
+        n=0
+        for x,y in zip(fs,bs):
+            if x!=y: break
+            n+=1
+        if n<6: raise ValueError('Unexpected Frankston and Burnley City Loop stops')
+        for k in range(n): geo['lines'][f]['nodes'][k]=geo['lines'][b]['nodes'][k]
+        for k in range(n-1): geo['lines'][f]['hops'][k]=geo['lines'][b]['hops'][k]
+        join=fs[n-1]
+        if join not in gs: raise ValueError('Frankston geometry guide misses the loop junction')
+        q=gs.index(join)
+        for k in range(n-1,len(fs)):
+            t=q+k-(n-1)
+            if t>=len(gs) or fs[k]!=gs[t]: raise ValueError('Frankston geometry guide stops do not match')
+            geo['lines'][f]['nodes'][k]=geo['lines'][g]['nodes'][t]
+            if k+1<len(fs): geo['lines'][f]['hops'][k]=geo['lines'][g]['hops'][t]
+        if 'Frankston' in fallback: fallback.remove('Frankston'); chosen += 1
+        print(f'Composed Frankston Loop and branch geometry at {net["stations"][join]["name"]}',flush=True)
     # The two tunnel branches share precisely the same stops through Dandenong.
     # Feed shapes sometimes snap them to different platform ends, producing
     # unnecessary separate tracks and an artificial split at Town Hall.
@@ -329,6 +363,7 @@ def join_tunnel(out):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--city-loops', action='store_true', help='prepare directional City Loop services')
     p.add_argument('--simplified', action='store_true', help='merge similar stopping patterns and add colour-based line groups')
     p.add_argument('--gtfs', required=True, type=Path)
     p.add_argument('--date', required=True, help='2026 service date, YYYY-MM-DD')
@@ -337,6 +372,7 @@ def main():
     p.add_argument('--graph', required=True, type=Path)
     p.add_argument('--out', required=True, type=Path)
     a = p.parse_args(); date = dt.date.fromisoformat(a.date)
+    if a.city_loops and not a.simplified: p.error('--city-loops requires --simplified')
     if date.year != 2026: p.error('choose a service day in 2026')
     out = a.out.resolve(); out.mkdir(parents=True, exist_ok=True)
     if (out / 'mel_real.save').exists(): raise FileExistsError('Use a fresh output directory')
@@ -376,10 +412,11 @@ def main():
     if a.simplified:
         # Prefer shared corridors and use adjacent pairs only on the busiest sections.
         import realshared
-        realcorridors.PACK_LOAD_RAIL = 1.0
-        realcorridors.WANT_LOAD = 1.0
-        realcorridors.APART_LOAD = 1.8
-        realshared.PLAT_LOAD = 1.2
+        realcorridors.PACK_LOAD_RAIL = 0.65
+        realcorridors.WANT_LOAD = 0.8
+        realcorridors.APART_LOAD = 1.05
+        realshared.PLAT_LOAD = 1.0
+        realshared.PAIR_GAP = 16.0
     packs = TW / 'data' / 'packs'; (packs / 'realgraph').mkdir(parents=True, exist_ok=True)
     for source, dest in ((a.pack, packs / 'mel.json'), (a.graph, packs / 'realgraph' / 'au.rgr')):
         if source.resolve() != dest.resolve():
@@ -399,13 +436,14 @@ def main():
     realnet.ADAPTERS['gtfs'] = load
     realnet.cmd_net('mel')
     net_path = out / 'mel_real.json'; net = json.loads(net_path.read_text())
-    if a.simplified: simplify_services(net)
+    if a.simplified: simplify_services(net, a.city_loops)
     counts = Counter(line['name'] for line in net['lines'])
     labels = defaultdict(int)
     for line in net['lines']:
-        name = line['name']; line['symbol'] = SYMBOLS.get(name, '')
+        name = line['name']; base_name = 'Frankston' if name == 'Frankston geometry guide' else name
+        line['symbol'] = SYMBOLS.get(base_name, '')
         if a.simplified:
-            group_id, group_name, group_symbol = GROUPS[name]
+            group_id, group_name, group_symbol = GROUPS[base_name]
             line.update(group=group_id, group_name=group_name, group_symbol=group_symbol, group_colour=line.get('colour', ''))
         if name == 'Flemington Racecourse':
             line['name'] = 'Flemington Racecourse (Showgrounds events)'
@@ -427,8 +465,11 @@ def main():
     join_tunnel(out)
     if a.simplified: single_track_stony_point(out)
     add_flemington_infrastructure(out, realnet)
+    if a.city_loops:
+        import city_loop
+        city_loop.build(out)
     subprocess.run(['cargo','run','--release','--features','demand','--bin','realsave','--','--city','mel','--out',str(out),'--shared','--left'], cwd=TW/'sim', check=True)
     sys.argv = ['realnet.py','gamesave','mel']; realnet.cmd_gamesave()
-    subprocess.run([sys.executable, str(ROOT / 'melbourne/validate_metro.py'), str(out / 'mel_real.save')], check=True)
+    subprocess.run([sys.executable, str(ROOT / 'melbourne/validate_metro.py'), str(out / 'mel_real.save')] + (['--city-loops'] if a.city_loops else []), check=True)
 
 if __name__ == '__main__': main()

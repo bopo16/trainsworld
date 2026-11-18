@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-p = argparse.ArgumentParser(description=__doc__); p.add_argument('save', type=Path); a = p.parse_args()
+p = argparse.ArgumentParser(description=__doc__); p.add_argument('save', type=Path); p.add_argument('--city-loops', action='store_true'); a = p.parse_args()
 raw = gzip.decompress(a.save.read_bytes())
 if len(raw) < 9 or raw[:4] != b'TWG1': raise ValueError('Invalid game container')
 n = struct.unpack_from('<I', raw, 4)[0]
@@ -20,4 +20,4 @@ if h.get('game') != 'anitabuilder' or h.get('format') != 1 or h.get('city') != r
     raise ValueError('Invalid game header')
 with tempfile.TemporaryDirectory() as tmp:
     payload = Path(tmp) / 'network.twt2'; payload.write_bytes(raw[8+n:])
-    subprocess.run(['cargo','run','--release','--features','demand','--bin','melbourne_metro_validate','--',str(payload),str(h['fleet'])], cwd=ROOT/'trainworld/sim', check=True)
+    subprocess.run(['cargo','run','--release','--features','demand','--bin','melbourne_metro_validate','--',str(payload),str(h['fleet'])] + (['--city-loops'] if a.city_loops else []), cwd=ROOT/'trainworld/sim', check=True)

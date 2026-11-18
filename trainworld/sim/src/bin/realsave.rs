@@ -292,7 +292,7 @@ fn main() {
                 pis = seq.into_iter().map(|(_, p)| p).collect();
             }
             let e = net.alloc_edge();
-            if let Err(issue) = net.set_edge(e, Some(EdgeData { a, b, tracks: ed["tracks"].as_u64().unwrap_or(2) as u8, pis, built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::from_hsr(edge_hsr), sep: true, day: 0, oneway: 0, join: [0; 2] })) {
+            if let Err(issue) = net.set_edge(e, Some(EdgeData { a, b, tracks: ed["tracks"].as_u64().unwrap_or(2) as u8, pis, built: true, off: false, thru: vec![], crossover: false, kind: TrackKind::from_hsr(edge_hsr), sep: true, day: 0, oneway: ed["oneway"].as_u64().unwrap_or(0) as u8, join: [0; 2] })) {
                 eprintln!("edge {ei} ({a} to {b}) refused: {issue:?}");
                 refused += 1;
             }
@@ -321,7 +321,7 @@ fn main() {
             let group = l["group"].as_u64().unwrap_or(0) as u32;
             let group_colour = l["group_colour"].as_str().and_then(|s| u32::from_str_radix(s.trim_start_matches('#'), 16).ok());
             let look = GroupLook { symbol: l["group_symbol"].as_str().unwrap_or("").to_string(), colour: group_colour };
-            let r = net.set_line(id, Some(LineData { symbol: l["symbol"].as_str().unwrap_or("").to_string(), trains, auto: None, name, colour, stops, path, tph: [tph[0], tph[1], tph[2]], dwell_s: 30.0, turnaround_s: 180.0, cars, fast: false, bus: None, ferry: None, group, group_name: l["group_name"].as_str().unwrap_or("").to_string(), group_look: look, day: 0, hand: false, one_way: false, limit: 0, twin: Default::default() }));
+            let r = net.set_line(id, Some(LineData { symbol: l["symbol"].as_str().unwrap_or("").to_string(), trains, auto: None, name, colour, stops, path, tph: [tph[0], tph[1], tph[2]], dwell_s: 30.0, turnaround_s: 180.0, cars, fast: false, bus: None, ferry: None, group, group_name: l["group_name"].as_str().unwrap_or("").to_string(), group_look: look, day: 0, hand: false, one_way: l["one_way"].as_bool().unwrap_or(false), limit: 0, twin: Default::default() }));
             if r.is_ok() {
                 n_lines_ok += 1;
             }
