@@ -1,5 +1,7 @@
 # Melbourne metropolitan rail and trams
 
+This describes the earlier save. For the 0.4.0 update and revised OSM tram geometry, see [V040.md](V040.md); the current generator requires an additional `--tram-graph` input and produces the newer save instead of the hash below.
+
 Import `melbourne-rail-and-trams.save` using Trainsworld's **Load a file** command. The previous rail-only saves remain available. This revision includes the 16 simplified metropolitan rail services and all 24 numbered tram routes active on 18 November 2026: 1, 3, 5, 6, 11, 12, 16, 19, 30, 35, 48, 57, 58, 59, 64, 67, 70, 72, 75, 78, 82, 86, 96 and 109.
 
 ## Rail geometry

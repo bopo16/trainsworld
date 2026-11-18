@@ -107,7 +107,7 @@ fn main() {
             let raw = st["name"].as_str().unwrap();
             let name = names::tidy_station(raw).unwrap_or_else(|| raw.to_string());
             let platform = st["platform"].as_u64().unwrap() as u16;
-            net.set_station(id, Some(StationData { platform, name: name.clone(), named: false, built: true, off: false, upgrades: 0, berth: None, day: 0, one: 0 })).unwrap();
+            net.set_station(id, Some(StationData { platform, name: name.clone(), named: false, built: true, off: false, upgrades: st["upgrades"].as_u64().unwrap_or(0) as u8, berth: None, day: 0, one: 0 })).unwrap();
             node_key.push(st["key"].as_str().unwrap().to_string());
             node_names.push(name);
         }
@@ -130,7 +130,7 @@ fn main() {
         for (ei, ed) in m["edges"].as_array().unwrap().iter().enumerate() {
             let edge_hsr = on_hsr[ei] && !on_other[ei];
             let tram = ed["kind"].as_str() == Some("tram");
-            let design = if edge_hsr { design_radius(320.0) } else { R_CAP };
+            let design = if tram { 30.0 } else if edge_hsr { design_radius(320.0) } else { R_CAP };
             let (a, b) = (ed["a"].as_u64().unwrap() as u32, ed["b"].as_u64().unwrap() as u32);
             let mut pis = vec![];
             let node_level = |n: u32| m["nodes"][n as usize]["level"].as_i64().unwrap() as i8;
@@ -168,7 +168,7 @@ fn main() {
                 line.extend(inner.iter().copied());
                 line.push(lb);
                 let t = std::time::Instant::now();
-                let r = if inner.is_empty() { None } else { trace::trace(&line, false, TRACE_TOL_M, if tram { TRAM_MIN_RADIUS } else { TRACE_MIN_RADIUS }, design, lv_a) };
+                let r = if inner.is_empty() { None } else { trace::trace(&line, false, if tram { 5.0 } else { TRACE_TOL_M }, if tram { TRAM_MIN_RADIUS } else { TRACE_MIN_RADIUS }, design, lv_a) };
                 trace_s += t.elapsed().as_secs_f64();
                 let mid: Vec<Pi> = match r {
                     Some(t) => {

@@ -27,7 +27,7 @@ class Graph:
     """A region's graph (`data/packs/realgraph/<cc>.rgr`) in plane metres from `origin`, only the
     chains reaching into `box` (x0, y0, x1, y1)."""
 
-    def __init__(self, path, origin, box, r_earth):
+    def __init__(self, path, origin, box, r_earth, kinds=None):
         g = read(path)
         lon0, lat0 = origin
         x = r_earth * np.radians(g["lon"] - lon0) * math.cos(math.radians(lat0))
@@ -39,7 +39,8 @@ class Graph:
         cy0, cy1 = np.minimum.reduceat(y, lo), np.maximum.reduceat(y, lo)
         # rail, light rail and subway only: the real networks' lines are train lines, and the kinds a
         # version 2 graph adds (tram, monorail and the rest, T-3069) were never in their routes
-        keep = np.flatnonzero((cx1 >= x0) & (cx0 <= x1) & (cy1 >= y0) & (cy0 <= y1) & (hi - lo >= 2) & (g["kind"] <= 2))
+        kinds = (0, 1, 2) if kinds is None else kinds
+        keep = np.flatnonzero((cx1 >= x0) & (cx0 <= x1) & (cy1 >= y0) & (cy0 <= y1) & (hi - lo >= 2) & np.isin(g["kind"], kinds))
         self.pts, self.cum, self.ja, self.jb, self.fam, self.ha, self.hb, self.flags = [], [], [], [], [], [], [], []
         self.grid = {}
         adj = {}
@@ -108,7 +109,7 @@ class Graph:
         c = self.candidates(at, r)
         return self.fam[c[0][1]] if c else None
 
-    def route(self, a, b, r, fam0, extra=None):
+    def route(self, a, b, r, fam0, extra=None, turn_max=None):
         """The cheapest route from a to b: (polyline (n, 2), start snap, end snap, legs), or None;
         legs are the chains it runs on in order, (chain, from along, to along) (T-1305). `extra`
         multiplies chosen chains' cost ({chain: factor}, T-1774)."""
@@ -155,7 +156,7 @@ class Graph:
             for end in self.adj.get(J, ()):
                 c2, from_b = end >> 1, end & 1
                 hout = self.hb[c2] + math.pi if from_b else self.ha[c2]
-                if wrap_turn(hin, hout) > TURN_MAX:
+                if wrap_turn(hin, hout) > (TURN_MAX if turn_max is None else turn_max):
                     continue
                 f2, L = fac(c2), self.len[c2]
                 for e in ends_on.get(c2, ()):

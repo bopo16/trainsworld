@@ -114,6 +114,18 @@ def separate_event_tracks(model, net):
     print('Separated event route from cross-city track for readability',flush=True)
 
 
+def merge_identical_edges(model):
+    """Use one edge when generated railway edges are exactly identical."""
+    seen={}; remap={}
+    for i,edge in enumerate(model['edges']):
+        key=json.dumps(edge,sort_keys=True,separators=(',',':'))
+        if key in seen: remap[i]=seen[key]
+        else: seen[key]=i
+    for service in model['lines']:
+        if service: service['path']=[remap.get(c>>1,c>>1)<<1 | c&1 for c in service['path']]
+    print(f'Merged {len(remap)} exactly coincident rail edges',flush=True)
+
+
 def align(out):
     files = [out / 'mel_real.json', out / 'mel_real_corridors.json']
     net, doc = [json.loads(p.read_text()) for p in files]
@@ -139,10 +151,10 @@ def align(out):
     # The order remains fixed around curves; each is a separate one-way track.
     aligned_stations = []
     for primary, members, offset in [
-        ('Belgrave', ['Belgrave','Alamein','Lilydale','Glen Waverley'], -45),
-        ('Hurstbridge', ['Hurstbridge','Mernda'], -15),
-        ('Craigieburn', ['Craigieburn','Upfield'], 15),
-        ('Frankston', ['Frankston'], 45),
+        ('Belgrave', ['Belgrave','Alamein','Lilydale','Glen Waverley'], -90),
+        ('Hurstbridge', ['Hurstbridge','Mernda'], -30),
+        ('Craigieburn', ['Craigieburn','Upfield'], 30),
+        ('Frankston', ['Frankston'], 90),
     ]:
         i = line(primary); ids,p,f = section(i); lo,hi=sorted((p,f))
         old = services[i]['path'][lo:hi]
@@ -190,10 +202,10 @@ def align(out):
     ids,a,b=river_section(line('Belgrave'))
     river=LineString([nodes[x]['xy'] for x in ids[a:b+1]]).simplify(12)
     for primary,members,offset in [
-        ('Belgrave',['Belgrave','Alamein','Lilydale','Glen Waverley'],-45),
-        ('Hurstbridge',['Hurstbridge','Mernda'],-15),
-        ('Craigieburn',['Craigieburn','Upfield'],15),
-        ('Frankston',['Frankston'],45),
+        ('Belgrave',['Belgrave','Alamein','Lilydale','Glen Waverley'],-90),
+        ('Hurstbridge',['Hurstbridge','Mernda'],-30),
+        ('Craigieburn',['Craigieburn','Upfield'],30),
+        ('Frankston',['Frankston'],90),
     ]:
         i=line(primary); ids,a,b=river_section(i); lo,hi=sorted((a,b)); old=services[i]['path'][lo:hi]
         start,end=ids[a],ids[b]; curve=river.offset_curve(offset)
@@ -215,9 +227,47 @@ def align(out):
             if len(matches)!=1: raise ValueError(f'{member}: river Loop segment not found')
             k=matches[0];services[line(member)]['path']=path[:k]+replacement+path[k+len(old):]
         print(f'Aligned {primary} Southern Cross–Flinders Street track',flush=True)
+    # Three groups travel from Flagstaff to Southern Cross. Derive their
+    # intermediate curves from a common spine; the Northern group instead
+    # enters via North Melbourne, so it does not use this part of the loop.
+    def western_section(i):
+        ids=walk(services[i]['path'])
+        a=next(k for k,x in enumerate(ids) if name(x)=='Flagstaff')
+        b=next(k for k,x in enumerate(ids) if name(x)=='Southern Cross')
+        if a>=b: raise ValueError('Unexpected western Loop order')
+        return ids,a,b
+    ids,a,b=western_section(line('Belgrave'))
+    western=LineString([nodes[x]['xy'] for x in ids[a:b+1]]).simplify(8)
+    for primary,members,offset in [
+        ('Belgrave',['Belgrave','Alamein','Lilydale','Glen Waverley'],0),
+        ('Hurstbridge',['Hurstbridge','Mernda'],60),
+        ('Frankston',['Frankston'],120),
+    ]:
+        ids,a,b=western_section(line(primary));old=services[line(primary)]['path'][a:b]
+        start,end=ids[a],ids[b];curve=western.offset_curve(offset)
+        if curve.geom_type != 'LineString' or curve.length < western.length*.7: raise ValueError('Cannot offset western Loop curve')
+        lead=min(80,curve.length/4); c0=list(curve.coords[0]); c1=list(curve.coords[-1]); start_xy=nodes[start]['xy'];end_xy=nodes[end]['xy']
+        va=list(curve.interpolate(lead).coords[0]);vb=list(curve.interpolate(curve.length-lead).coords[0])
+        middle=substring(curve,lead,curve.length-lead)
+        e=copy.deepcopy(edges[old[0]>>1]);e.update(a=start,b=end,
+            lead_a=[start_xy[j]+va[j]-c0[j] for j in (0,1)],lead_b=[end_xy[j]+vb[j]-c1[j] for j in (0,1)],
+            line=list(middle.coords)[1:-1],tracks=1,oneway=1,levels=[])
+        new=len(edges)<<1;edges.append(e)
+        for member in members:
+            path=services[line(member)]['path']; matches=[k for k in range(len(path)-len(old)+1) if path[k:k+len(old)]==old]
+            if len(matches)!=1: raise ValueError(f'{member}: western Loop segment not found')
+            k=matches[0];services[line(member)]['path']=path[:k]+[new]+path[k+len(old):]
+        print(f'Aligned {primary} Flagstaff–Southern Cross track',flush=True)
+    # Keep the Flinders Street platforms level, placing the simplified
+    # Clifton Hill transition further out on the approach to Jolimont.
+    ids=walk(services[line('Hurstbridge')]['path'])
+    start=next(i for i,v in enumerate(ids) if name(v)=='Flinders Street')
+    end=next(i for i,v in enumerate(ids[start+1:],start+1) if name(v)=='Jolimont-MCG')
+    for v in ids[start:end]: nodes[v]['level']=nodes[ids[start-1]]['level']
     merge_redundant_platforms(m)
     remove_short_station_joints(m)
     separate_event_tracks(m,net)
+    merge_identical_edges(m)
     used={c>>1 for s in services if s for c in s['path']}
     # Preserve deliberately unserved Flemington infrastructure.
     used.update(i for i,e in enumerate(edges) if any(name(v)=='Flemington Racecourse' for v in (e['a'],e['b'])))

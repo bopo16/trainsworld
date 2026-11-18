@@ -148,6 +148,12 @@ fn main() {
         assert_eq!(tram_symbols, expected, "unexpected numbered tram routes");
         assert!(tram_edge_use.values().any(|&users| users > 1), "tram routes do not share track");
         assert!(event_edges.is_disjoint(&cross_city_edges), "event and cross-city services overlap on an edge");
+        if options.iter().any(|x| x == "--tram-upgrades") {
+            for stop in ["Flinders Street Station/Elizabeth St #1", "Waterfront City/Docklands Dr #D11"] {
+                let upgraded = (0..n.node_count() as u32).filter_map(|i| n.station_data(i)).any(|st| st.name == stop && st.upgrades & 9 == 9);
+                assert!(upgraded, "{stop} missing its tram terminal/passing upgrade");
+            }
+        }
         assert!(fleet >= tram_needed, "header tram fleet {fleet} is less than {tram_needed} sections needed");
     } else { assert_eq!(tram_count, 0, "tram validation flag missing"); }
     let issues = n.validate(&(0..n.edge_count() as u32).collect::<Vec<_>>(), &(0..n.node_count() as u32).collect::<Vec<_>>(), &[]);

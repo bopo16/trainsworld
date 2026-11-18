@@ -1,7 +1,8 @@
 """Append a compact GTFS tram network to a generated Melbourne shared-track model."""
 import io
 import json
-from collections import defaultdict
+import math
+from collections import Counter, defaultdict
 from pathlib import Path
 import zipfile
 import numpy as np
@@ -12,11 +13,11 @@ from shapely.ops import substring
 GREEN = '009B3A'
 
 
-def build(out, archive, date, realnet):
+def build(out, archive, date, realnet, tram_graph):
     """Build one representative full-length pattern per active numbered route.
 
-    GTFS shapes provide the track geometry; hops with the same stop endpoints are
-    shared, so routes can run on common track. This is not a road-snap operation.
+    Prefer OSM tram/light-rail geometry, falling back to GTFS shapes. Hops with
+    the same stop endpoints are shared, so routes can run on common track.
     """
     from metro_network import service_ids
     import realshared
@@ -54,6 +55,10 @@ def build(out, archive, date, realnet):
     stop_ids=set(samples[samples.trip_id.isin(set(chosen.trip_id))].stop_id)
     relevant=stops[stops.stop_id.isin(stop_ids)].copy()
     relevant['x'], relevant['y']=realnet.to_xy(relevant.stop_lon.astype(float).to_numpy(),relevant.stop_lat.astype(float).to_numpy(),origin)
+    import realroute
+    xs,ys=relevant['x'].to_numpy(),relevant['y'].to_numpy()
+    graph=realroute.Graph(str(tram_graph),origin,(xs.min()-2000,ys.min()-2000,xs.max()+2000,ys.max()+2000),realnet.R_EARTH,kinds=(1,3))
+    if not graph.pts: raise ValueError('The supplied realgraph contains no Melbourne tram/light rail')
     stations=[]; station_of={}
     for nm,group in relevant.groupby('stop_name',sort=True):
         points=group[['x','y']].to_numpy(); center=points.mean(axis=0)
@@ -68,7 +73,7 @@ def build(out, archive, date, realnet):
     for sid,g in shapes.groupby('shape_id'):
         g=g.sort_values('seq'); x,y=realnet.to_xy(g.shape_pt_lon.astype(float).to_numpy(),g.shape_pt_lat.astype(float).to_numpy(),origin)
         shape_by[sid]=LineString(np.column_stack((x,y)))
-    route_by=routes.set_index('route_id'); lines=[]; clines=[]; pieces=[]; polys=[]; hops={}; straight_hops=0
+    route_by=routes.set_index('route_id'); lines=[]; clines=[]; pieces=[]; polys=[]; hops={}; straight_hops=0; osm_hops=0; final_straight=0
     for r in chosen.itertuples():
         seq=samples[samples.trip_id.eq(r.trip_id)].copy(); seq['seq']=seq.stop_sequence.astype(int); seq=seq.sort_values('seq')
         def seconds(value):
@@ -89,8 +94,17 @@ def build(out, archive, date, realnet):
                 da,db=shape.project(p),shape.project(q)
                 sub=substring(shape,da,db).simplify(4)
                 line=list(sub.coords) if sub.geom_type=='LineString' else []
+                straight=False; osm=False
                 if len(line)<2 or sub.length > max(700,4*p.distance(q)):
-                    line=[list(p.coords[0]),list(q.coords[0])]; straight_hops+=1
+                    line=[list(p.coords[0]),list(q.coords[0])]; straight_hops+=1; straight=True
+                match=graph.route(np.array(p.coords[0]),np.array(q.coords[0]),20,0,turn_max=math.radians(105))
+                if match is not None and len(match[0]) >= 2:
+                    routed=match[0]
+                    if realroute.length(routed) <= max(150,2.5*p.distance(q)+120) and (straight or realroute.far_from(routed,np.asarray(line)) <= 90):
+                        line=routed.tolist(); osm_hops+=1; osm=True
+                if not osm:
+                    print(f"Tram {code}: {'straight' if straight else 'GTFS'} fallback from {stations[a]['name']} to {stations[b]['name']}",flush=True)
+                if straight and not osm: final_straight+=1
                 poly=np.array([list(p.coords[0])]+line[1:-1]+[list(q.coords[0])])
                 index=len(pieces); hops[key]=(index,a,b); pieces.append({'id':index,'pairs':1,'ends':[a,b]});polys.append(poly)
             index,u,v=hops[key]; path.append([index,1 if (a,b)==(u,v) else -1,0])
@@ -117,6 +131,12 @@ def build(out, archive, date, realnet):
         l['path']=[[piece,direction, (1 if lines[i]['symbol'] in cohorts[1] else 0) if piece in split else 0]
                    for piece,direction,_ in l['path']]
     print(f'Tram capacity: {len(split)} busy pieces use two pairs',flush=True)
+    # A double-track tram stop handles both directions; don't split platforms
+    # merely because several routes use it. Distinct track pairs remain distinct.
+    realshared.PLAT_LOAD=1e6
+    realshared.LEAD_MAX=20.0
+    realshared.HEAD_M=20.0
+    realshared.BRANCH_CLEAR=10.0
     model=realshared.track_model({'pieces':pieces,'lines':clines},polys,{'stations':stations,'lines':lines});stats=model['stats']
     if any(x is None for x in model['lines']): raise ValueError(f'Tram tracks missing routes: {stats}')
     # Route 35 starts and ends at Waterfront City, but separate approaches
@@ -136,9 +156,17 @@ def build(out, archive, date, realnet):
                     if edge['lead_'+side] is not None: edge['lead_'+side]=(np.array(edge['lead_'+side])+delta).tolist()
         for line in model['lines']: line['stops']=[start if s==end else s for s in line['stops']]
         b['station']=None
+    stop_counts=Counter(node['station']['key'] for node in model['nodes'] if node['station'])
+    if any(count > 2 for count in stop_counts.values()):
+        raise ValueError('A tram stop has more than two separate station nodes')
     for node in model['nodes']:
         node['level']=0
-        if node['station']: node['station']['platform']=40
+        if node['station']:
+            node['station']['platform']=40
+            # Two unusually busy shared termini use v0.4's tram terminal and
+            # passing-track upgrades instead of separate station nodes.
+            if node['station']['name'] in ('Flinders Street Station/Elizabeth St #1','Waterfront City/Docklands Dr #D11'):
+                node['station']['upgrades']=9
     for edge in model['edges']: edge.update(kind='tram',levels=[])
     net_path=out/'mel_real.json'; corr_path=out/'mel_real_corridors.json'; geom_path=out/'mel_real_geom.json'
     net=json.loads(net_path.read_text()); corr=json.loads(corr_path.read_text()); geom=json.loads(geom_path.read_text());m=corr['model']
@@ -152,4 +180,4 @@ def build(out, archive, date, realnet):
     for l in lines: l['stops']=[x+so for x in l['stops']]
     net['stations'].extend(stations);net['lines'].extend(lines);geom['lines'].extend([{} for _ in lines])
     for p,data in ((net_path,net),(corr_path,corr),(geom_path,geom)):p.write_text(json.dumps(data))
-    print(f'Tram model: {len(lines)} routes, {len(stations)} named stops, {len(model["edges"])} edges; {straight_hops} straight fallback hops; {dict(stats)}',flush=True)
+    print(f'Tram model: {len(lines)} routes, {len(stations)} named stops, {len(model["edges"])} edges; {osm_hops}/{len(pieces)} OSM-routed hops, {final_straight} final straight fallbacks ({straight_hops} before OSM matching); {dict(stats)}',flush=True)

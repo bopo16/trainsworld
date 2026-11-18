@@ -3,12 +3,32 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 from metro_network import join_tunnel, service_ids, simplify_services, ordered_shape, single_track_stony_point
-from loop_geometry import merge_redundant_platforms, remove_short_station_joints, separate_event_tracks
+from loop_geometry import merge_redundant_platforms, remove_short_station_joints, separate_event_tracks, merge_identical_edges
 
 class MetroTests(unittest.TestCase):
+    def test_identical_edges_are_shared_without_changing_direction(self):
+        model={'edges':[{'a':0,'b':1,'line':[]}, {'a':0,'b':1,'line':[]}, {'a':0,'b':1,'line':[[5,2]]}],
+               'lines':[{'path':[0]}, {'path':[3]}, {'path':[4]}]}
+        merge_identical_edges(model)
+        self.assertEqual([s['path'] for s in model['lines']],[[0],[1],[4]])
+
+    def test_tram_graph_filters_rail_and_allows_street_corner(self):
+        import numpy as np
+        import realroute
+        data={'lon':np.array([0,0,0,.001,0,.001]), 'lat':np.array([0,.001,.001,.001,0,.001]),
+              'off':np.array([0,2,4,6]), 'a':np.array([0,1,0]), 'b':np.array([1,2,2]),
+              'kind':np.array([3,3,0]), 'flags':np.array([0,0,0])}
+        with patch.object(realroute, 'read', return_value=data):
+            graph=realroute.Graph('unused',(0,0),(-10,-10,200,200),6371000,kinds=(3,))
+        self.assertEqual(len(graph.pts),2)
+        start,end=graph.pts[0][0],graph.pts[1][-1]
+        self.assertIsNone(graph.route(start,end,1,0))
+        self.assertIsNotNone(graph.route(start,end,1,0,turn_max=np.deg2rad(105)))
+
     def test_event_track_separation_preserves_racecourse_extension(self):
         def node(name, xy): return {'xy':xy, 'station':{'name':name} if name else None}
         def edge(a,b): return {'a':a,'b':b,'lead_a':None,'lead_b':None,'line':[]}

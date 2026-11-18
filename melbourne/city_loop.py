@@ -71,10 +71,10 @@ def build(out):
         loops[name] = (loop,direct,join,allowed)
         print(f'{name}: through Flinders Street via one-way loop, join node {join}', flush=True)
 
-    for args in [('Belgrave','Alamein','Richmond',[-12,12]),
+    for args in [('Belgrave','Alamein','Richmond',[35,55]),
                  ('Hurstbridge','Mernda','Jolimont-MCG',[0,0]),
-                 ('Craigieburn','Upfield','North Melbourne',[12,-12]),
-                 ('Frankston','Frankston geometry guide','Richmond',[24,-24])]:
+                 ('Craigieburn','Upfield','North Melbourne',[70,70]),
+                 ('Frankston','Frankston geometry guide','Richmond',[-35,-55])]:
         make(*args)
 
     def add_branch(name, template):
