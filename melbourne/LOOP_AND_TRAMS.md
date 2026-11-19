@@ -2,6 +2,8 @@
 
 Import [melbourne-v040-loop-and-trams.save](melbourne-v040-loop-and-trams.save) with **Load file**. This revision starts from the [v0.4 rail and tram save](V040.md) and keeps its 16 rail services and 24 tram routes.
 
+The [V/Line and blueprint revision](VLINE.md) builds on this save.
+
 ## City Loop and approaches
 
 The four directional City Loop tracks and two double-track surface alignments run side by side around a common bend between Southern Cross and Flinders Street. The Frankston alignment takes the outside slot and the Flinders Street leads continue east on the platform axes. The six river alignments keep their order through the bend. In the Flinders Street platform and immediate lead area, the six modelled alignments had five centre-line crossings in the previous revision and have none in this one. The Altona, Werribee–Sandringham and Williamstown–Sandringham services use the same cross-city tracks and Southern Cross platform where their approaches coincide. The Flemington event tracks keep their separate pair.

@@ -36,6 +36,8 @@ fn main() {
     let mut groups = std::collections::BTreeMap::new();
     let has_loop_services = (0..n.line_count() as u32).any(|i| n.line_data(i).is_some_and(|l| l.one_way));
     assert!(!expect_city_loops || has_loop_services, "missing directional City Loop services");
+    let mut vline = BTreeSet::new();
+    let mut vline_edges = BTreeSet::new();
     let mut loop_platforms = std::collections::BTreeMap::new();
     let mut tunnel_edges: std::collections::BTreeMap<u32, BTreeSet<u32>> = std::collections::BTreeMap::new();
     for i in 0..n.line_count() as u32 {
@@ -48,6 +50,15 @@ fn main() {
             }
         }
         let stop_names: Vec<String> = l.stops.iter().map(|&id| n.station_data(id).expect("line stop is not a station").name).collect();
+        if l.group_name == "V/Line" {
+            assert_eq!(stop_names.first().unwrap(), "Southern Cross");
+            assert_eq!(n.line_loop(i), LoopKind::None);
+            assert_ne!(n.station_data(l.stops[0]).unwrap().upgrades & trainworld_sim::track::upgrades::TERMINAL, 0);
+            assert!(!["Flagstaff", "Melbourne Central", "Parliament", "State Library", "Town Hall"]
+                .iter().any(|name| stop_names.iter().any(|stop| stop == name)), "{} uses a city tunnel platform", l.name);
+            vline.insert(l.symbol.clone());
+            vline_edges.extend(l.path.iter().map(|p| p >> 1));
+        }
         if ["Flinders Street", "Southern Cross", "Flagstaff", "Melbourne Central", "Parliament"].iter().all(|s| stop_names.iter().any(|x| x == s)) { city_loop = true; }
         if l.name == "Cranbourne – Sunbury" || l.name == "Pakenham – Sunbury" {
             for station in ["Sunbury", "Arden", "Parkville", "State Library", "Town Hall", "Anzac", "Caulfield"] {
@@ -127,7 +138,8 @@ fn main() {
         assert!(names.iter().any(|name| name.contains(expected)), "missing line {expected}");
     }
     if grouped {
-        assert_eq!(groups.len(), if tram_fleet.is_some() { 8 } else { 7 }, "unexpected line groups");
+        let base_groups = if tram_fleet.is_some() { 8 } else { 7 };
+        assert_eq!(groups.len(), base_groups + usize::from(!vline.is_empty()), "unexpected line groups");
         for name in ["Burnley Group", "Clifton Hill Group", "Northern Group", "Caulfield Group", "Cross-City Group", "Metro Tunnel", "Special Events"] {
             assert!(groups.values().any(|x| x == name), "missing group {name}");
         }
@@ -141,6 +153,14 @@ fn main() {
     }
     assert!(city_loop, "no route serves all City Loop stations");
     assert!(names.contains("Cranbourne – Sunbury") && names.contains("Pakenham – Sunbury"), "Metro Tunnel through services missing");
+    if options.iter().any(|x| x == "--vline") {
+        let expected: BTreeSet<String> = ["ABY", "ART", "BAT", "BDE", "BGO", "ECH", "GEL", "SER", "SNH", "SWL", "WBL"]
+            .into_iter().map(str::to_owned).collect();
+        assert_eq!(vline, expected, "V/Line corridor coverage");
+        for edges in tunnel_edges.values() {
+            assert!(edges.is_disjoint(&vline_edges), "V/Line uses City Loop track");
+        }
+    }
     assert!(fleet >= needed, "header fleet {fleet} is less than {needed} cars needed");
     if let Some(fleet) = tram_fleet {
         assert_eq!(tram_count, 24, "expected all 24 tram routes");
