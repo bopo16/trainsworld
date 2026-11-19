@@ -410,14 +410,24 @@ fn southern_cross_north(net: &mut Network) {
     // Keep it east of the new bundle through the immediate station throat.
     let station = point(net, 443);
     place(net, 445, plus(station, southward, -183.0 * scale));
-    place(net, 446, plane(net, [-743.0, -11.0]));
-    place(net, 447, plane(net, [-781.0, 142.0]));
     replace_shape(net, 338, &[], 0);
-    let lead = plus(point(net, 445), southward, -45.0 * scale);
-    replace_shape(net, 339, &[lead], 1);
-    replace_shape(net, 340, &[], 0);
-    let node = point(net, 447);
-    retangent(net, 341, 447, node, tangent(point(net, 446), node), 45.0);
+    // One curve through the cross-under instead of the short sideways dogleg
+    // and its three joints. The through service still enters North Melbourne.
+    let mut exit = net.edge_data(339).unwrap();
+    exit.b = 449;
+    net.set_edge(339, Some(exit)).unwrap();
+    let q = [
+        plus(point(net, 445), southward, -55.0 * scale),
+        plane(net, [-771.0, 76.0]),
+        plane(net, [-931.0, 285.0]),
+        plane(net, [-1150.0, 437.0]),
+        plane(net, [-1292.0, 566.0]),
+    ];
+    replace_shape(net, 339, &q, q.len());
+    for name in ["Craigieburn", "Upfield"] {
+        route(net, name, &[678, 680, 682, 685], &[678], None);
+    }
+    retire(net, &[340, 341, 342], &[446, 447, 448]);
 }
 
 fn move_bundle(net: &mut Network, nodes: &[u32], offset: Point) {
@@ -452,6 +462,15 @@ fn approaches(net: &mut Network) {
     move_bundle(net, &[451, 450], [-9.0, -3.0]);
     move_bundle(net, &[478, 477], [4.0, 10.0]);
     move_bundle(net, &[484, 483], [-4.0, -10.0]);
+    // The Burnley directions had identical control nodes on the east lead,
+    // then swapped sides before East Richmond. Keep both lanes ordered
+    // through both platforms and into the shared line beyond them.
+    move_bundle(net, &[373, 374, 375, 376, 377, 378, 379], [8.0, 14.0]);
+    move_bundle(
+        net,
+        &[381, 382, 383, 384, 385, 386, 387, 388],
+        [-8.0, -14.0],
+    );
     move_bundle(net, &[413, 412], [0.0, 8.0]);
     move_bundle(net, &[418, 417], [0.0, -8.0]);
     for (edge, node, other, lead) in [(337, 439, 438, 58.0), (345, 451, 450, 58.0)] {
@@ -713,21 +732,33 @@ fn swanston_trams(net: &mut Network) {
     for &(node, xy) in &centres {
         place(net, node, xy);
     }
-    // Swanston Street is straight through these stops. Use one axis in
-    // place of the small side steps inherited from independent platforms.
-    let south = point(net, 726);
-    let axis = tangent(south, point(net, 740));
-    for node in [728, 730, 732, 734, 736, 738] {
-        let offset = sub(point(net, node), south);
-        place(
-            net,
-            node,
-            plus(south, axis, offset[0] * axis[0] + offset[1] * axis[1]),
-        );
+    // South of RMIT the city-grid track is one straight line, aligned
+    // to OSM rails 9522–9533 and 10385–10397. The 9511–9514/9534–9536
+    // bundle turns northeast out of the grid towards Melbourne Uni.
+    let frame = net.frame();
+    let (origin_x, origin_y) = frame.from_lonlat(ORIGIN[0], ORIGIN[1]);
+    let scale = frame.scale_at(ORIGIN[1]).0;
+    let nodes = [726, 728, 730, 732, 734, 736, 738, 740];
+    for node in nodes {
+        let y = (point(net, node)[1] - origin_y) / scale;
+        let x = if node <= 734 {
+            507.0 - 0.362 * y
+        } else {
+            23.9 + 0.139 * y
+        };
+        place(net, node, [origin_x + x * scale, origin_y + y * scale]);
     }
-    for edge in [640, 642, 644, 646, 648, 650, 652] {
+    for edge in [640, 642, 644, 646, 650, 652] {
         replace_shape(net, edge, &[], 0);
     }
+    let [x, y] = plane(net, [148.0, 992.0]);
+    let mut turn = net.edge_data(648).unwrap();
+    turn.pis = vec![Pi::new(x, y, 78.0, 0)];
+    net.set_edge(648, Some(turn)).unwrap();
+    let north = point(net, 726);
+    let scale = net.frame().scale_at(ORIGIN[1]).0;
+    let lead = plus(north, unit([0.362, -1.0]), 35.0 * scale);
+    replace_shape(net, 638, &[lead], 1);
     for id in 0..net.line_count() as u32 {
         let mut line = net.line_data(id).unwrap();
         let mut changed = false;
