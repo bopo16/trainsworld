@@ -3,7 +3,7 @@
 import argparse,gzip,json,struct,subprocess,tempfile
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('city',choices=('per','can','syd'));p.add_argument('save',type=Path);p.add_argument('--expanded',action='store_true');a=p.parse_args()
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('city',choices=('per','can','syd','bri','ade'));p.add_argument('save',type=Path);p.add_argument('--expanded',action='store_true');a=p.parse_args()
 raw=gzip.decompress(a.save.read_bytes())
 if raw[:4]!=b'TWG1':raise ValueError('not a game save')
 n=struct.unpack_from('<I',raw,4)[0]

@@ -51,8 +51,9 @@ mod recipe {
     use serde::Deserialize;
     use std::collections::{BTreeMap, BTreeSet};
     use trainworld_sim::track::{
-        geom::Pi,
-        net::{EdgeData, GroupLook, Network, NodeData, StationData, DAY_UNKNOWN},
+        frame::FrameKind,
+        geom::{self, Pi},
+        net::{EdgeData, GroupLook, LineData, Network, NodeData, StationData, DAY_UNKNOWN},
         params::{TrackKind, R_CAP},
         save, trace, upgrades,
         world::TrackWorld,
@@ -69,6 +70,8 @@ mod recipe {
         platform: u16,
         #[serde(default)]
         terminal: bool,
+        #[serde(default)]
+        passing: bool,
         link: Option<u32>,
     }
 
@@ -81,6 +84,8 @@ mod recipe {
         guides: Vec<[f64; 2]>,
         #[serde(default)]
         levels: Vec<i8>,
+        #[serde(default)]
+        leads: [Option<[f64; 2]>; 2],
         #[serde(default)]
         tram: bool,
         #[serde(default = "track_pair")]
@@ -118,6 +123,7 @@ mod recipe {
 
     #[derive(Deserialize)]
     struct Recipe {
+        origin: Option<[f64; 2]>,
         nodes: Vec<Node>,
         edges: Vec<Edge>,
         routes: Vec<Route>,
@@ -139,7 +145,7 @@ mod recipe {
             .into_iter()
             .map(|[lon, lat]| frame.from_lonlat(lon, lat))
             .collect();
-        let pis = if edge.levels.is_empty() {
+        let mut pis = if edge.levels.is_empty() {
             let mut polyline = vec![(a.x, a.y)];
             polyline.extend(guides);
             polyline.push((b.x, b.y));
@@ -166,6 +172,28 @@ mod recipe {
                 .map(|((x, y), level)| Pi::new(x, y, 0.0, level))
                 .collect()
         };
+        for (end, lead) in edge.leads.into_iter().enumerate() {
+            let Some([lon, lat]) = lead else { continue };
+            let (x, y) = frame.from_lonlat(lon, lat);
+            let node = if end == 0 { &a } else { &b };
+            let reach = (x - node.x).hypot(y - node.y);
+            let mut proposal: Vec<_> = pis
+                .iter()
+                .copied()
+                .filter(|pi| (pi.x - node.x).hypot(pi.y - node.y) > reach * 1.30)
+                .collect();
+            let insert = if end == 0 { 0 } else { proposal.len() };
+            proposal.insert(insert, Pi::new(x, y, 0.0, node.level));
+            let mut vertices = vec![Pi::new(a.x, a.y, 0.0, a.level)];
+            vertices.extend(proposal.iter().copied());
+            vertices.push(Pi::new(b.x, b.y, 0.0, b.level));
+            if geom::fit_min(&vertices, frame.scaled(), R_CAP, kind.spec().min_radius)
+                .issues
+                .is_empty()
+            {
+                pis = proposal;
+            }
+        }
         let old = net.edge_data(edge.id);
         net.set_edge(
             edge.id,
@@ -189,9 +217,15 @@ mod recipe {
         .unwrap_or_else(|issue| panic!("edge {}: {issue:?}", edge.id));
     }
 
-    pub fn apply(raw: &[u8], recipe: &str) -> (Vec<u8>, u64, u64) {
+    pub fn apply(raw: Option<&[u8]>, recipe: &str) -> (Vec<u8>, u64, u64) {
         let recipe: Recipe = serde_json::from_str(recipe).expect("parse recipe");
-        let mut net = save::decode(raw).expect("decode network");
+        let mut net = match raw {
+            Some(bytes) => save::decode(bytes).expect("decode network"),
+            None => {
+                let [lon, lat] = recipe.origin.expect("new network origin");
+                Network::new_in(FrameKind::Merc, lon, lat, false)
+            }
+        };
         for node in &recipe.nodes {
             let (x, y) = net.frame().from_lonlat(node.at[0], node.at[1]);
             let flying = net.node_data(node.id).is_some_and(|n| n.flying);
@@ -214,7 +248,8 @@ mod recipe {
                         named: true,
                         built: true,
                         off: false,
-                        upgrades: if node.terminal { upgrades::TERMINAL } else { 0 },
+                        upgrades: (u8::from(node.terminal) * upgrades::TERMINAL)
+                            | (u8::from(node.passing) * upgrades::PASSING),
                         berth: None,
                         day: DAY_UNKNOWN,
                         one: 0,
@@ -242,17 +277,31 @@ mod recipe {
             let (id, mut line) = if let Some(id) = route.existing {
                 (id, net.line_data(id).expect("existing line"))
             } else {
-                let mut line = net.line_data(0).expect("rail service defaults");
-                line.name = route.name;
-                line.symbol = route.symbol;
-                line.colour = route.colour;
-                line.tph = route.tph;
-                line.cars = route.cars;
-                line.trains = None;
-                line.auto = None;
-                line.group = 0;
-                line.group_name = route.group;
-                line.group_look = GroupLook::default();
+                let mut line = LineData {
+                    name: route.name,
+                    symbol: route.symbol,
+                    colour: route.colour,
+                    stops: vec![],
+                    path: vec![],
+                    tph: route.tph,
+                    trains: None,
+                    auto: None,
+                    dwell_s: 35.0,
+                    turnaround_s: 240.0,
+                    cars: route.cars,
+                    fast: false,
+                    bus: None,
+                    ferry: None,
+                    group: 0,
+                    group_name: route.group,
+                    group_look: GroupLook::default(),
+                    day: DAY_UNKNOWN,
+                    hand: true,
+                    one_way: false,
+                    limit: 0,
+                    twin: Default::default(),
+                    weekend: Default::default(),
+                };
                 if !line.group_name.is_empty() {
                     line.group = *groups.entry(line.group_name.clone()).or_insert_with(|| {
                         let group = next_group;
@@ -264,14 +313,6 @@ mod recipe {
                         colour: Some(line.colour),
                     };
                 }
-                line.one_way = false;
-                line.hand = true;
-                line.twin = Default::default();
-                line.weekend = Default::default();
-                line.dwell_s = 35.0;
-                line.turnaround_s = 240.0;
-                line.limit = 0;
-                line.day = DAY_UNKNOWN;
                 (net.line_count() as u32, line)
             };
             line.path = route.path;
@@ -326,19 +367,22 @@ mod recipe {
 
 fn main() {
     let mut args = env::args_os().skip(1);
-    let input = fs::read(args.next().expect("input")).expect("read input");
+    let input = args.next().expect("input or --new");
+    let input = (input != "--new").then(|| fs::read(input).expect("read input"));
     let output = args.next().expect("output");
     let recipe = args.next().expect("recipe or --blueprint");
     if recipe == "--blueprint" {
-        let (result, cost) = blueprint(&input);
+        let (result, cost) = blueprint(input.as_deref().expect("blueprint input"));
         fs::write(output, result).expect("write blueprint");
         println!("{cost}");
         return;
     }
     #[cfg(feature = "demand")]
     {
-        let (result, rail, tram) =
-            recipe::apply(&input, &fs::read_to_string(recipe).expect("read recipe"));
+        let (result, rail, tram) = recipe::apply(
+            input.as_deref(),
+            &fs::read_to_string(recipe).expect("read recipe"),
+        );
         fs::write(output, result).expect("write network");
         println!("{rail} {tram}");
     }

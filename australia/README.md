@@ -4,6 +4,8 @@ Download a playable `.save`, open Trainsworld and choose **Load file**. This ind
 
 | City | Current playable save | Editable blueprint | Network notes |
 | --- | --- | --- | --- |
+| Adelaide | [Adelaide](saves/adelaide.save) | | [Suburban trains and trams](ADELAIDE.md) |
+| Brisbane and South East Queensland | [Brisbane](saves/brisbane.save) | | [Suburban, coast and G:link](BRISBANE.md) |
 | Canberra | [Canberra](saves/canberra.save) | | [Light rail build](BASE_NETWORKS.md) |
 | Melbourne | [Melbourne](saves/melbourne.save) | [Melbourne](blueprints/melbourne.save) | [V/Line, City Loop and trams](../melbourne/VLINE.md) |
 | Perth | [Perth](saves/perth.save) | | [Perth Station and Bayswater approaches](PERTH_APPROACH.md) |
