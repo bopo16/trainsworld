@@ -1,4 +1,5 @@
 # Australian city saves
+For the revised Sydney CBD map, see [Sydney Central, City Circle and CBD Metro](SYDNEY_GEOMETRY.md).
 
 Three independent Trainsworld 0.4 saves, built for 18 November 2026. Import the `.save` file through the game's load/import interface. These are simplified, playable *models*, not working timetables or surveyed track plans. They reuse the game's real-network, corridor, shared-track and save generators. Melbourne is unchanged.
 

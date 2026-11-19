@@ -7,6 +7,7 @@ fn main() {
     let file=a.next().expect("payload");
     let fleet:u64=a.next().expect("fleet").parse().unwrap();
     let trams:u64=a.next().expect("tram fleet").parse().unwrap();
+    let expanded = a.any(|arg| arg == "--expanded");
     let bytes=std::fs::read(file).unwrap();
     let mut api=TrackApi::new(0.0,0.0,false);
     assert!(api.load(&bytes),"game load failed");
@@ -55,6 +56,43 @@ fn main() {
       "can"=>{assert!(names.contains("Canberra Light Rail 1"));assert_eq!(names.len(),1);for name in ["Gungahlin Place","Alinga Street"] {assert!(stations.contains(name),"missing {name}");}assert!(stations.len()>=14);assert!(trams>=tram_need);},
       "syd"=>{for code in ["M1","T1","T2","T3","T4","T5","T6","T7","T8","T9","L1","L2","L3","L4"] {assert!(symbols.contains(code),"missing {code}");}for name in ["Tallawong","Bankstown","Central"] {assert!(stations.contains(name),"missing {name}");}let lidcombe=(0..n.node_count() as u32).filter_map(|i|n.station_data(i)).any(|s|s.name=="Lidcombe" && s.upgrades&9==9);assert!(lidcombe,"Lidcombe missing terminus upgrades");assert!(stations.len()>=180);assert!(fleet>=need && trams>=tram_need);},
       _=>panic!("unknown city")
+    }
+    if city == "syd" && expanded {
+        let stop = |name: &str, id| n.station_data(id).is_some_and(|station| station.name == name);
+        let mut surface_central = BTreeSet::new();
+        for id in 0..n.line_count() as u32 {
+            let line = n.line_data(id).unwrap();
+            match line.symbol.as_str() {
+                "T1" | "T2" | "T3" | "T8" | "T9" => {
+                    surface_central.extend(line.stops.iter().copied().filter(|&node| {
+                        stop("Central", node) && n.node_data(node).unwrap().level == 0
+                    }));
+                }
+                "T4" => {
+                    for name in ["Redfern", "Central", "Town Hall"] {
+                        let node = *line.stops.iter().find(|&&node| stop(name, node)).expect("T4 CBD stop");
+                        assert!(n.node_data(node).unwrap().level < 0, "T4 must serve underground {name}");
+                        for other in [1, 2, 3, 4, 5, 11, 12, 13] {
+                            assert!(!n.line_data(other).unwrap().stops.contains(&node), "T4 shares {name} with a surface line");
+                        }
+                    }
+                }
+                "BMT" | "BTH" | "CCN" | "SCO" => {
+                    let terminal = line.stops[0];
+                    assert!(stop("Central", terminal));
+                    assert_eq!(n.built_ports(terminal), 1, "{} Central track is not a terminus", line.name);
+                    assert_ne!(n.station_data(terminal).unwrap().upgrades & 1, 0);
+                    assert!(!line.stops.iter().any(|&node| stop("Museum", node)), "regional train uses the City Circle");
+                }
+                "L5" | "HUN" => assert!(line.stops.iter().any(|&node| stop("Newcastle Interchange", node))),
+                _ => {}
+            }
+        }
+        assert_eq!(surface_central.len(), 4, "expected four surface suburban platforms");
+        for code in ["BMT", "BTH", "CCN", "SCO", "SHL", "HUN", "L5"] {
+            assert!(symbols.contains(code), "missing {code}");
+        }
+        assert_eq!(n.line_count(), 28);
     }
     let issues=n.validate(&(0..n.edge_count() as u32).collect::<Vec<_>>(),&(0..n.node_count() as u32).collect::<Vec<_>>(),&[]);
     for issue in &issues {eprintln!("track validation: {issue:?}");}
