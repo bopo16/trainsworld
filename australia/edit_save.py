@@ -20,6 +20,7 @@ def main():
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--recipe", type=Path)
     mode.add_argument("--blueprint", action="store_true")
+    parser.add_argument("--home", help="map zone to open on import (for example mel or syd)")
     args = parser.parse_args()
     original = args.input.read_bytes()
     if args.recipe:
@@ -31,6 +32,8 @@ def main():
         parser.error("input must be a Trainworld save")
     size = struct.unpack_from("<I", raw, 4)[0]
     header = json.loads(raw[8:8 + size])
+    if args.home:
+        header["home"] = args.home
 
     with tempfile.TemporaryDirectory() as directory:
         source = Path(directory) / "input.twt2"
