@@ -1,6 +1,6 @@
 # Sydney track pairs and regional services
 
-Load [sydney-expanded.save](sydney-expanded.save) to play. Load [sydney-blueprint.save](sydney-blueprint.save) to edit the same tracks, junctions and station platforms as a construction plan. The blueprint has no service lines and includes the engine's construction quote plus a cash buffer. Keep both files if you want to edit one and compare it with the running network.
+Load [Sydney playable save](saves/sydney.save) to play. Load [Sydney blueprint](blueprints/sydney.save) to edit the same tracks, junctions and station platforms as a construction plan. The blueprint has no service lines and includes the engine's construction quote plus a cash buffer. Keep both files if you want to edit one and compare it with the running network.
 
 ## What the track data shows
 
@@ -33,9 +33,9 @@ Intercity stopping patterns and headways are representative. The Newcastle light
 The recipe pins the [CBD geometry save](SYDNEY_GEOMETRY.md) and contains the fitted corridor guides and route choices used by the fork.
 
 ```sh
-python australia/edit_save.py australia/sydney-cbd.save australia/sydney-expanded.save --recipe australia/sources/sydney-track-and-service-recipe.json
-python australia/validate.py syd australia/sydney-expanded.save --expanded
-python australia/edit_save.py australia/sydney-expanded.save australia/sydney-blueprint.save --blueprint --home syd
+python australia/edit_save.py australia/archive/sydney/sydney-cbd.save australia/saves/sydney.save --recipe australia/sources/sydney-track-and-service-recipe.json
+python australia/validate.py syd australia/saves/sydney.save --expanded
+python australia/edit_save.py australia/saves/sydney.save australia/blueprints/sydney.save --blueprint --home syd
 ```
 
 The native game loader checks 28 running services, 367 distinct station names and 461 track pieces. It confirms the four surface suburban Central platforms, the separate T4 underground platforms and the regional turnbacks. The geometry validator reports 167 placement warnings, mostly small heading mismatches at stations. Chromium confirmed the expanded network over the OpenFreeMap basemap in the geometry view. The game engine also reloaded the blueprint and constructed the complete plan with the supplied budget.

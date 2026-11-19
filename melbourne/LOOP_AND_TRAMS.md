@@ -1,6 +1,6 @@
 # Melbourne Loop and tram geometry revision
 
-Import [melbourne-v040-loop-and-trams.save](melbourne-v040-loop-and-trams.save) with **Load file**. This revision starts from the [v0.4 rail and tram save](V040.md) and keeps its 16 rail services and 24 tram routes.
+Import [melbourne-v040-loop-and-trams.save](../australia/archive/melbourne/melbourne-v040-loop-and-trams.save) with **Load file**. This revision starts from the [v0.4 rail and tram save](V040.md) and keeps its 16 rail services and 24 tram routes.
 
 The [V/Line and blueprint revision](VLINE.md) builds on this save.
 
@@ -25,7 +25,7 @@ The native validator reloads the save and checks all 40 services, the four Loop 
 From the repository root with Rust and Cargo on PATH:
 
 ```sh
-python melbourne/geometry_revision.py melbourne/melbourne-v040-rail-and-trams.save /tmp/melbourne-revised.save
+python melbourne/geometry_revision.py australia/archive/melbourne/melbourne-v040-rail-and-trams.save /tmp/melbourne-revised.save
 python melbourne/validate_metro.py /tmp/melbourne-revised.save --city-loops --trams --tram-upgrades
 ```
 

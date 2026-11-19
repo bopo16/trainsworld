@@ -1,6 +1,6 @@
 # Perth Station northeast approach
 
-Import [perth.save](perth.save) through **Load file**. Airport, Ellenbrook, and Fremantle–Midland use the northern pair through McIver and Claisebrook. Armadale and Thornlie–Cockburn use the southern pair. The two platform pairs are linked at McIver and Claisebrook for passenger transfers.
+Import [perth.save](saves/perth.save) through **Load file**. Airport, Ellenbrook, and Fremantle–Midland use the northern pair through McIver and Claisebrook. Armadale and Thornlie–Cockburn use the southern pair. The two platform pairs are linked at McIver and Claisebrook for passenger transfers.
 
 The original save merged those services onto one pair through the stations, then placed several separate game edges on nearly the same geometry. This revision separates the approaches from Perth to the east side of Claisebrook and removes an overlapping duplicate toward East Perth. It also extends the track carrying the Claisebrook and East Perth platforms past the old joints. The grouping represents the parallel corridor in the game and leaves the detailed real-world crossover and platform assignments open.
 

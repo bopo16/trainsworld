@@ -14,6 +14,10 @@ WebAssembly. The city data is built by Python scripts, and the game fetches the 
 Everything is in the `trainworld/` folder (the game was called trainworld while it was built), and the docs write
 paths from this repo's root, so `node trainworld/checks/smoke.mjs` means what it says.
 
+## Australian network saves
+
+The Australian builds are collected on the [australian-city-maps branch](https://github.com/bopo16/trainsworld/tree/australian-city-maps/australia). The [save index](australia/README.md) links to each current network, its report and any editable blueprint.
+
 ## Run it
 
 You need Node 22 or newer, Rust (stable) with the `wasm32-unknown-unknown` target, and wasm-pack 0.15.

@@ -1,6 +1,6 @@
 # Melbourne V/Line and construction blueprint
 
-Load [melbourne-v040-vline.save](melbourne-v040-vline.save) to play or [melbourne-v040-blueprint.save](melbourne-v040-blueprint.save) to edit the full network as a construction plan. The blueprint keeps the track, junctions, stations and transfers with no service lines. It includes the engine's construction quote plus extra cash for edits.
+Load [Melbourne playable save](../australia/saves/melbourne.save) to play or [Melbourne blueprint](../australia/blueprints/melbourne.save) to edit the full network as a construction plan. The blueprint keeps the track, junctions, stations and transfers with no service lines. It includes the engine's construction quote plus extra cash for edits.
 
 This revision starts with the [Melbourne Loop and tram update](LOOP_AND_TRAMS.md) and adds representative V/Line services to Geelong and Waurn Ponds, Warrnambool, Ballarat and Wendouree, Ararat, Bendigo, Echuca, Swan Hill, Seymour, Shepparton, Albury and Bairnsdale. All V/Line services terminate at Southern Cross and avoid the City Loop. Gippsland serves Flinders Street and Richmond on the surface and joins the eastern suburban route at Caulfield. Geelong and Ballarat services share the Regional Rail Link to Deer Park. Warrnambool and Ararat reuse the corresponding trunk routes.
 
@@ -9,9 +9,9 @@ Routes, stops and geometry use a weekday snapshot of the published Transport Vic
 ## Reproduce and verify
 
 ```sh
-python australia/edit_save.py melbourne/melbourne-v040-loop-and-trams.save melbourne/melbourne-v040-vline.save --recipe melbourne/vline-recipe.json
-python melbourne/validate_metro.py melbourne/melbourne-v040-vline.save --city-loops --trams --tram-upgrades --vline
-python australia/edit_save.py melbourne/melbourne-v040-vline.save melbourne/melbourne-v040-blueprint.save --blueprint --home mel
+python australia/edit_save.py australia/archive/melbourne/melbourne-v040-loop-and-trams.save australia/saves/melbourne.save --recipe melbourne/vline-recipe.json
+python melbourne/validate_metro.py australia/saves/melbourne.save --city-loops --trams --tram-upgrades --vline
+python australia/edit_save.py australia/saves/melbourne.save australia/blueprints/melbourne.save --blueprint --home mel
 ```
 
 The native game loader checks 51 running services, including all 24 tram routes and 11 V/Line routes. It also checks that V/Line avoids the City Loop. The validator reports 87 placement warnings, mostly small heading mismatches at stations. Chromium inspection used OpenFreeMap in the geometry view. The game engine reloaded the blueprint and constructed the complete plan with the supplied budget.
