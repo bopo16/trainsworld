@@ -1,5 +1,7 @@
 # Sydney Central, City Circle and CBD Metro
 
+The [track-pair and regional revision](SYDNEY_TRACKS_AND_REGIONAL.md) builds on this save.
+
 Import [sydney-cbd.save](sydney-cbd.save) with **Load file**. This is a geometry revision of the original [Sydney save](sydney.save).
 
 The two suburban Central platforms retain their service assignments and are linked with the Metro platform for transfers. Their southern leads use a simpler alignment through the existing junctions. Both western City Circle approaches follow the bend into the turnout south of Town Hall, as shown by OSM chains 5516 and 6892. The existing eastern leg via Museum, St James and Circular Quay and the route directions through the Circle are preserved.
