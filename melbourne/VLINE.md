@@ -11,10 +11,10 @@ Routes, stops and geometry use a weekday snapshot of the published Transport Vic
 ```sh
 python australia/edit_save.py melbourne/melbourne-v040-loop-and-trams.save melbourne/melbourne-v040-vline.save --recipe melbourne/vline-recipe.json
 python melbourne/validate_metro.py melbourne/melbourne-v040-vline.save --city-loops --trams --tram-upgrades --vline
-python australia/edit_save.py melbourne/melbourne-v040-vline.save melbourne/melbourne-v040-blueprint.save --blueprint
+python australia/edit_save.py melbourne/melbourne-v040-vline.save melbourne/melbourne-v040-blueprint.save --blueprint --home mel
 ```
 
 The native game loader checks 51 running services, including all 24 tram routes and 11 V/Line routes. It also checks that V/Line avoids the City Loop. The validator reports 87 placement warnings, mostly small heading mismatches at stations. Chromium inspection used OpenFreeMap in the geometry view. The game engine reloaded the blueprint and constructed the complete plan with the supplied budget.
 
 - Playable save SHA-256 `6a427cafe871f91e57e3a9a7efc601d97d09b85c5c4c08377ca81dba07510e60`
-- Blueprint SHA-256 `5c97ec45b50a7b5a328ed110383d2bb80b71335e8d291d36d79da81510764962`
+- Blueprint SHA-256 `4dadd7fcbbef31ccc0b8b6ea03915e1247321ea9cce9a8e1bf1bffb4f3575846`
